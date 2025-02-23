@@ -16,19 +16,20 @@ const Customers: React.FC = () => {
       try {
         if (!customersStore.isLoadingData) {
           await customersStore.fetchCustomers();
-          setIsLoading(false)
         }
-        const unsubscribe = customersStore.subscribe(() => setIsLoading(customersStore.isLoadingData));
-        return unsubscribe;
-  
       } catch (error) {
         console.error("Error fetching customers:", error);
-        setIsLoading(false); // In case of an error, stop loading
-    
+        setIsLoading(false);
       }
     };
-    
+  
+    // Subscribe before fetching customers
+    const unsubscribe = customersStore.subscribe(() => setIsLoading(false));
+  
     fetchAndSubscribe();
+  
+    // Cleanup function to unsubscribe when component unmounts
+    return () => unsubscribe();
   }, []);
 
   const handleDelete = async (id: number) => {
