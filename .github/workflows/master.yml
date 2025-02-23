@@ -18,12 +18,12 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts || true
+          ssh-keyscan -p 1221 -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts || true
         shell: bash
 
       - name: Deploy via SSH
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa deployer@${{ secrets.SERVER_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no -p 1221 -i ~/.ssh/id_rsa deployer@${{ secrets.SERVER_IP }} << EOF
           cd /apps/subul-fe
           git pull origin main # Change 'main' to your branch name if needed
           docker-compose down
