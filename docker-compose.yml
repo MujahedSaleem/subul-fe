@@ -19,6 +19,7 @@ services:
       - "traefik.http.routers.subul-FE-https.rule=Host(`subul.saleem-tech.com`)"
       - "traefik.http.routers.subul-FE-https.tls.certresolver=cloudflare"
       - "traefik.http.services.subul-FE.loadbalancer.server.port=80"
+      
 
     networks:
       - traefik_default  # Use the existing Traefik network
@@ -29,4 +30,3 @@ networks:
   traefik_default:
     external: true
   subul-network:
-    internal: true
