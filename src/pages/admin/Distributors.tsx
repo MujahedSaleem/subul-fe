@@ -12,16 +12,26 @@ const Distributors: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   
   useEffect(() => {
+    setIsLoading(true); // Start loading
+  
+    const unsubscribe = distributorsStore.subscribe(() => setIsLoading(false)); // Subscribe first
+  
     const fetchAndSubscribe = async () => {
-      setIsLoading(true);
-      if (!distributorsStore.isLoadingData) {
-        await distributorsStore.fetchDistributors();
+      try {
+        if (!distributorsStore.isLoadingData) {
+          await distributorsStore.fetchDistributors();
+        }
+      } catch (error) {
+        console.error("Error fetching distributors:", error);
+        setIsLoading(false); // Ensure loading stops even if there's an error
       }
-      const unsubscribe = distributorsStore.subscribe(() => setIsLoading(false));
-      return unsubscribe;
     };
+  
     fetchAndSubscribe();
+  
+    return () => unsubscribe(); // Cleanup subscription on unmount
   }, []);
+  
 
   const handleDelete = async (id: string) => {
     if (window.confirm('هل أنت متأكد من حذف هذا الموزع؟')) {

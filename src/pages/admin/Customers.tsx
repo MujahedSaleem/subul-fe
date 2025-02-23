@@ -12,6 +12,8 @@ const Customers: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   
   useEffect(() => {
+    const unsubscribe = customersStore.subscribe(() => setIsLoading(false));
+
     const fetchAndSubscribe = async () => {
       try {
         if (!customersStore.isLoadingData) {
@@ -23,12 +25,9 @@ const Customers: React.FC = () => {
       }
     };
   
-    // Subscribe before fetching customers
-    const unsubscribe = customersStore.subscribe(() => setIsLoading(false));
   
     fetchAndSubscribe();
   
-    // Cleanup function to unsubscribe when component unmounts
     return () => unsubscribe();
   }, []);
 

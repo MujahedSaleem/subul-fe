@@ -25,27 +25,39 @@ const Orders: React.FC = () => {
   const [activeDistributors, setActiveDistributors] = useState<Distributor[]>([]);
 
   useEffect(() => {
-    const fetchAndSubscribe = async () => {
-      setIsLoading(true);
-      if (!distributorsStore.isLoadingData) {
-        await distributorsStore.fetchDistributors();
-        setActiveDistributors(distributorsStore.distributors.filter(d => d.isActive));
-      }
-      if (!ordersStore.isLoadingData) {
-        await ordersStore.fetchOrders();
-      }
-
+    setIsLoading(true); // Start loading
     
-
-      const unsubscribe = ordersStore.subscribe(() => {
-        setIsLoading(false);
-      });
-
-      return unsubscribe;
+    // Subscribe before fetching to ensure UI updates properly
+    const unsubscribeOrders = ordersStore.subscribe(() => setIsLoading(false));
+    const unsubscribeDistributors = distributorsStore.subscribe(() => {
+      setActiveDistributors(distributorsStore.distributors.filter(d => d.isActive));
+    });
+  
+    const fetchData = async () => {
+      try {
+        if (!distributorsStore.isLoadingData) {
+          await distributorsStore.fetchDistributors();
+          setActiveDistributors(distributorsStore.distributors.filter(d => d.isActive));
+        }
+  
+        if (!ordersStore.isLoadingData) {
+          await ordersStore.fetchOrders();
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setIsLoading(false); // Ensure loading state is reset in case of failure
+      }
     };
-
-    fetchAndSubscribe();
+  
+    fetchData();
+  
+    return () => {
+      unsubscribeOrders(); 
+      unsubscribeDistributors(); // Cleanup subscriptions when component unmounts
+    };
   }, []);
+  
 
   const handleDelete = async (id: number) => {
     if (window.confirm('هل أنت متأكد من حذف هذا الطلب؟')) {
