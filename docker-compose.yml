@@ -6,8 +6,6 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: always
-    ports:
-      - "8000:80"
     labels:
       - "traefik.enable=true"
 
@@ -23,11 +21,12 @@ services:
       - "traefik.http.services.subul-FE.loadbalancer.server.port=80"
 
     networks:
-      # - traefik_default  # Use the existing Traefik network
+      - traefik_default  # Use the existing Traefik network
       - subul-network
 
 
 networks:
-  # traefik_default:
-  #   external: true
+  traefik_default:
+    external: true
   subul-network:
+    internal: true
