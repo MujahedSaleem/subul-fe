@@ -1,0 +1,33 @@
+services:
+  react-vite-app:
+    image: subul-fe:v1
+    container_name: subul-fe
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "8000:80"
+    labels:
+      - "traefik.enable=true"
+
+      # HTTP Router (Redirect HTTP to HTTPS)
+      - "traefik.http.routers.subul-FE-http.entrypoints=web"
+      - "traefik.http.routers.subul-FE-http.rule=Host(`subul.saleem-tech.com`)"
+      - "traefik.http.routers.subul-FE-http.middlewares=redirect-web-to-websecure@internal"
+
+      # HTTPS Router
+      - "traefik.http.routers.subul-FE-https.entrypoints=websecure"
+      - "traefik.http.routers.subul-FE-https.rule=Host(`subul.saleem-tech.com`)"
+      - "traefik.http.routers.subul-FE-https.tls.certresolver=cloudflare"
+      - "traefik.http.services.subul-FE.loadbalancer.server.port=80"
+
+    networks:
+      # - traefik_default  # Use the existing Traefik network
+      - subul-network
+
+
+networks:
+  # traefik_default:
+  #   external: true
+  subul-network:
