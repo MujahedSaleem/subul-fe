@@ -32,8 +32,6 @@ COPY nginx.conf /etc/nginx/nginx.conf
 # Copy production dependencies and build artifacts
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Expose port 80 (default HTTP port)
-EXPOSE 80
 
 # Start Nginx
 CMD ["nginx", "-g", "daemon off;"]
