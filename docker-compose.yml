@@ -30,3 +30,4 @@ networks:
   traefik_default:
     external: true
   subul-network:
+    external: true
