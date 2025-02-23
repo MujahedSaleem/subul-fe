@@ -6,7 +6,7 @@ class CustomersStore {
   private static instance: CustomersStore;
   private _customers: Customer[] = [];
   private listeners: (() => void)[] = [];
-  private isFetching: boolean = false; // ✅ Prevent duplicate API calls
+  private _isLoading: boolean = false; // ✅ Prevent duplicate API calls
 
   private constructor() {}
 
@@ -16,14 +16,16 @@ class CustomersStore {
     }
     return CustomersStore.instance;
   }
-
+  get isLoadingData(): boolean {
+    return this._isLoading;
+  }
   get customers(): Customer[] {
     return this._customers;
   }
 
   async fetchCustomers() {
-    if (this.isFetching ) return; // ✅ Prevent multiple fetch calls
-    this.isFetching = true;
+    if (this._isLoading ) return; // ✅ Prevent multiple fetch calls
+    this._isLoading = true;
 
     try {
       const response = await axiosInstance.get<Customer[]>("/customers");
@@ -32,7 +34,7 @@ class CustomersStore {
     } catch (error) {
       console.error("Error fetching customers:", error);
     } finally {
-      this.isFetching = false;
+      this._isLoading = false;
     }
   }
 
