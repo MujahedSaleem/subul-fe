@@ -13,7 +13,6 @@ const Customers: React.FC = () => {
   
   useEffect(() => {
     const fetchAndSubscribe = async () => {
-      setIsLoading(true);
       if (!customersStore.isLoadingData) {
         await customersStore.fetchCustomers();
       }
