@@ -13,12 +13,20 @@ const Customers: React.FC = () => {
   
   useEffect(() => {
     const fetchAndSubscribe = async () => {
-      if (!customersStore.isLoadingData) {
-        await customersStore.fetchCustomers();
+      try {
+        if (!customersStore.isLoadingData) {
+          await customersStore.fetchCustomers();
+        }
+        const unsubscribe = customersStore.subscribe(() => setIsLoading(customersStore.isLoadingData));
+        return unsubscribe;
+  
+      } catch (error) {
+        console.error("Error fetching customers:", error);
+        setIsLoading(false); // In case of an error, stop loading
+    
       }
-      const unsubscribe = customersStore.subscribe(() => setIsLoading(false));
-      return unsubscribe;
     };
+    
     fetchAndSubscribe();
   }, []);
 
