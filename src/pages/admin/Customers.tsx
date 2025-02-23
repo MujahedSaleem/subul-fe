@@ -16,6 +16,7 @@ const Customers: React.FC = () => {
       try {
         if (!customersStore.isLoadingData) {
           await customersStore.fetchCustomers();
+          setIsLoading(false)
         }
         const unsubscribe = customersStore.subscribe(() => setIsLoading(customersStore.isLoadingData));
         return unsubscribe;
