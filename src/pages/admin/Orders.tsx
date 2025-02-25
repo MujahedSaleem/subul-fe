@@ -96,10 +96,12 @@ const Orders: React.FC = () => {
       const [latitude, longitude] = location.coordinates.split(',').map(coord => coord.trim());
 
       if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-        window.location.href = `geo:${latitude},${longitude}`;
-      } else {
-        window.open(`https://www.google.com/maps?q=${latitude},${longitude}`, '_blank');
-      }
+        const googleMapsUrl = `geo:0,0?q=${encodeURIComponent(latitude)},${encodeURIComponent(longitude)}`;
+        window.location.href = googleMapsUrl;
+          } else {
+        const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(latitude)},${encodeURIComponent(longitude)}`;
+        window.open(url, '_blank');
+            }
     } else {
       alert('لا توجد إحداثيات متوفرة لهذا الموقع');
     }
