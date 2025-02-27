@@ -44,4 +44,45 @@ export const normalizePhoneNumber = (phone: string): string => {
 
   return phone;
 };
+export function extractAndNormalizeLocalPhoneNumber(input: string): string | null {
+  // Step 1: Remove all non-numeric characters except '+' and Arabic numerals
+  const cleanedInput = Array.from(input)
+    .map(char => arabicToLatinMap[char] || char) // Convert Arabic numerals to Latin
+    .join('')
+    .replace(/[^+\d]/g, ''); // Remove all non-numeric characters except '+'
+
+  // Step 2: Extract potential phone numbers using regex
+  const phoneRegex = /(\+?\d+)/g; // Matches phone numbers with or without '+'
+  const matches = cleanedInput.match(phoneRegex);
+
+  if (!matches || matches.length === 0) {
+    return null; // No valid phone number found
+  }
+
+  // Step 3: Normalize the extracted phone numbers
+  const normalizedNumbers = matches.map(number => {
+    // Replace country codes (+970, +972, 970, 972, 00970, 00972) with '0'
+    const countryCodes = ['+970', '+972', '970', '972', '00970', '00972'];
+    for (const code of countryCodes) {
+      if (number.startsWith(code)) {
+        number = '0' + number.substring(code.length); // Replace with '0'
+        break;
+      }
+    }
+    return number;
+  });
+
+  // Step 4: Return the first valid phone number (or null if none are valid)
+  const result = normalizedNumbers[0].replace(/\D/g, ''); // Remove any remaining non-digit characters
+  return result.length > 0 ? result : null;
+}
+
+// Helper function: Map Arabic numerals to Latin numerals
+const arabicToLatinMap: { [key: string]: string } = {
+  '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+  '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
+};
+export const isValidPhoneNumber = (phoneNumber: string) => {
+  return /^(09|05|04)\d{7,8}$/.test(phoneNumber)
+}
 

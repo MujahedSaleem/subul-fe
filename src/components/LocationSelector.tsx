@@ -32,9 +32,8 @@ const LocationSelector = forwardRef<LocationSelectorRef, LocationSelectorProps>(
     const [isAddingGPSLocation, setIsAddingGPSLocation] = useState(false);
     const [gpsLocation, setGpsLocation] = useState<{ coordinates: string; description: string } | undefined>(undefined);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const inputRef = useRef<HTMLInputElement>(null);
     const childRef = useRef<any>(null);
-
+    const [gpsLocationName, setGpsLocationName]  = useState('')
     // Use useImperativeHandle to expose methods to the parent
     useImperativeHandle(ref, () => ({
       resetState: () => {
@@ -44,7 +43,9 @@ const LocationSelector = forwardRef<LocationSelectorRef, LocationSelectorProps>(
       },
       activateGpsLocation: async () =>{
         await handleGetCurrentLocation()
-      }
+      },
+      setNewLocationName:  setNewLocationName,
+      getNewLocationName: gpsLocationName
     }));
 
     const buildOptions = () => {
@@ -65,28 +66,32 @@ const LocationSelector = forwardRef<LocationSelectorRef, LocationSelectorProps>(
       }
     }, [isNewCustomer]);
 
-    const setNewLocationName = (newLocationName: string) => {
+  const setNewLocationName = (newLocationName: string) => {
       if (gpsLocation) {
-        setOrder((prev) => ({
-          ...prev,
-          customer: {
-            ...prev.customer,
-            locations: [
-              ...(prev.customer?.locations ?? []),
-              {
-                id: 0,
-                name: newLocationName,
-                coordinates: gpsLocation.coordinates,
-                description: gpsLocation.description,
-              },
-            ],
-          },
-          LocationId: 0,
-        }));
+        const newLocation = {
+          id: 0, // ID for a new location
+          name: newLocationName,
+          coordinates: gpsLocation.coordinates,
+          description: gpsLocation.description,
+        };
+        setOrder((prev) => {
+          const updatedOrder ={
+            ...prev,
+            customer: {
+              ...prev.customer,
+              locations: [...(prev.customer?.locations ?? []), newLocation],
+            },
+            location: newLocation, // Ensure this is updated
+          };
+          return updatedOrder;
+      });
+    
+    
         setIsAddingLocation(false);
         setIsAddingGPSLocation(false);
       }
     };
+    
 
     const handleGetCurrentLocation = async () => {
       try {
@@ -133,9 +138,10 @@ const LocationSelector = forwardRef<LocationSelectorRef, LocationSelectorProps>(
       !disabled && (
         <div className="flex flex-col">
           <label className="text-sm font-medium text-slate-700">الموقع</label>
-          {!isAddingLocation ? (
+          {!isAddingLocation &&customer?.locations?.length   ? (
             <Select
-              value={order?.location?.id || ""}
+            key={JSON.stringify(customer?.locations)} // Force re-render when locations change
+              value={order?.location?.id}
               onChange={(e) => {
                 setOrder((prev) => ({ ...prev, location: { id: e } }));
               }}
@@ -150,19 +156,14 @@ const LocationSelector = forwardRef<LocationSelectorRef, LocationSelectorProps>(
               {isAddingGPSLocation && (
                 <div>
                   <Input
-                    inputRef={inputRef}
                     type="text"
                     className="block w-full pr-10 pl-3 py-2.5 border border-slate-200 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                     placeholder="أدخل اسم الموقع"
+                    value={gpsLocationName}
+                    onChange={e => setGpsLocationName(e.target.value)}
+                    required 
                     autoFocus
                   />
-                  <IconButton
-                    icon={faCheck}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      setNewLocationName(inputRef.current?.value ?? "");
-                    }}
-                  ></IconButton>
                 </div>
               )}
             </>

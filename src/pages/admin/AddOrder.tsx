@@ -61,7 +61,11 @@ const AddOrder: React.FC = () => {
     try {
       // Validate the order before submission
       if (!order.customer || !order.location || !order.cost || !order.distributor) {
-        throw new Error('يرجى تعبئة جميع الحقول المطلوبة.');
+        dispatch({
+          type: 'SET_ERROR',
+          payload: errorMessage || 'يرجى تعبئة جميع الحقول المطلوبة.',
+        });
+        return 
       }
       let newCustomer = null;
       if (!order.customer?.id)

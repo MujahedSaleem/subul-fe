@@ -52,6 +52,14 @@ const DistributorSelector: React.FC<DistributorSelectorProps> = ({
       <label htmlFor="distributor" className="text-sm font-medium text-slate-700">
         الموزع
       </label>
+        {/* Hidden input to enforce required validation */}
+        <input 
+                type="text" 
+                value={order?.distributor?.id} 
+                required 
+                onChange={() => {}} // Prevent React warning
+                style={{ display: "none" }} 
+            />
       <Select
         id="distributor"
         value={order?.distributor?.id || ''}
@@ -61,16 +69,18 @@ const DistributorSelector: React.FC<DistributorSelectorProps> = ({
             distributor: { ...prev.distributor, id: e }
           }));
         }}
-        className="block w-full pr-10 pl-3 py-2.5 border border-slate-200 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
-        required={!disabled}
         disabled={disabled}
         label='اختر الموزع'
+        className="block w-full pr-10 pl-3 py-2.5 border border-slate-200 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+        placeholder={undefined}
+
       >
         {activeDistributors.map(distributor => (
           <Option key={distributor.id} value={distributor.id}>
             {`${distributor.firstName} ${distributor.lastName}`}
           </Option>
         ))}
+        
       </Select>
     </div>
   );

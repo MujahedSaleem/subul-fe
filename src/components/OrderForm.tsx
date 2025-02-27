@@ -10,6 +10,7 @@ import DistributorSelector from './DistributorSelector';
 import CostInput from './CostInput';
 import { Customer } from '../types/customer';
 import { useNavigate } from 'react-router-dom';
+import { isValidPhoneNumber } from '../utils/formatters';
 
 interface OrderFormProps {
   order: OrderList;
@@ -34,9 +35,10 @@ const OrderForm: React.FC<OrderFormProps> = ({
    const navigate = useNavigate();
   const locationRef = React.useRef(null);
   useEffect(() => {
+    console.log(order?.customer?.phone)
     setIsSearching(true);
 
-      if (order?.customer?.phone && order?.customer?.phone?.length === 10 && /^05\d{8}$/.test(order?.customer?.phone)) {
+      if (order?.customer?.phone && isValidPhoneNumber(order?.customer?.phone)) {
         const existingCustomer = customersStore.customers.find(c => c.phone === order?.customer?.phone);
         if (existingCustomer) {
           setIsNewCustomer(false);
@@ -54,11 +56,16 @@ const  handleSubmit = (e) =>{
   setLoading(true)
 
   e.preventDefault();
-  if(order?.location?.id === undefined){
+  if (locationRef?.current?.getNewLocationName && order?.location?.id  === undefined){
+    locationRef.current.setNewLocationName(locationRef?.current?.getNewLocationName)
+    setLoading(false);
+    return; // Prevent calling onSubmit immediately
+
+  }else if(order?.location?.id === undefined){
     locationRef?.current?.activateGpsLocation();
     setLoading(false)
     return
-  }
+  } 
   onSubmit(e);
 }
  
