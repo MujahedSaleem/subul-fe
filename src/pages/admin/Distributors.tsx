@@ -1,16 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
-import { faPlus, faPenToSquare, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faPenToSquare, faTrash, faKey } from '@fortawesome/free-solid-svg-icons';
 import Button from '../../components/Button';
 import IconButton from '../../components/IconButton';
 import { distributorsStore } from '../../store/distributorsStore';
 import { Card, CardHeader, CardBody, Typography } from '@material-tailwind/react';
+import ChangePasswordModal from '../../components/admin/shared/ChangePasswordModal';
 
 const Distributors: React.FC = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  
+  const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState<boolean>(false);
+  const [selectedDistributorId, setSelectedDistributorId] = useState<string | null>(null);
+
   useEffect(() => {
     setIsLoading(true); // Start loading
   
@@ -31,8 +34,19 @@ const Distributors: React.FC = () => {
   
     return () => unsubscribe(); // Cleanup subscription on unmount
   }, []);
-  
-
+  const handleSavePassword = async (oldPassword: string, newPassword: string, confirmPassword: string) => {
+    if (!selectedDistributorId) return { status: 400, error: 'No distributor selected' };
+    try {
+      await distributorsStore.changeDistributorPassword(selectedDistributorId, oldPassword, newPassword, confirmPassword);
+      return { status: 200 };
+    } catch (error) {
+      return { status: 500, error: error.message};
+    }
+  };
+  const handleChangePassword = (id: string) => {
+    setSelectedDistributorId(id);
+    setIsChangePasswordModalOpen(true);
+  };
   const handleDelete = async (id: string) => {
     if (window.confirm('هل أنت متأكد من حذف هذا الموزع؟')) {
       setIsLoading(true);
@@ -59,6 +73,7 @@ const Distributors: React.FC = () => {
         <div className="flex items-center gap-2">
           <IconButton onClick={() => navigate(`/admin/distributors/edit/${distributor.id}`)} icon={faPenToSquare} title="تعديل" />
           <IconButton onClick={() => handleDelete(distributor.id)} icon={faTrash} variant="danger" title="حذف" />
+          <IconButton onClick={() => handleChangePassword(distributor.id)} icon={faKey} variant="gradient" title="تغير كلمة السر" />
         </div>
       ),
       className: 'w-32' 
@@ -106,6 +121,12 @@ const Distributors: React.FC = () => {
           </CardBody>
         )}
       </Card>
+      {isChangePasswordModalOpen && (
+        <ChangePasswordModal 
+          onClose={() => setIsChangePasswordModalOpen(false)} 
+          onSave={handleSavePassword} 
+        />
+      )}
     </Layout>
   );
 };

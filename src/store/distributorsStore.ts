@@ -1,7 +1,9 @@
+import { AuthResult } from "../types/authResult";
 import { Distributor } from "../types/distributor";
 import axiosInstance from "../utils/axiosInstance";
 
 class DistributorsStore {
+ 
   private static instance: DistributorsStore;
   private _distributors: Distributor[] = [];
   private isLoading: boolean = false;
@@ -90,6 +92,38 @@ class DistributorsStore {
 
   private notifyListeners() {
     this.listeners.forEach((listener) => listener());
+  }
+  async changeDistributorPassword(
+    selectedDistributorId: string,
+    oldPassword: string,
+    newPassword: string,
+    confirmPassword: string
+  ): Promise<boolean> {
+    try {
+      // Prepare the request payload
+      const passwordUpdateRequest = {
+        userId: selectedDistributorId,
+        oldPassword: oldPassword,
+        newPassword: newPassword,
+        confirmPassword: confirmPassword,
+      };
+
+      // Send the request to the backend API
+      const response = await axiosInstance.post<AuthResult>(
+        "/auth/updatePassword",
+        passwordUpdateRequest
+      );
+
+      // Check if the update was successful
+      if (response.data.succeeded) {
+        return true; // Password updated successfully
+      } else {
+        throw new Error(response.data.error || "Failed to update password");
+      }
+    } catch (error: any) {
+      console.error("Failed to change distributor password:", error.message);
+      throw new Error(error.response?.data?.error || "An error occurred while updating the password.");
+    }
   }
 }
 
