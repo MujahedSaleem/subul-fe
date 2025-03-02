@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
 import { Customer } from '../types/customer';
 import { Input } from '@material-tailwind/react';
-import { customersStore } from '../store/customersStore';
 import { OrderList } from '../types/order';
 
 interface CustomerNameInputProps {
@@ -17,13 +16,7 @@ const CustomerNameInput: React.FC<CustomerNameInputProps> = ({
   isNewCustomer,
   disabled,
 }) => {
-    useEffect(() => {
-      const fetchCustomers = async () => {
-        await customersStore.fetchCustomers();
-      };
-      fetchCustomers();
-    }
-    , []);
+ 
   return (customer?.phone &&
     <div className="flex flex-col">
       <label htmlFor="customerName" className="text-sm font-medium text-slate-700">

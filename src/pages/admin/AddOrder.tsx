@@ -38,7 +38,10 @@ const AddOrder: React.FC = () => {
         newCustomer = await customersStore.updateCustomer(customer);
       if(newCustomer){
         const selectedLocation = newCustomer?.locations?.find(l => l.coordinates === customer.locations[0].coordinates) ;
-        await ordersStore.addOrder({ ...order, customerId:newCustomer?.id, LocationId:selectedLocation?.id, statusString: 'Draft' });
+        await ordersStore.addOrder({ ...order, customerId:newCustomer?.id,
+           LocationId:selectedLocation?.id,
+            statusString: 'Draft',
+          distributorId:order?.distributor?.id});
     }
       // Save the order as a draft before navigating back
 
@@ -81,7 +84,7 @@ const AddOrder: React.FC = () => {
               customerId:newCustomer.id,
               LocationId:selectedLocation?.id,
               cost:order.cost,
-              distributorId:order.distributor.id,      
+              distributorId:order?.distributor?.id,      
             } as OrderRequest;
         
            

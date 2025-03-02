@@ -95,7 +95,7 @@ const DistributorForm: React.FC<DistributorFormProps> = ({
                 onChange={(e) =>
                   setDistributor((prev) => ({
                     ...prev,
-                    isActive: e.target.value === 'Active',
+                    isActive: e === 'Active',
                   }))
                 }
                 className="block w-full pr-10 pl-3 py-2.5 border border-slate-200 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"

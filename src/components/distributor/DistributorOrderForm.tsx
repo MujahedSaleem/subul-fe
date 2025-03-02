@@ -1,18 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import type { OrderList } from '../types/order';
-import { customersStore } from '../store/customersStore';
-import Button from './Button';
-import { faArrowRight, faSave } from '@fortawesome/free-solid-svg-icons';
-import CustomerPhoneInput from './CustomerPhoneInput';
-import CustomerNameInput from './CustomerNameInput';
-import LocationSelector from './LocationSelector';
-import DistributorSelector from './DistributorSelector';
-import CostInput from './CostInput';
-import { Customer } from '../types/customer';
 import { useNavigate } from 'react-router-dom';
-import { isValidPhoneNumber } from '../utils/formatters';
+import { faArrowRight, faSave } from '@fortawesome/free-solid-svg-icons';
+import type { OrderList } from '../../types/order';
+import type { Customer } from '../../types/customer';
+import Button from '../Button';
+import CustomerPhoneInput from '../CustomerPhoneInput';
+import CustomerNameInput from '../CustomerNameInput';
+import LocationSelector from '../LocationSelector';
+import CostInput from '../CostInput';
+import { isValidPhoneNumber } from '../../utils/formatters';
+import { distributorCustomersStore } from '../../store/distributorCustomersStore';
 
-interface OrderFormProps {
+interface DistributorOrderFormProps {
   order: OrderList;
   setOrder: React.Dispatch<React.SetStateAction<OrderList>>;
   onSubmit: (e?: React.FormEvent) => void;
@@ -21,7 +20,7 @@ interface OrderFormProps {
   isEdit?: boolean;
 }
 
-const OrderForm: React.FC<OrderFormProps> = ({
+const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
   order,
   setOrder,
   onSubmit,
@@ -38,20 +37,28 @@ const OrderForm: React.FC<OrderFormProps> = ({
   useEffect(() => {
     setIsSearching(true);
     if (order?.customer?.phone && isValidPhoneNumber(order?.customer?.phone)) {
-      const existingCustomer = customersStore.customers.find(c => c.phone === order?.customer?.phone);
-      if (existingCustomer) {
-        setIsNewCustomer(false);
-        setOrder((prev) => ({
-          ...prev,
-          customer: {
-            ...existingCustomer,
-            locations: [...(prev.customer?.locations || []), ...(existingCustomer?.locations || [])]
+      const findCustomer = async () => {
+        try {
+          const existingCustomer = await distributorCustomersStore.findCustomerByPhone(order?.customer?.phone);
+
+          if (existingCustomer) {
+            setIsNewCustomer(false);
+            setOrder((prev) => ({
+              ...prev,
+              customer: existingCustomer
+            }));
+          } else {
+            setIsNewCustomer(true);
+        
           }
-        }));
-      } else {
-        setIsNewCustomer(true);
-      }
-      setIsSearching(false);
+        } catch (error) {
+          console.error('Error finding customer:', error);
+          setIsNewCustomer(true);
+        } finally {
+          setIsSearching(false);
+        }
+      };
+      findCustomer();
     } else {
       setIsNewCustomer(true);
       setIsSearching(false);
@@ -64,6 +71,10 @@ const OrderForm: React.FC<OrderFormProps> = ({
 
     if (locationRef?.current?.getNewLocationName && order?.location?.id === undefined) {
       locationRef.current.setNewLocationName(locationRef?.current?.getNewLocationName);
+      setLoading(false);
+      return;
+    } else if (order?.location?.id === undefined) {
+      locationRef?.current?.activateGpsLocation();
       setLoading(false);
       return;
     }
@@ -85,26 +96,21 @@ const OrderForm: React.FC<OrderFormProps> = ({
           customer={order?.customer}
           setOrder={setOrder}
           isNewCustomer={isNewCustomer}
-          disabled={isEdit && order.status === 'Confirmed'}
+          disabled={(isEdit && order.status === 'Confirmed') || !isNewCustomer}
         />
       )}
 
-      {!isSearching && (
+      {!isSearching &&order?.customer?.phone && (
         <LocationSelector
           order={order}
           setOrder={setOrder}
           isNewCustomer={isNewCustomer}
-          disabled={(isEdit && order.status === 'Confirmed') || !order?.customer?.name}
+          disabled={isEdit && order.status === 'Confirmed'}
           customer={order?.customer}
           ref={locationRef}
+          isDistributor={true}
         />
       )}
-
-      <DistributorSelector
-        order={order}
-        setOrder={setOrder}
-        disabled={isEdit && order.status === 'Confirmed'}
-      />
 
       <CostInput
         cost={order.cost}
@@ -141,4 +147,4 @@ const OrderForm: React.FC<OrderFormProps> = ({
   );
 };
 
-export default OrderForm;
+export default DistributorOrderForm;

@@ -40,7 +40,6 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
     { path: '/admin/orders', label: 'الطلبات', icon: faBox },
     { path: '/admin/distributors', label: 'الموزعون', icon: faUserCheck },
   ] : [
-    { path: '/distributor', label: 'لوحة التحكم', icon: faGauge },
     { path: '/distributor/orders', label: 'الطلبات', icon: faBox },
   ];
 

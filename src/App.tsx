@@ -10,8 +10,11 @@ import EditOrder from "./pages/admin/EditOrder";
 import Distributors from "./pages/admin/Distributors";
 import AddDistributor from "./pages/admin/AddDistributor";
 import EditDistributor from "./pages/admin/EditDistributor";
-import DistributorOrders from "./pages/distributor/Orders";
+// import DistributorOrders from "./pages/distributor/Orders";
 import EditCustomerPage from "./pages/admin/EditCustomerPage";
+import DistributorEditOrder from "./pages/distributor/DistributorEditOrder";
+import DistributorAddOrder from "./pages/distributor/DistributorAddOrder";
+import DistributorListOrder from "./pages/distributor/DistributorListOrder";
 
 // ✅ Authentication & Role-Based Access
 const isAuthenticated = () => !!localStorage.getItem("accessToken");
@@ -45,6 +48,12 @@ function App() {
           path="/admin"
           element={<ProtectedRoute allowedRoles={["Admin"]}><AdminDashboard /></ProtectedRoute>}
         />
+        {/* Distributor Routes */}
+        <Route path="/distributor" element={<ProtectedRoute allowedRoles={["Distributor"]}><Navigate to="/distributor/orders" replace /></ProtectedRoute>} />
+        <Route path="/distributor/orders" element={<ProtectedRoute allowedRoles={["Distributor"]}><DistributorListOrder /></ProtectedRoute>} />
+        <Route path="/distributor/orders/add" element={<ProtectedRoute allowedRoles={["Distributor"]}><DistributorAddOrder /></ProtectedRoute>} />
+        <Route path="/distributor/orders/edit/:id" element={<ProtectedRoute allowedRoles={["Distributor"]}><DistributorEditOrder /></ProtectedRoute>} />
+
         <Route
           path="/admin/customers"
           element={<ProtectedRoute allowedRoles={["Admin"]}><Customers /></ProtectedRoute>}
@@ -87,10 +96,10 @@ function App() {
           path="/distributor"
           element={<ProtectedRoute allowedRoles={["Distributor"]}><Navigate to="/distributor/orders" replace /></ProtectedRoute>}
         />
-        <Route
+        {/* <Route
           path="/distributor/orders"
           element={<ProtectedRoute allowedRoles={["Distributor"]}><DistributorOrders /></ProtectedRoute>}
-        />
+        /> */}
 
         {/* Default Route - Redirect to Login */}
         <Route path="/" element={<Navigate to="/login" replace />} />
