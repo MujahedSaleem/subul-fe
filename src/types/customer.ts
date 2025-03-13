@@ -11,3 +11,7 @@ export interface Customer {
   phone: string;
   locations: Location[];
 }
+export interface DistributorCreateCustomerRequest extends Customer {
+  locationName: string;
+  coordinates: string;
+}

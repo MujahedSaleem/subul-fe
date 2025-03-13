@@ -1,4 +1,4 @@
-import React, { useState, useEffect, ReactNode } from "react";
+import React, { useState, ReactNode, useRef, useEffect, ReactElement } from "react";
 
 interface OptionProps {
   value: string | number;
@@ -24,35 +24,63 @@ export const Option: React.FC<OptionProps> = ({ value, children, onClick, classN
 interface SearchableDropdownProps {
   value?: string | number;
   onChange: (value: string | number) => void;
-  onAddOption?: (value: string) => void;
   disabled?: boolean;
   className?: string;
   placeholder?: string;
   children: ReactNode;
-  defaultOption?: string;
+  addedOption?:ReactElement<any, any>
 }
 
 export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
   value,
   onChange,
-  onAddOption,
   disabled = false,
   className = "",
   placeholder = "اختر خيارًا",
   children,
-  defaultOption = "أضف الخيار الجديد",
+  addedOption
 }) => {
   const [query, setQuery] = useState("");
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
-  const [selectedLabel, setSelectedLabel] = useState("");
+  const [selectedLabel, setSelectedLabel] = useState(value||""); // Keep track of the selected label separately
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   const options = React.Children.toArray(children) as React.ReactElement<OptionProps>[];
 
   useEffect(() => {
-    const selectedOption = options.find((opt) => opt.props.value === value);
-    setSelectedLabel(selectedOption ? String(selectedOption.props.children) : "");
-  }, [value, options]);
+    const handleClickOutside = (e: MouseEvent) => {
+      if (inputRef.current && !inputRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener("click", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
+
+  useEffect(() => {
+    if(value !== undefined)
+    setSelectedLabel(value)
+
+  }, [value]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setQuery(e.target.value);
+    setIsOpen(true); // Keep dropdown open while typing
+    setSelectedLabel("")
+  };
+
+  const handleSelect = (option: React.ReactElement<OptionProps>) => {
+    if (disabled) return;
+    onChange(option.props.value);
+    setSelectedLabel(String(option.props.children)); // Update visible title
+    setQuery(""); // Clear query input after selection
+    setIsOpen(false);
+  };
 
   const filteredOptions = query.trim()
     ? options.filter((option) =>
@@ -60,16 +88,8 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
       )
     : options;
 
-  const handleSelect = (option: React.ReactElement<OptionProps>) => {
-    if (disabled) return; // Prevent selection when disabled
-    onChange(option.props.value);
-    setSelectedLabel(String(option.props.children));
-    setQuery("");
-    setIsOpen(false);
-  };
-
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (disabled) return; // Prevent key interactions when disabled
+    if (disabled) return;
 
     if (e.key === "ArrowDown") {
       setHighlightedIndex((prev) => (prev + 1) % filteredOptions.length);
@@ -80,14 +100,6 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
     }
   };
 
-  const handleDefaultOptionClick = () => {
-    if (disabled) return;
-    if (query.trim() !== "" && onAddOption) {
-      onAddOption(query.trim()); // Notify parent to add option
-    }
-    setQuery("");
-    setIsOpen(false);
-  };
 
   return (
     <div
@@ -95,47 +107,45 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
       dir="rtl"
     >
       <input
+        ref={inputRef}
         type="text"
-        value={query || selectedLabel}
-        onChange={(e) => setQuery(e.target.value)}
-        onFocus={() => !disabled && setIsOpen(true)}
+        value={query || selectedLabel} // Display query text, not selectedLabel
+        onChange={handleInputChange}
         onKeyDown={handleKeyDown}
+        onClick={()=>setIsOpen(true)}
         placeholder={placeholder}
+        className="block w-full p-2 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
         disabled={disabled}
-        className={`w-full border-2 rounded-md py-3 px-4 text-right bg-white border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 ${
-          disabled
-            ? "bg-gray-100 cursor-not-allowed border-gray-300"
-            : "bg-white hover:border-blue-500 focus:ring-blue-500"
-        }`}
       />
+
       {isOpen && !disabled && (
-        <ul
-          className="absolute w-full bg-white border-2 border-gray-300 rounded-md mt-1 max-h-48 overflow-y-auto shadow-lg z-10 text-right"
-          role="listbox"
-        >
-          {filteredOptions.length > 0 ? (
-            filteredOptions.map((option, index) => (
-              <Option
-                key={option.props.value}
-                value={option.props.value}
-                onClick={() => handleSelect(option)}
-                className={`cursor-pointer text-sm py-2 rounded-md ${
-                  highlightedIndex === index ? "bg-blue-600 text-white" : "hover:bg-blue-100"
-                }`}
+        <div id="dropdownSearch" className="z-10 bg-white rounded-lg shadow-sm w-60 dark:bg-gray-700 mt-2 absolute">
+          <ul className="h-48 px-3 pb-3 overflow-y-auto text-sm text-gray-700 dark:text-gray-200"          >
+            {addedOption}
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((option, index) => (
+                <Option
+                  key={option.props.value}
+                  value={option.props.value}
+                  onClick={() => handleSelect(option)}
+                  className={`cursor-pointer text-sm py-2 rounded-md ${
+                    highlightedIndex === index ? "bg-blue-600 text-white" : "hover:bg-blue-100"
+                  }`}
+                >
+                  {option.props.children}
+                </Option>
+              ))
+            ) : (
+              <li
+                className="px-4 py-2 text-gray-500 cursor-pointer rounded-md hover:bg-gray-100"
               >
-                {option.props.children}
-              </Option>
-            ))
-          ) : (
-            <li
-              className="px-4 py-2 text-gray-500 cursor-pointer rounded-md hover:bg-gray-100"
-              onClick={handleDefaultOptionClick}
-            >
-              {defaultOption} "{query}"
-            </li>
-          )}
-        </ul>
+                لا يوجد مواقع
+              </li>
+            )}
+          </ul>
+        </div>
       )}
     </div>
   );
 };
+

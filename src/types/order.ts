@@ -5,7 +5,7 @@ export interface OrderRequest {
   id: number;
   orderNumber: string;
   customerId?: string;
-  LocationId: number|undefined;
+  locationId: number|undefined;
   cost: number;
   statusString: 'New' | 'Pending' | 'Confirmed' | 'Draft';
   distributorId?: string;

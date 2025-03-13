@@ -1,68 +1,56 @@
-import axios from "axios";
+import axios from 'axios';
 
-// Read API base URL from Vite environment variables
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-
-console.log("API Base URL:", API_BASE_URL);
 
 // Create an Axios instance
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
   headers: {
-    "Content-Type": "application/json",
+    'Content-Type': 'application/json',
   },
-  withCredentials: true, // Ensure cookies are sent if needed
 });
 
-// ✅ Prevent multiple redirects by using a flag
-let isRedirecting = false;
-
-// ✅ Request Interceptor - Add Authorization Header
+// Interceptor to add access token to headers
 axiosInstance.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("accessToken");
-    if (token && config.url !== "/auth/login") {
-      config.headers["Authorization"] = `Bearer ${token}`;
+    const accessToken = localStorage.getItem('accessToken');
+    if (accessToken) {
+      config.headers['Authorization'] = `Bearer ${accessToken}`;
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    return Promise.reject(error);
+  }
 );
 
-// ✅ Response Interceptor - Handle Unauthorized & Redirects
+// Interceptor to handle token expiration and refresh
 axiosInstance.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response) {
-      const { status, request } = error.response;
-      const redirectUrl = request?.responseURL;
+  async (error) => {
+    const originalRequest = error.config;
 
-      // Check if already on the login page to prevent infinite loop
-      if (window.location.pathname === "/login") {
-        return Promise.reject(error);
-      }
+    // If the error is due to an expired token
+    if (error.response.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
 
-      // Detect backend redirecting to `/Account/Login`
-      if ((status === 302 || status === 404) && redirectUrl?.includes("/Account/Login")) {
-        console.warn("Unauthorized - Redirecting to /login");
+      // Attempt to refresh the token
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (refreshToken) {
+        try {
+          const response = await axios.post(`${API_BASE_URL}/auth/refreshToken`, { refreshToken });
 
-        if (!isRedirecting) {
-          isRedirecting = true;
-          localStorage.removeItem("accessToken");
-          localStorage.removeItem("userType");
-          window.location.href = "/login";
-        }
-      }
-
-      // Handle standard 401 Unauthorized
-      if (status === 401) {
-        console.warn("401 Unauthorized - Redirecting to login");
-
-        if (!isRedirecting) {
-          isRedirecting = true;
-          localStorage.removeItem("accessToken");
-          localStorage.removeItem("userType");
-          window.location.href = "/login";
+          // If refresh is successful, update the access token and retry the original request
+          const { accessToken } = response.data;
+          localStorage.setItem('accessToken', accessToken);
+          originalRequest.headers['Authorization'] = `Bearer ${accessToken}`;
+          return axios(originalRequest);
+        } catch (refreshError) {
+          // Handle refresh token failure (e.g., log the user out)
+          console.error('Token refresh failed', refreshError);
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          window.location.href = '/login'; // Redirect to login page
         }
       }
     }
@@ -70,5 +58,6 @@ axiosInstance.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
 
 export default axiosInstance;

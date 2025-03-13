@@ -36,17 +36,15 @@ const OrderForm: React.FC<OrderFormProps> = ({
   const locationRef = React.useRef(null);
 
   useEffect(() => {
+   const findCustomer = async () => {
     setIsSearching(true);
     if (order?.customer?.phone && isValidPhoneNumber(order?.customer?.phone)) {
-      const existingCustomer = customersStore.customers.find(c => c.phone === order?.customer?.phone);
-      if (existingCustomer) {
+          const existingCustomer = await customersStore.findCustomerByPhone(order?.customer?.phone);
+      if (existingCustomer !== undefined && existingCustomer !== null) {
         setIsNewCustomer(false);
         setOrder((prev) => ({
           ...prev,
-          customer: {
-            ...existingCustomer,
-            locations: [...(prev.customer?.locations || []), ...(existingCustomer?.locations || [])]
-          }
+          customer: existingCustomer
         }));
       } else {
         setIsNewCustomer(true);
@@ -56,6 +54,8 @@ const OrderForm: React.FC<OrderFormProps> = ({
       setIsNewCustomer(true);
       setIsSearching(false);
     }
+   }
+   findCustomer()
   }, [order?.customer?.phone]);
 
   const handleSubmit = async (e: React.FormEvent) => {

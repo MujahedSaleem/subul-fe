@@ -1,12 +1,12 @@
 import React from 'react';
-import { faPhone, faLocationDot, faPenToSquare, faCircleCheck, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faPhone, faLocationDot, faPenToSquare, faCircleCheck } from '@fortawesome/free-solid-svg-icons';
 import IconButton from '../../IconButton';
 import type { OrderList } from '../../../types/order';
 
 interface OrdersTableProps {
   orders: OrderList[];
   onEdit: (order: number) => void;
-  onConfirm: (orderId:number) => void;
+  onConfirm: (order:OrderList) => void;
   onDelete?: (orderId: number) => void;
   onCall: (customerName: string) => void;
   onLocation: (customerName: string) => void;
@@ -35,7 +35,7 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
           <tbody>
             {orders?.map((order) => {
               const customer = order?.customer;
-              const hasLocation = customer?.locations?.some(loc => loc.coordinates);
+              const hasLocation = order?.location?.coordinates;
               
               return (
                 <tr key={order.id}>
@@ -46,7 +46,7 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
                           onClick={() => onCall(customer?.phone)}
                           icon={faPhone}
                           variant="info"
-                          size="sm"
+                          size="md"
                           title="اتصال بالعميل"
                         />
                         {hasLocation && (
@@ -54,7 +54,7 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
                             onClick={() => onLocation(order?.location?.coordinates)}
                             icon={faLocationDot}
                             variant="primary"
-                            size="sm"
+                            size="md"
                             title="فتح الموقع"
                           />
                         )}
@@ -62,16 +62,16 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
                           onClick={() => onEdit(order?.id)}
                           icon={faPenToSquare}
                           variant="primary"
-                          size="sm"
+                          size="md"
                           title="تعديل"
                         />
                       </div>
                       <div className="flex items-center gap-1">
                         <IconButton 
-                          onClick={() => onConfirm(order?.id)}
+                          onClick={() => onConfirm(order)}
                           icon={faCircleCheck}
                           variant="success"
-                          size="sm"
+                          size="md"
                           title="تأكيد الطلب"
                         />
                      

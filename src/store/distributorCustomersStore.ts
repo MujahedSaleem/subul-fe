@@ -1,5 +1,5 @@
 import axiosInstance from "../utils/axiosInstance";
-import { Customer } from "../types/customer";
+import { Customer, DistributorCreateCustomerRequest } from "../types/customer";
 import { OrderList, OrderRequest } from "../types/order";
 
 export class DistributorCustomersStore {
@@ -42,7 +42,7 @@ export class DistributorCustomersStore {
     }
   }
 
-  async addCustomer(customer: Partial<Customer>) {
+  async addCustomer(customer: Partial<DistributorCreateCustomerRequest>) {
     try {
       const response = await axiosInstance.post<Customer>("/distributors/customers", customer);
       this._customers = [...this._customers, response.data];

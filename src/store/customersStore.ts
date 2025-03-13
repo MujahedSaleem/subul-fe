@@ -3,6 +3,7 @@ import { Customer } from "../types/customer";
 
 class CustomersStore {
 
+
   private static instance: CustomersStore;
   private _customers: Customer[] = [];
   private listeners: (() => void)[] = [];
@@ -22,7 +23,20 @@ class CustomersStore {
   get customers(): Customer[] {
     return this._customers;
   }
+  async findCustomerByPhone(phone: string) {
+    if (this._isLoading ) return; // ✅ Prevent multiple fetch calls
+    this._isLoading = true;
 
+    try {
+      const response = await axiosInstance.get<Customer[]>("/customers/filter", {params:{phone:phone}});
+      this._customers = [...this._customers, ...response.data];
+      this.notifyListeners();
+      return response.data[0]
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+    } finally {
+      this._isLoading = false;
+    }  }
   async fetchCustomers() {
     if (this._isLoading ) return; // ✅ Prevent multiple fetch calls
     this._isLoading = true;

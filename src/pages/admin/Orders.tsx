@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { faPlus } from '@fortawesome/free-solid-svg-icons';
 import { Card, CardBody, CardHeader, Typography } from '@material-tailwind/react';
 import CallModal from '../../components/admin/shared/CallModal';
 import { distributorsStore } from '../../store/distributorsStore';
@@ -25,7 +24,6 @@ const Orders: React.FC = () => {
   const [activeDistributors, setActiveDistributors] = useState<Distributor[]>([]);
 
   useEffect(() => {
-    setIsLoading(true); // Start loading
     
     // Subscribe before fetching to ensure UI updates properly
     const unsubscribeOrders = ordersStore.subscribe(() => setIsLoading(false));
@@ -34,10 +32,11 @@ const Orders: React.FC = () => {
     });
   
     const fetchData = async () => {
+      setIsLoading(true); // Ensure loading state is reset in case of failure
+
       try {
         if (!distributorsStore.isLoadingData) {
           await distributorsStore.fetchDistributors();
-          setActiveDistributors(distributorsStore.distributors.filter(d => d.isActive));
         }
   
         if (!ordersStore.isLoadingData) {
@@ -45,8 +44,6 @@ const Orders: React.FC = () => {
         }
       } catch (error) {
         console.error("Error fetching data:", error);
-      } finally {
-        setIsLoading(false); // Ensure loading state is reset in case of failure
       }
     };
   
@@ -54,7 +51,7 @@ const Orders: React.FC = () => {
   
     return () => {
       unsubscribeOrders(); 
-      unsubscribeDistributors(); // Cleanup subscriptions when component unmounts
+      unsubscribeDistributors(); 
     };
   }, []);
   
@@ -109,9 +106,8 @@ const Orders: React.FC = () => {
 
   const filteredOrders = ordersStore.orders.filter(order => {
     let matches = true;
-
     if (selectedDistributor) {
-      matches = matches && order.distributor.id === selectedDistributor;
+      matches = matches && order?.distributor?.id === selectedDistributor;
     }
 
     if (order.status === 'Confirmed' && order.confirmedAt) {

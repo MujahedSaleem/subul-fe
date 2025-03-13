@@ -12,10 +12,13 @@ import { distributorCustomersStore } from '../../store/distributorCustomersStore
 import DistributorHeader from '../../components/distributor/shared/DistributorHeader';
 import { isValidPhoneNumber } from '../../utils/formatters';
 import Layout from '../../components/Layout';
+import { useAuth } from '../../context/AuthContext';
+import { OrderList } from '../../types/order';
 
 const DistributorListOrder: React.FC = () => {
   const navigate = useNavigate();
   const { dispatch } = useError();
+  const { logout } = useAuth();  // Access logout function from context
   const [isCallModalOpen, setIsCallModalOpen] = useState(false);
   const [selectedCustomerPhone, setSelectedCustomerPhone] = useState('');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -48,8 +51,7 @@ const DistributorListOrder: React.FC = () => {
   }, []); // Empty dependency array ensures this runs only on mount
 
   const handleLogout = () => {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('userType');
+    logout();
     navigate('/login');
   };
 
@@ -81,12 +83,9 @@ const DistributorListOrder: React.FC = () => {
     }
   };
 
-  const handleOpenLocation = (customerName: string) => {
-    const customer = distributorCustomersStore.customers.find(c => c.name === customerName);
-    const location = customer?.locations.find(loc => loc.coordinates);
-    
-    if (location?.coordinates) {
-      const [latitude, longitude] = location.coordinates.split(',').map(coord => coord.trim());
+  const handleOpenLocation = (coordinates: string) => {
+    if (coordinates) {
+      const [latitude, longitude] = coordinates.split(',').map(coord => coord.trim());
       
       if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
         const googleMapsUrl = `geo:0,0?q=${encodeURIComponent(latitude)},${encodeURIComponent(longitude)}`;
@@ -101,9 +100,13 @@ const DistributorListOrder: React.FC = () => {
   };
 
 
-  const handleConfirmOrder = async (orderId: number) => {
+  const handleConfirmOrder = async (order: OrderList) => {
     try {
-      await distributorCustomersStore.confirmOrder(orderId);
+      if(!order?.cost || !order?.customer?.id || !order?.location?.id) {
+        dispatch({ type: 'SET_ERROR', payload: 'الطلب غير صالح' });
+        return;
+      }
+      await distributorCustomersStore.confirmOrder(order?.id);
       setIsLoading(true)
       await distributorCustomersStore.fetchOrders();
     } catch (error) {

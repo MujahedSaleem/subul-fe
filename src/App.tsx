@@ -15,33 +15,26 @@ import EditCustomerPage from "./pages/admin/EditCustomerPage";
 import DistributorEditOrder from "./pages/distributor/DistributorEditOrder";
 import DistributorAddOrder from "./pages/distributor/DistributorAddOrder";
 import DistributorListOrder from "./pages/distributor/DistributorListOrder";
+import { ProtectedRoute } from "./components/authGuard";
+import { useAuth } from "./context/AuthContext";
 
 // ✅ Authentication & Role-Based Access
-const isAuthenticated = () => !!localStorage.getItem("accessToken");
-const getUserRole = () => localStorage.getItem("userType") || "";
 
 // ✅ Protected Route Component
-const ProtectedRoute = ({ children, allowedRoles }: { children: JSX.Element; allowedRoles: string[] }) => {
-  const loggedIn = isAuthenticated();
-  const userRole = getUserRole();
+const RoleBasedRedirect = () => {
+  const { userType } = useAuth(); // Get user info from AuthContext
 
-  if (!loggedIn) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (!allowedRoles.includes(userRole)) {
-    return <Navigate to="/" replace />;
-  }
-
-  return children;
+  if (!userType) return <Login></Login>;
+  if (userType === "Admin") return <Navigate to="/admin" replace />;
+  if (userType === "Distributor") return <Navigate to="/distributor/orders" replace />;
+  
+  return <Navigate to="/login" replace />; // Fallback
 };
-
 function App() {
   return (
-    <Router>
       <Routes>
         {/* Public Route */}
-        <Route path="/login" element={<Login />} />
+        <Route path="/login" element={<RoleBasedRedirect />} />
 
         {/* Admin Routes - Only accessible to Admin users */}
         <Route
@@ -102,9 +95,8 @@ function App() {
         /> */}
 
         {/* Default Route - Redirect to Login */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<RoleBasedRedirect />} />
       </Routes>
-    </Router>
   );
 }
 

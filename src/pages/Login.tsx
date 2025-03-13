@@ -2,67 +2,37 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faRightToBracket, faUser, faLock } from '@fortawesome/free-solid-svg-icons';
-import  {jwtDecode} from 'jwt-decode';
 import Button from '../components/Button';
-import axiosInstance from '../utils/axiosInstance';
 import { Input } from '@material-tailwind/react';
-
-interface DecodedToken {
-  sub: string;
-  jti: string;
-  role: string;
-  exp: number;
-  iss: string;
-  aud: string;
-  unique_name: string;
-  nbf: number;
-  iat: number;
-  
-}
+import { useAuth } from '../context/AuthContext';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
+  const { login, loading } = useAuth(); // Destructure the login method and loading state from context
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // Local loading state
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-  
+    setIsLoading(true); // Set loading to true while logging in
+
     try {
-      const response = await axiosInstance.post("/auth/login", {
-        username,
-        password,
-      });
-  
-      const data = response.data;
-  
-      // Store tokens
-      localStorage.setItem("accessToken", data.accessToken);
-      localStorage.setItem("refreshToken", data.refreshToken);
-  
-      // Decode JWT to get userType
-      const decodedToken: DecodedToken = jwtDecode<DecodedToken>(data.accessToken);
-      console.log(decodedToken)
-      const userType = decodedToken.role;
-  
-      localStorage.setItem("userType", userType.toString());
-  
-      // Redirect based on user type
+      await login(username, password); // Call login method from AuthContext
+      // After successful login, redirect user based on their role
+      const userType = localStorage.getItem("userType");
       if (userType === 'Admin') {
         navigate("/admin");
       } else if (userType === 'Distributor') {
         navigate("/distributor");
-      } 
+      }
     } catch (error) {
       console.error("Login error:", error);
       alert("Login failed. Please check your credentials.");
     } finally {
-      setLoading(false);
+      setIsLoading(false); // Set loading to false after the login attempt
     }
   };
-  
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center py-6">
@@ -130,7 +100,7 @@ const Login: React.FC = () => {
                 size="lg"
                 block
                 icon={faRightToBracket}
-                loading={loading}
+                loading={isLoading}
                 disabled={!username || !password}
               >
                 دخول

@@ -24,14 +24,19 @@ const DistributorAddOrder: React.FC = () => {
     try {
       if (customer) {
         // Save customer if new
-        if (!customer.id && customer?.phone) {
-          const newCustomer = await distributorCustomersStore.addCustomer(customer);
+        if ((!customer.id|| customer.id=='' )&& customer?.phone) {
+          const newCustomer = await distributorCustomersStore.addCustomer({
+            ...customer,
+            locationName: customer.locations[0].name,
+            coordinates: customer.locations[0].coordinates,
+          });
           if (newCustomer) {
             const selectedLocation = newCustomer.locations?.find(l => l.coordinates === customer.locations[0].coordinates);
             await distributorCustomersStore.addOrder({
               ...order,
+              location:selectedLocation,
               customerId: newCustomer.id,
-              LocationId: selectedLocation?.id,
+              locationId: selectedLocation?.id,
               statusString: 'Draft'
             });
           }
@@ -42,8 +47,9 @@ const DistributorAddOrder: React.FC = () => {
             const selectedLocation = updatedCustomer.locations?.find(l => l.coordinates === customer.locations[0].coordinates);
             await distributorCustomersStore.addOrder({
               ...order,
+              location:selectedLocation,
               customerId: updatedCustomer.id,
-              LocationId: selectedLocation?.id,
+              locationId: selectedLocation?.id,
               statusString: 'Draft'
             });
           }

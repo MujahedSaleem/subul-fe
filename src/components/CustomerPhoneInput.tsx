@@ -1,8 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Customer } from '../types/customer';
 import { Input } from '@material-tailwind/react';
 import { OrderList } from '../types/order';
 import { extractAndNormalizeLocalPhoneNumber, isValidPhoneNumber } from '../utils/formatters';
+import CallModal from './admin/shared/CallModal';
+import IconButton from './IconButton';
+import { faPhone } from '@fortawesome/free-solid-svg-icons';
 
 interface CustomerPhoneInputProps {
   customer: Customer;
@@ -15,6 +18,7 @@ const CustomerPhoneInput: React.FC<CustomerPhoneInputProps> = ({
   setOrder,
   disabled,
 }) => {
+   const [isCallModalOpen, setIsCallModalOpen] = useState(false);
  
 
   return (
@@ -22,7 +26,8 @@ const CustomerPhoneInput: React.FC<CustomerPhoneInputProps> = ({
       <label htmlFor="phone" className="text-sm font-medium text-slate-700">
         رقم الهاتف
       </label>
-      <Input
+     <div className="flex flex-row">
+     <Input
         type="tel"
         id="phone"
         value={customer?.phone || ''}
@@ -32,9 +37,19 @@ const CustomerPhoneInput: React.FC<CustomerPhoneInputProps> = ({
         required={!disabled}
         disabled={disabled}
       />
+     {isValidPhoneNumber(customer?.phone) && (<IconButton
+      icon={faPhone}
+      onClick={(e) =>{e.preventDefault();setIsCallModalOpen(!isCallModalOpen)}}
+      ></IconButton>)}
+     </div>
       {customer?.phone && !isValidPhoneNumber(customer?.phone) && (
         <p className="text-red-500 text-sm mt-1">رقم الهاتف يجب أن يكون 10 أرقام ويبدأ بـ 05.</p>
       )}
+        <CallModal
+            phone={customer?.phone}
+            isOpen={isCallModalOpen}
+            onClose={() => setIsCallModalOpen(false)}
+          />
     </div>
   );
 };

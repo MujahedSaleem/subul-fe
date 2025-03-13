@@ -29,6 +29,15 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
   resetFilters,
   activeDistributors,
 }) => {
+ const  getSelectedDistributor = (id: string) => {
+  console.log(id)
+  if (!selectedDistributor)
+    return ''
+  const selectedDist = activeDistributors.find(d =>d.id === id)
+  if(!selectedDist)
+    return ''
+  return `${selectedDist.firstName} ${selectedDist.lastName}`
+ }
   return (
     <div dir="rtl">
       <Button onClick={() => setShowFilters(!showFilters)} variant={showFilters ? 'success' : 'secondary'} icon={faFilter}>
