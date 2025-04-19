@@ -1,8 +1,9 @@
 import axiosInstance from "../utils/axiosInstance";
-import { Customer, DistributorCreateCustomerRequest } from "../types/customer";
+import { Customer, DistributorCreateCustomerRequest, Location } from "../types/customer";
 import { OrderList, OrderRequest } from "../types/order";
 
 export class DistributorCustomersStore {
+
   private static instance: DistributorCustomersStore;
   private _customers: Customer[] = [];
   private _orders: OrderList[] = [];
@@ -147,6 +148,15 @@ export class DistributorCustomersStore {
       return false;
     }
   }
+  async updateCustomerLocation(customerId: string, location:Location): any {
+    try {
+      await axiosInstance.put(`/distributors/customers/${customerId}/locations/${location.id}`, location);
+      this.notifyListeners();
+      return true;
+    } catch (error) {
+      console.error('Failed to deactivate distributor:', error);
+      return false;
+    }  }
 
   subscribe(listener: () => void) {
     this.listeners.push(listener);

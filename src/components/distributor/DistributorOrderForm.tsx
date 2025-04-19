@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { faArrowRight, faSave } from '@fortawesome/free-solid-svg-icons';
+import { faArrowRight, faMapLocation, faSave } from '@fortawesome/free-solid-svg-icons';
 import type { OrderList } from '../../types/order';
 import type { Customer } from '../../types/customer';
 import Button from '../Button';
@@ -10,6 +10,8 @@ import LocationSelector from '../LocationSelector';
 import CostInput from '../CostInput';
 import { isValidPhoneNumber } from '../../utils/formatters';
 import { distributorCustomersStore } from '../../store/distributorCustomersStore';
+import IconButton from '../IconButton';
+import { getCurrentLocation } from '../../services/locationService';
 
 interface DistributorOrderFormProps {
   order: OrderList;
@@ -31,9 +33,10 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
   const [isNewCustomer, setIsNewCustomer] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [getttingGpsLocation, setGetttingGpsLocation] = useState(false);
   const navigate = useNavigate();
-  const locationRef = React.useRef(null);
 
+  
   useEffect(() => {
     setIsSearching(true);
     if (order?.customer?.phone && isValidPhoneNumber(order?.customer?.phone)) {
@@ -69,17 +72,25 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
     e.preventDefault();
     setLoading(true);
 
-    if (locationRef?.current?.getNewLocationName && order?.location?.id === undefined) {
-      locationRef.current.setNewLocationName(locationRef?.current?.getNewLocationName);
-      setLoading(false);
-      return;
-    } else if (order?.location?.id === undefined) {
-      locationRef?.current?.activateGpsLocation();
-      setLoading(false);
-      return;
-    }
+
     onSubmit(e);
   };
+const handleSetLocation = async  (e) => {
+  e.preventDefault()
+  setGetttingGpsLocation(true)
+  const gpsLocation = await getCurrentLocation();
+  distributorCustomersStore.updateCustomerLocation(order?.customer?.id, {...order?.location, coordinates:gpsLocation?.coordinates});
+  setGetttingGpsLocation(false)
+  distributorCustomersStore.subscribe(() => {
+    setGetttingGpsLocation(false);
+    setOrder((prev) => ({
+      ...prev,
+      location:{...prev.location, coordinates:gpsLocation?.coordinates}
+    }));
+
+  });
+
+}
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -101,16 +112,32 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
       )}
 
       {!isSearching &&order?.customer?.phone && (
+        <>
         <LocationSelector
           order={order}
           setOrder={setOrder}
           isNewCustomer={isNewCustomer}
           disabled={isEdit && order.status === 'Confirmed'}
           customer={order?.customer}
-          ref={locationRef}
           isDistributor={true}
         />
+              {!(order?.location?.coordinates)&&(
+        <div className="flex items-center gap-1">
+                <p className="text-red-500 text-xs">لا توجد إحداثيات متوفرة لهذا الموقع</p>
+                <IconButton 
+                  onClick={handleSetLocation}
+                  icon={faMapLocation}
+                  variant="danger"
+                  size="lg"
+                  loading={getttingGpsLocation}
+
+                  title=" استخدام الموقع الحالي"></IconButton>
+      </div>
+
       )}
+        </>
+      )}
+
 
       <CostInput
         cost={order.cost}
@@ -138,7 +165,7 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
           variant="primary"
           icon={faSave}
           disabled={isEdit && order.status === 'Confirmed'}
-          loading={loading}
+          loading={loading || getttingGpsLocation}
         >
           {title}
         </Button>

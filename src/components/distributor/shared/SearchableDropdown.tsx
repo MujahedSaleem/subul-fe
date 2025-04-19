@@ -24,6 +24,7 @@ export const Option: React.FC<OptionProps> = ({ value, children, onClick, classN
 interface SearchableDropdownProps {
   value?: string | number;
   onChange: (value: string | number) => void;
+  onAddOption?: (newValue: string) => void;
   disabled?: boolean;
   className?: string;
   placeholder?: string;
@@ -34,14 +35,16 @@ interface SearchableDropdownProps {
 export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
   value,
   onChange,
+  onAddOption,
   disabled = false,
   className = "",
   placeholder = "اختر خيارًا",
   children,
   addedOption
 }) => {
+  console.log("value", value)
   const [query, setQuery] = useState("");
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [selectedLabel, setSelectedLabel] = useState(value||""); // Keep track of the selected label separately
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -95,8 +98,14 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
       setHighlightedIndex((prev) => (prev + 1) % filteredOptions.length);
     } else if (e.key === "ArrowUp") {
       setHighlightedIndex((prev) => (prev - 1 + filteredOptions.length) % filteredOptions.length);
-    } else if (e.key === "Enter" && filteredOptions[highlightedIndex]) {
-      handleSelect(filteredOptions[highlightedIndex]);
+    }else if (e.key === "Enter") {
+      if (highlightedIndex < filteredOptions.length) {
+        handleSelect(filteredOptions[highlightedIndex]);
+      } else if (onAddOption && query.trim()) {
+        onAddOption(query.trim());
+        setQuery("");
+        setIsOpen(false);
+      }
     }
   };
 
@@ -140,6 +149,21 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                 className="px-4 py-2 text-gray-500 cursor-pointer rounded-md hover:bg-gray-100"
               >
                 لا يوجد مواقع
+              </li>
+            )}
+            
+            {query.trim() && onAddOption && !filteredOptions.some((option) =>
+              String(option.props.children).toLowerCase() === query.toLowerCase()
+            ) && (
+              <li
+                className="px-4 py-2 text-blue-600 cursor-pointer rounded-md hover:bg-blue-100"
+                onClick={() => {
+                  onAddOption(query.trim());
+                  setQuery("");
+                  setIsOpen(false);
+                }}
+              >
+                إضافة "{query}"
               </li>
             )}
           </ul>

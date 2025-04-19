@@ -25,11 +25,12 @@ const DistributorAddOrder: React.FC = () => {
       if (customer) {
         // Save customer if new
         if ((!customer.id|| customer.id=='' )&& customer?.phone) {
-          const newCustomer = await distributorCustomersStore.addCustomer({
+
+          const newCustomer = await distributorCustomersStore.addCustomer((customer?.locations&& customer?.locations.length>0)? {
             ...customer,
             locationName: customer.locations[0].name,
             coordinates: customer.locations[0].coordinates,
-          });
+          }:{...customer} );
           if (newCustomer) {
             const selectedLocation = newCustomer.locations?.find(l => l.coordinates === customer.locations[0].coordinates);
             await distributorCustomersStore.addOrder({
