@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { OrderList } from '../types/order';
 import { customersStore } from '../store/customersStore';
 import Button from './Button';
-import { faArrowRight, faSave } from '@fortawesome/free-solid-svg-icons';
+import { faArrowRight, faMapLocation, faSave } from '@fortawesome/free-solid-svg-icons';
 import CustomerPhoneInput from './CustomerPhoneInput';
 import CustomerNameInput from './CustomerNameInput';
 import LocationSelector from './LocationSelector';
@@ -11,6 +11,8 @@ import CostInput from './CostInput';
 import { Customer } from '../types/customer';
 import { useNavigate } from 'react-router-dom';
 import { isValidPhoneNumber } from '../utils/formatters';
+import IconButton from './IconButton';
+import { getCurrentLocation } from '../services/locationService';
 
 interface OrderFormProps {
   order: OrderList;
@@ -32,6 +34,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
   const [isNewCustomer, setIsNewCustomer] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [getttingGpsLocation, setGetttingGpsLocation] = useState(false);
   const navigate = useNavigate();
   const locationRef = React.useRef(null);
 
@@ -70,6 +73,39 @@ const OrderForm: React.FC<OrderFormProps> = ({
     onSubmit(e);
   };
 
+  const handleSetLocation = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    setGetttingGpsLocation(true);
+    try {
+      const gpsLocation = await getCurrentLocation();
+      if (gpsLocation?.coordinates && order.customer) {
+        const updatedLocation = {
+          ...order.location,
+          coordinates: gpsLocation.coordinates
+        };
+        
+        const updatedCustomer = {
+          ...order.customer,
+          locations: order.customer.locations.map(loc => 
+            loc.id === order.location?.id ? updatedLocation : loc
+          )
+        };
+        
+        await customersStore.updateCustomer(updatedCustomer);
+        
+        setOrder(prev => ({
+          ...prev,
+          location: updatedLocation,
+          customer: updatedCustomer
+        }));
+      }
+    } catch (error) {
+      console.error('Error getting location:', error);
+    } finally {
+      setGetttingGpsLocation(false);
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <h2 className="text-xl font-semibold text-slate-800 mb-6">تفاصيل الطلب</h2>
@@ -98,6 +134,20 @@ const OrderForm: React.FC<OrderFormProps> = ({
           customer={order?.customer}
           ref={locationRef}
         />
+      )}
+        {!(order?.location?.coordinates)&&(
+        <div className="flex items-center gap-1">
+                <p className="text-red-500 text-xs">لا توجد إحداثيات متوفرة لهذا الموقع</p>
+                <IconButton 
+                  onClick={handleSetLocation}
+                  icon={faMapLocation}
+                  variant="danger"
+                  size="lg"
+                  loading={getttingGpsLocation}
+
+                  title=" استخدام الموقع الحالي"></IconButton>
+      </div>
+
       )}
 
       <DistributorSelector
