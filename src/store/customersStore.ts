@@ -2,12 +2,11 @@ import axiosInstance from "../utils/axiosInstance";
 import { Customer } from "../types/customer";
 
 class CustomersStore {
-
-
   private static instance: CustomersStore;
   private _customers: Customer[] = [];
   private listeners: (() => void)[] = [];
-  private _isLoading: boolean = false; // ✅ Prevent duplicate API calls
+  private _isLoading: boolean = false;
+  private _isInitialized: boolean = false;
 
   private constructor() {}
 
@@ -17,12 +16,19 @@ class CustomersStore {
     }
     return CustomersStore.instance;
   }
-  get isLoadingData(): boolean {
-    return this._isLoading;
-  }
+
   get customers(): Customer[] {
     return this._customers;
   }
+
+  get isLoadingData(): boolean {
+    return this._isLoading;
+  }
+
+  get isInitialized(): boolean {
+    return this._isInitialized;
+  }
+
   async findCustomerByPhone(phone: string) {
     if (this._isLoading ) return; // ✅ Prevent multiple fetch calls
     this._isLoading = true;
@@ -37,16 +43,19 @@ class CustomersStore {
     } finally {
       this._isLoading = false;
     }  }
+
   async fetchCustomers() {
-    if (this._isLoading ) return; // ✅ Prevent multiple fetch calls
+    if (this._isLoading || this._isInitialized) return;
     this._isLoading = true;
 
     try {
       const response = await axiosInstance.get<Customer[]>("/customers");
       this._customers = response.data;
+      this._isInitialized = true;
       this.notifyListeners();
     } catch (error) {
       console.error("Error fetching customers:", error);
+      throw error;
     } finally {
       this._isLoading = false;
     }
@@ -85,16 +94,17 @@ class CustomersStore {
     }
   }
 
-  subscribe(listener: () => void) {
+  subscribe(listener: () => void): () => void {
     this.listeners.push(listener);
     return () => {
-      this.listeners = this.listeners.filter((l) => l !== listener);
+      this.listeners = this.listeners.filter(l => l !== listener);
     };
   }
 
   private notifyListeners() {
-    this.listeners.forEach((listener) => listener());
+    this.listeners.forEach(listener => listener());
   }
+
   async findOrCreateCustomer(customerName: string, arg1: { name: string; coordinates: string; phone: string; }) {
     let customer = this._customers.find(c => c.name === customerName);
     

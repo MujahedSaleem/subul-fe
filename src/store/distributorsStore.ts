@@ -6,8 +6,9 @@ class DistributorsStore {
  
   private static instance: DistributorsStore;
   private _distributors: Distributor[] = [];
-  private isLoading: boolean = false;
-  private _isFetched: boolean = false; // New flag to track if data has been fetched
+  private _isLoading: boolean = false;
+  private _isInitialized: boolean = false;
+  private listeners: (() => void)[] = [];
 
   private constructor() {}
 
@@ -23,24 +24,37 @@ class DistributorsStore {
   }
 
   get isLoadingData(): boolean {
-    return this.isLoading;
+    return this._isLoading;
   }
-  get isFetched(): boolean {
-    return this._isFetched;
+
+  get isInitialized(): boolean {
+    return this._isInitialized;
+  }
+
+  subscribe(listener: () => void): () => void {
+    this.listeners.push(listener);
+    return () => {
+      this.listeners = this.listeners.filter(l => l !== listener);
+    };
+  }
+
+  private notifyListeners() {
+    this.listeners.forEach(listener => listener());
   }
 
   async fetchDistributors() {
-    this.isLoading = true;
+    if (this._isLoading || this._isInitialized) return;
+    this._isLoading = true;
     try {
       const response = await axiosInstance.get<Distributor[]>('/distributors');
-      this._distributors = response.data; // Includes orderCount
-      this._isFetched = true; // Mark data as fetched
-
+      this._distributors = response.data;
+      this._isInitialized = true;
       this.notifyListeners();
     } catch (error) {
       console.error('Failed to fetch distributors:', error);
+      throw error;
     } finally {
-      this.isLoading = false;
+      this._isLoading = false;
     }
   }
 
@@ -81,18 +95,6 @@ class DistributorsStore {
     }
   }
 
-  private listeners: (() => void)[] = [];
-
-  subscribe(listener: () => void) {
-    this.listeners.push(listener);
-    return () => {
-      this.listeners = this.listeners.filter((l) => l !== listener);
-    };
-  }
-
-  private notifyListeners() {
-    this.listeners.forEach((listener) => listener());
-  }
   async changeDistributorPassword(
     selectedDistributorId: string,
     oldPassword: string,

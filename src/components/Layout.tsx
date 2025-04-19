@@ -15,6 +15,7 @@ import Button from './Button';
 import IconButton from './IconButton';
 import { useError } from "../context/ErrorContext";
 import { useAuth } from "../context/AuthContext"; // ✅ Import AuthContext
+import { initializeStores } from '../store/initializeStores';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -29,6 +30,24 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
   const location = useLocation();
   const isAdmin = location.pathname.startsWith('/admin');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(false);
+
+  useEffect(() => {
+    if (isAdmin) {
+      const initStores = async () => {
+        try {
+          setIsInitializing(true);
+          await initializeStores();
+        } catch (error) {
+          console.error('Failed to initialize stores:', error);
+          dispatch({ type: 'SET_ERROR', payload: 'فشل تحميل البيانات، يرجى المحاولة لاحقًا' });
+        } finally {
+          setIsInitializing(false);
+        }
+      };
+      initStores();
+    }
+  }, [isAdmin, dispatch]);
 
   // Handle logout by calling logoutUser function from AuthContext
   const handleLogout = () => {
@@ -44,6 +63,17 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
   ] : [
     { path: '/distributor/orders', label: 'الطلبات', icon: faBox },
   ];
+
+  if (isInitializing) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+          <p className="mt-4 text-slate-600">جاري تحميل البيانات...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">

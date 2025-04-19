@@ -7,14 +7,12 @@ import { SearchableDropdown ,Option } from "./distributor/shared/SearchableDropd
 
 interface LocationSelectorProps {
   order: OrderList | undefined;
-  setOrder: React.Dispatch<React.SetStateAction<any>>;
+  setOrder: React.Dispatch<React.SetStateAction<OrderList | undefined>>;
   disabled: boolean;
   customer: Customer | undefined;
   isNewCustomer: boolean;
   isDistributor?: boolean;
 }
-
-
 
 const LocationSelector : React.FC<LocationSelectorProps> =(
   { order, setOrder, disabled, customer, isNewCustomer, isDistributor },
@@ -43,23 +41,31 @@ const LocationSelector : React.FC<LocationSelectorProps> =(
         };
     
         // Update state with the new location
-        setOrder((prev) => ({
-          ...prev,
-          customer: {
-            ...prev.customer,
-            locations: [...(prev.customer?.locations ?? []), newLocation],
-          }        }));
-        setOrder((prev) => ({
-          ...prev,
-          location: newLocation, // Ensure this is updated
-        }));
+        setOrder((prev: OrderList | undefined) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            customer: {
+              ...prev.customer,
+              locations: [...(prev.customer?.locations ?? []), newLocation],
+            }
+          };
+        });
+        setOrder((prev: OrderList | undefined) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            location: newLocation,
+          };
+        });
       }
     };
     
-
-
     const handleSaveCustomer = (updatedCustomer: Customer) => {
-      setOrder((prev) => ({ ...prev, customer: updatedCustomer }));
+      setOrder((prev: OrderList | undefined) => {
+        if (!prev) return prev;
+        return { ...prev, customer: updatedCustomer };
+      });
       setIsModalOpen(false);
     };
 
@@ -72,15 +78,23 @@ const LocationSelector : React.FC<LocationSelectorProps> =(
           key={JSON.stringify(customer?.locations)} // Force re-render when locations change
           value={order?.location?.name}
           onChange={(e) => {
-            setOrder((prev) => ({ ...prev, location: { ...order?.location, id: e } }));
+            // Find the selected location from customer's locations
+            const selectedLocation = customer?.locations?.find(loc => loc.id === e);
+            if (selectedLocation) {
+              setOrder((prev: OrderList | undefined) => {
+                if (!prev) return prev;
+                return { 
+                  ...prev, 
+                  location: selectedLocation 
+                };
+              });
+            }
           }}
           onAddOption={(newLocation) => {
             setNewLocationName(newLocation);
-          }
-          }
+          }}
           disabled={disabled}
           className="block w-full pr-10 pl-3 py-2.5 border border-slate-200 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200 ease-in-out"
-     
         >
           {customer?.locations?.filter(location => location?.name?.trim()).map((location) => (
             <Option key={location.id} value={location.id}>
@@ -89,8 +103,6 @@ const LocationSelector : React.FC<LocationSelectorProps> =(
           ))}
         </SearchableDropdown>
       </div>
-
-         
 
           {customer && !isNewCustomer && !isDistributor && (
             <button
@@ -103,30 +115,24 @@ const LocationSelector : React.FC<LocationSelectorProps> =(
             </button>
           )}
     
-         
-
           {/* Modal for Editing Customer */}
-          {isModalOpen && customer && (
+          {isModalOpen && (
             <Modal
               isOpen={isModalOpen}
               onClose={() => setIsModalOpen(false)}
-              title="تعديل بيانات الزبون"
-              onConfirm={() => {
-                if (childRef.current) {
-                  childRef.current.saveChanges(); // Call saveChanges via ref
-                }
-              }}
+              title="تعديل بيانات العميل"
             >
               <EditCustomer
-                ref={childRef} // Pass the ref to EditCustomer
-                customerId={customer?.id?.toString()}
+                customerId={customer?.id?.toString() ?? ''}
                 onCustomerUpdated={handleSaveCustomer}
                 onCloseModal={() => setIsModalOpen(false)}
+                ref={childRef}
               />
             </Modal>
           )}
         </div>
       )
     );
-  };
+};
+
 export default LocationSelector;

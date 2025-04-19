@@ -4,8 +4,8 @@ import axiosInstance from '../utils/axiosInstance';
 class OrdersStore {
   private static instance: OrdersStore;
   private _orders: OrderList[] = [];
-  private _isFetched: boolean = false;
   private _isLoading: boolean = false;
+  private _isInitialized: boolean = false;
   private listeners: (() => void)[] = [];
 
   private constructor() {}
@@ -21,26 +21,61 @@ class OrdersStore {
     return this._orders;
   }
 
-  get isFetched(): boolean {
-    return this._isFetched;
-  }
-
   get isLoadingData(): boolean {
     return this._isLoading;
   }
 
+  get isInitialized(): boolean {
+    return this._isInitialized;
+  }
+
+  subscribe(listener: () => void): () => void {
+    this.listeners.push(listener);
+    return () => {
+      this.listeners = this.listeners.filter(l => l !== listener);
+    };
+  }
+
+  private notifyListeners() {
+    this.listeners.forEach(listener => listener());
+  }
+
   async fetchOrders() {
+    if (this._isLoading) return;
     this._isLoading = true;
     try {
       const response = await axiosInstance.get<OrderList[]>('/orders');
       this._orders = response.data;
-      this._isFetched = true;
+      this._isInitialized = true;
       this.notifyListeners();
     } catch (error) {
       console.error('Failed to fetch orders:', error);
+      throw error;
     } finally {
       this._isLoading = false;
+    }
+  }
+
+  async getOrderById(id: number): Promise<OrderList | null> {
+    try {
+      // First check if the order is in the store
+      const existingOrder = this._orders.find(o => o.id === id);
+      if (existingOrder) {
+        return existingOrder;
+      }
+
+      // If not in store, try to fetch it directly
+      const response = await axiosInstance.get<OrderList>(`/orders/${id}`);
+      const order = response.data;
+      
+      // Add the order to the store
+      this._orders = [...this._orders, order];
       this.notifyListeners();
+      
+      return order;
+    } catch (error) {
+      console.error('Failed to get order:', error);
+      return null;
     }
   }
 
@@ -109,17 +144,6 @@ class OrdersStore {
   setOrders(orders: OrderList[]) {
     this._orders = orders;
     this.notifyListeners();
-  }
-
-  subscribe(listener: () => void) {
-    this.listeners.push(listener);
-    return () => {
-      this.listeners = this.listeners.filter(l => l !== listener);
-    };
-  }
-
-  private notifyListeners() {
-    this.listeners.forEach(listener => listener());
   }
 }
 
