@@ -109,14 +109,24 @@ const OrderForm: React.FC<OrderFormProps> = ({
     try {
       const gpsLocation = await getCurrentLocation();
       if (gpsLocation?.coordinates && order.customer) {
-        const updatedLocation = {
-          ...order.location,
-          coordinates: gpsLocation.coordinates
+        // Update the selected location's coordinates
+        const updatedLocations = order.customer.locations.map(loc => 
+          loc.id === order.location?.id 
+            ? { ...loc, coordinates: gpsLocation.coordinates }
+            : loc
+        );
+
+        // Update the customer with new locations
+        const updatedCustomer = {
+          ...order.customer,
+          locations: updatedLocations
         };
-        
+
+        // Update the order with new location and customer
         setOrder(prev => ({
           ...prev,
-          location: updatedLocation
+          location: updatedLocations.find(loc => loc.id === order.location?.id),
+          customer: updatedCustomer
         }));
       }
     } catch (error) {
@@ -155,19 +165,22 @@ const OrderForm: React.FC<OrderFormProps> = ({
           ref={locationRef}
         />
       )}
-        {!(order?.location?.coordinates)&&(
-        <div className="flex items-center gap-1">
-                <p className="text-red-500 text-xs">لا توجد إحداثيات متوفرة لهذا الموقع</p>
-                <IconButton 
-                  onClick={handleSetLocation}
-                  icon={faMapLocation}
-                  variant="danger"
-                  size="lg"
-                  loading={getttingGpsLocation}
 
-                  title=" استخدام الموقع الحالي"></IconButton>
-      </div>
-
+      {order?.location && !order.location.coordinates && (
+        <div className="flex items-center gap-2 bg-yellow-50 p-3 rounded-lg border border-yellow-100">
+          <div className="flex-1">
+            <p className="text-yellow-800 text-sm">لا توجد إحداثيات متوفرة لهذا الموقع</p>
+            <p className="text-yellow-600 text-xs mt-1">يمكنك تحديد الموقع الحالي لتحديث الإحداثيات</p>
+          </div>
+          <IconButton 
+            onClick={handleSetLocation}
+            icon={faMapLocation}
+            variant="warning"
+            size="lg"
+            loading={getttingGpsLocation}
+            title="استخدام الموقع الحالي"
+          />
+        </div>
       )}
 
       <DistributorSelector
