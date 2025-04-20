@@ -41,8 +41,9 @@ const OrderForm: React.FC<OrderFormProps> = ({
   useEffect(() => {
    const findCustomer = async () => {
     setIsSearching(true);
-    if (order?.customer?.phone && isValidPhoneNumber(order?.customer?.phone)) {
-          const existingCustomer = await customersStore.findCustomerByPhone(order?.customer?.phone);
+    // Only search for customer if this is a new order or if we don't have a customer yet
+    if (!order?.customer?.id && order?.customer?.phone && isValidPhoneNumber(order?.customer?.phone)) {
+      const existingCustomer = await customersStore.findCustomerByPhone(order?.customer?.phone);
       if (existingCustomer !== undefined && existingCustomer !== null) {
         setIsNewCustomer(false);
         setOrder((prev) => ({
@@ -52,11 +53,10 @@ const OrderForm: React.FC<OrderFormProps> = ({
       } else {
         setIsNewCustomer(true);
       }
-      setIsSearching(false);
     } else {
-      setIsNewCustomer(true);
-      setIsSearching(false);
+      setIsNewCustomer(false);
     }
+    setIsSearching(false);
    }
    findCustomer()
   }, [order?.customer?.phone]);
@@ -65,12 +65,42 @@ const OrderForm: React.FC<OrderFormProps> = ({
     e.preventDefault();
     setLoading(true);
 
-    if (locationRef?.current?.getNewLocationName && order?.location?.id === undefined) {
-      locationRef.current.setNewLocationName(locationRef?.current?.getNewLocationName);
+    try {
+      // Check if we need to save a new location
+      if (order?.location && !order.location.id && order.customer) {
+        // Create a new location for the customer
+        const newLocation = {
+          ...order.location,
+          customerId: order.customer.id
+        };
+        
+        const updatedCustomer = await customersStore.updateCustomer({
+          ...order.customer,
+          locations: [...(order.customer.locations || []), newLocation]
+        });
+        
+        if (updatedCustomer) {
+          // Find the newly created location
+          const savedLocation = updatedCustomer.locations?.find(
+            loc => loc.coordinates === order.location?.coordinates
+          );
+          
+          if (savedLocation) {
+            setOrder(prev => ({
+              ...prev,
+              location: savedLocation,
+              customer: updatedCustomer
+            }));
+          }
+        }
+      }
+      
+      onSubmit(e);
+    } catch (error) {
+      console.error('Error saving location:', error);
+    } finally {
       setLoading(false);
-      return;
     }
-    onSubmit(e);
   };
 
   const handleSetLocation = async (e: React.MouseEvent) => {
@@ -84,19 +114,9 @@ const OrderForm: React.FC<OrderFormProps> = ({
           coordinates: gpsLocation.coordinates
         };
         
-        const updatedCustomer = {
-          ...order.customer,
-          locations: order.customer.locations.map(loc => 
-            loc.id === order.location?.id ? updatedLocation : loc
-          )
-        };
-        
-        await customersStore.updateCustomer(updatedCustomer);
-        
         setOrder(prev => ({
           ...prev,
-          location: updatedLocation,
-          customer: updatedCustomer
+          location: updatedLocation
         }));
       }
     } catch (error) {

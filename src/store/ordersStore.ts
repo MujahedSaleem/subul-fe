@@ -1,4 +1,4 @@
-import { OrderRequest, OrderList } from '../types/order';
+import { OrderRequest, OrderList, PaginatedOrders } from '../types/order';
 import axiosInstance from '../utils/axiosInstance';
 
 class OrdersStore {
@@ -6,7 +6,12 @@ class OrdersStore {
   private _orders: OrderList[] = [];
   private _isLoading: boolean = false;
   private _isInitialized: boolean = false;
+  private _total: number = 0;
+  private _page: number = 1;
+  private _pageSize: number = 10;
+  private _totalPages: number = 0;
   private listeners: (() => void)[] = [];
+  private pendingGetOrderById: Map<number, Promise<OrderList | null>> = new Map();
 
   private constructor() {}
 
@@ -21,7 +26,23 @@ class OrdersStore {
     return this._orders;
   }
 
-  get isLoadingData(): boolean {
+  get total(): number {
+    return this._total;
+  }
+
+  get page(): number {
+    return this._page;
+  }
+
+  get pageSize(): number {
+    return this._pageSize;
+  }
+
+  get totalPages(): number {
+    return this._totalPages;
+  }
+
+  get isLoading(): boolean {
     return this._isLoading;
   }
 
@@ -36,16 +57,47 @@ class OrdersStore {
     };
   }
 
-  private notifyListeners() {
+  private notifyListeners(): void {
     this.listeners.forEach(listener => listener());
   }
 
-  async fetchOrders() {
+  async fetchOrders(
+    pageNumber: number = 1,
+    pageSize: number = 10,
+    filters: {
+      distributorId?: string | null;
+      status?: string | null;
+      dateFrom?: string;
+      dateTo?: string;
+    } = {}
+  ) {
     if (this._isLoading) return;
+    
     this._isLoading = true;
     try {
-      const response = await axiosInstance.get<OrderList[]>('/orders');
-      this._orders = response.data;
+      const params = new URLSearchParams();
+      params.append('pageNumber', pageNumber.toString());
+      params.append('pageSize', pageSize.toString());
+
+      if (filters.distributorId) {
+        params.append('distributorId', filters.distributorId);
+      }
+      if (filters.status) {
+        params.append('status', filters.status);
+      }
+      if (filters.dateFrom) {
+        params.append('fromDate', filters.dateFrom);
+      }
+      if (filters.dateTo) {
+        params.append('toDate', filters.dateTo);
+      }
+
+      const response = await axiosInstance.get<PaginatedOrders>(`/orders?${params.toString()}`);
+      this._orders = response.data.items;
+      this._total = response.data.totalCount;
+      this._page = response.data.pageNumber;
+      this._pageSize = response.data.pageSize;
+      this._totalPages = response.data.totalPages;
       this._isInitialized = true;
       this.notifyListeners();
     } catch (error) {
@@ -57,38 +109,50 @@ class OrdersStore {
   }
 
   async getOrderById(id: number): Promise<OrderList | null> {
-    try {
-      // First check if the order is in the store
-      const existingOrder = this._orders.find(o => o.id === id);
-      if (existingOrder) {
-        return existingOrder;
-      }
-
-      // If not in store, try to fetch it directly
-      const response = await axiosInstance.get<OrderList>(`/orders/${id}`);
-      const order = response.data;
-      
-      // Add the order to the store
-      this._orders = [...this._orders, order];
-      this.notifyListeners();
-      
-      return order;
-    } catch (error) {
-      console.error('Failed to get order:', error);
-      return null;
+    // Check if we already have the order in the store
+    const existingOrder = this.orders.find(order => order.id === id);
+    if (existingOrder) {
+      return existingOrder;
     }
+
+    // Check if there's already a pending request for this order
+    const pendingRequest = this.pendingGetOrderById.get(id);
+    if (pendingRequest) {
+      return pendingRequest;
+    }
+
+    // Create a new request
+    const request = (async () => {
+      try {
+        const response = await axiosInstance.get<OrderList>(`/orders/${id}`);
+        const order = response.data;
+        
+        // Add the order to the store
+        this._orders = [...this._orders, order];
+        
+        // Remove the pending request
+        this.pendingGetOrderById.delete(id);
+        
+        return order;
+      } catch (error) {
+        console.error('Error fetching order:', error);
+        // Remove the pending request on error
+        this.pendingGetOrderById.delete(id);
+        return null;
+      }
+    })();
+
+    // Store the pending request
+    this.pendingGetOrderById.set(id, request);
+
+    return request;
   }
 
   async addOrder(order: Partial<OrderRequest>): Promise<OrderList> {
     try {
       const response = await axiosInstance.post<OrderList>('/orders', order);
       const newOrder = response.data;
-      const existingOrderIndex = this._orders.findIndex(o => o.id === newOrder.id);
-      if (existingOrderIndex !== -1) {
-        this._orders[existingOrderIndex] = newOrder;
-      } else {
-        this._orders = [...this._orders, newOrder];
-      }
+      this._orders = [...this._orders, newOrder];
       this.notifyListeners();
       return newOrder;
     } catch (error) {
@@ -101,12 +165,7 @@ class OrdersStore {
     try {
       const response = await axiosInstance.put<OrderList>(`/orders/${order.id}`, order);
       const updatedOrder = response.data;
-      const existingOrderIndex = this._orders.findIndex(o => o.id === updatedOrder.id);
-      if (existingOrderIndex !== -1) {
-        this._orders[existingOrderIndex] = updatedOrder;
-      } else {
-        this._orders = [...this._orders, updatedOrder];
-      }
+      this._orders = this._orders.map(o => o.id === updatedOrder.id ? updatedOrder : o);
       this.notifyListeners();
       return true;
     } catch (error) {

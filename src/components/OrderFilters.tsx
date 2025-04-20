@@ -1,20 +1,25 @@
 import React from 'react';
-import { faFilter } from '@fortawesome/free-solid-svg-icons';
-import { Select, Option, Input } from '@material-tailwind/react';
+import { faFilter, faTimes } from '@fortawesome/free-solid-svg-icons';
+import { Select, Option, Input, Card, CardBody, Typography } from '@material-tailwind/react';
 import { Distributor } from '../types/distributor';
 import Button from './Button';
+import IconButton from './IconButton';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faXmark } from '@fortawesome/free-solid-svg-icons';
 
 interface OrderFilterProps {
   showFilters: boolean;
   setShowFilters: React.Dispatch<React.SetStateAction<boolean>>;
-  selectedDistributor: string;
-  setSelectedDistributor: React.Dispatch<React.SetStateAction<string>>;
+  selectedDistributor: string | null;
+  setSelectedDistributor: React.Dispatch<React.SetStateAction<string | null>>;
   dateFrom: string;
   setDateFrom: React.Dispatch<React.SetStateAction<string>>;
   dateTo: string;
   setDateTo: React.Dispatch<React.SetStateAction<string>>;
   resetFilters: () => void;
   activeDistributors: Distributor[];
+  selectedStatus: string | null;
+  setSelectedStatus: (status: string | null) => void;
 }
 
 const OrderFilter: React.FC<OrderFilterProps> = ({
@@ -28,62 +33,189 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
   setDateTo,
   resetFilters,
   activeDistributors,
+  selectedStatus,
+  setSelectedStatus,
 }) => {
- const  getSelectedDistributor = (id: string) => {
-  console.log(id)
-  if (!selectedDistributor)
-    return ''
-  const selectedDist = activeDistributors.find(d =>d.id === id)
-  if(!selectedDist)
-    return ''
-  return `${selectedDist.firstName} ${selectedDist.lastName}`
- }
+  const getSelectedDistributor = (id: string) => {
+    if (!selectedDistributor) return '';
+    const selectedDist = activeDistributors.find(d => d.id === id);
+    if (!selectedDist) return '';
+    return `${selectedDist.firstName} ${selectedDist.lastName}`;
+  };
+
+  const hasActiveFilters = selectedDistributor || dateFrom || dateTo;
+
+  const statusOptions = [
+    { value: 'New', label: 'جديد' },
+    { value: 'Confirmed', label: 'تم التأكيد' },
+    { value: 'Pending', label: 'قيد الانتظار' },
+    { value: 'Draft', label: 'مسودة' }
+  ];
+
   return (
-    <div dir="rtl">
-      <Button onClick={() => setShowFilters(!showFilters)} variant={showFilters ? 'success' : 'secondary'} icon={faFilter}>
-        {showFilters ? 'إخفاء الفلتر' : 'إظهار الفلتر'}
-      </Button>
-      {showFilters && (
-        <>
-        <div className="flex flex-wrap sm:items-center sm:justify-between gap-4 mt-4">
-          {/* Distributor Filter */}
-          <Select
-            value={selectedDistributor}
-            onChange={e => setSelectedDistributor(e)}
-            className="border border-blue-gray-200 rounded-lg px-3 py-2  mb-2"
-            label="الموزع"
+    <div dir="rtl" className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Button 
+            onClick={() => setShowFilters(!showFilters)} 
+            variant={showFilters ? 'gradient' : 'outlined'} 
+            color={showFilters ? 'blue' : 'blue-gray'}
+            className="flex items-center gap-2"
           >
-            <Option value="">جميع الموزعين</Option>
-            {activeDistributors.map(d => (
-              <Option key={d.id} value={d.id.toString()}>
-                {`${d.firstName} ${d.lastName}`}
-              </Option>
-            ))}
-          </Select>
-          {/* Date From Filter */}
-          <Input
-            type="datetime-local"
-            value={dateFrom}
-            onChange={e => setDateFrom(e.target.value)}
-            className=" mb-2"
-            label="من تاريخ"
-          />
-          {/* Date To Filter */}
-          <Input
-            type="datetime-local"
-            value={dateTo}
-            onChange={e => setDateTo(e.target.value)}
-            className=" mb-2"
-            label="إلى تاريخ"
-          />
-          {/* Reset Button */}
-          <Button onClick={resetFilters} variant="danger">
-            إعادة تعيين
+            <FontAwesomeIcon icon={showFilters ? faXmark : faFilter} />
+            {showFilters ? 'إخفاء الفلتر' : 'إظهار الفلتر'}
           </Button>
+          {hasActiveFilters && (
+            <Button
+              onClick={resetFilters}
+              variant="outlined"
+              color="red"
+              className="flex items-center gap-2"
+            >
+              <i className="fas fa-times"></i>
+              إعادة تعيين
+            </Button>
+          )}
         </div>
-      
-          </>
-        
+        {hasActiveFilters && (
+          <Typography 
+            variant="small" 
+            color="blue-gray"
+            className="font-medium"
+            placeholder={undefined}
+            onPointerEnterCapture={undefined}
+            onPointerLeaveCapture={undefined}
+          >
+            {activeDistributors.length} طلب متاح
+          </Typography>
+        )}
+      </div>
+
+      {showFilters && (
+        <Card 
+          className="w-full"
+          placeholder={undefined}
+          onPointerEnterCapture={undefined}
+          onPointerLeaveCapture={undefined}
+        >
+          <CardBody 
+            className="p-4"
+            placeholder={undefined}
+            onPointerEnterCapture={undefined}
+            onPointerLeaveCapture={undefined}
+          >
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Distributor Filter */}
+              <div className="space-y-2">
+                <Typography 
+                  variant="small" 
+                  color="blue-gray"
+                  className="font-medium"
+                  placeholder={undefined}
+                  onPointerEnterCapture={undefined}
+                  onPointerLeaveCapture={undefined}
+                >
+                  الموزع
+                </Typography>
+                <Select
+                  value={selectedDistributor || ''}
+                  onChange={(e) => {
+                    console.log('Selected distributor:', e);
+                    setSelectedDistributor(e || null);
+                  }}
+                  className="border border-blue-gray-200 rounded-lg"
+                  placeholder={undefined}
+                  onPointerEnterCapture={undefined}
+                  onPointerLeaveCapture={undefined}
+                >
+                  <Option value="">جميع الموزعين</Option>
+                  {activeDistributors.map(d => (
+                    <Option key={d.id} value={d.id}>
+                      {`${d.firstName} ${d.lastName}`}
+                    </Option>
+                  ))}
+                </Select>
+              </div>
+
+              {/* Status Filter */}
+              <div className="space-y-2">
+                <Typography 
+                  variant="small" 
+                  color="blue-gray"
+                  className="font-medium"
+                  placeholder={undefined}
+                  onPointerEnterCapture={undefined}
+                  onPointerLeaveCapture={undefined}
+                >
+                  الحالة
+                </Typography>
+                <Select
+                  value={selectedStatus || ''}
+                  onChange={(e) => setSelectedStatus(e || null)}
+                  className="border border-blue-gray-200 rounded-lg"
+                  placeholder={undefined}
+                  onPointerEnterCapture={undefined}
+                  onPointerLeaveCapture={undefined}
+                >
+                  <Option value="">الكل</Option>
+                  {statusOptions.map((status) => (
+                    <Option key={status.value} value={status.value}>
+                      {status.label}
+                    </Option>
+                  ))}
+                </Select>
+              </div>
+
+              {/* Date From Filter */}
+              <div className="space-y-2">
+                <Typography 
+                  variant="small" 
+                  color="blue-gray"
+                  className="font-medium"
+                  placeholder={undefined}
+                  onPointerEnterCapture={undefined}
+                  onPointerLeaveCapture={undefined}
+                >
+                  من تاريخ
+                </Typography>
+                <Input
+                  type="datetime-local"
+                  value={dateFrom}
+                  onChange={e => setDateFrom(e.target.value)}
+                  className="border border-blue-gray-200 rounded-lg"
+                  placeholder={undefined}
+                  onPointerEnterCapture={undefined}
+                  onPointerLeaveCapture={undefined}
+                  crossOrigin={undefined}
+                />
+              </div>
+
+              {/* Date To Filter */}
+              <div className="space-y-2">
+                <Typography 
+                  variant="small" 
+                  color="blue-gray"
+                  className="font-medium"
+                  placeholder={undefined}
+                  onPointerEnterCapture={undefined}
+                  onPointerLeaveCapture={undefined}
+                >
+                  إلى تاريخ
+                </Typography>
+                <Input
+                  type="datetime-local"
+                  value={dateTo}
+                  onChange={e => setDateTo(e.target.value)}
+                  className="border border-blue-gray-200 rounded-lg"
+                  placeholder={undefined}
+                  onPointerEnterCapture={undefined}
+                  onPointerLeaveCapture={undefined}
+                  crossOrigin={undefined}
+                />
+              </div>
+            </div>
+          </CardBody>
+        </Card>
       )}
     </div>
   );

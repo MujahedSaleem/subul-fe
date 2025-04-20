@@ -21,5 +21,12 @@ export interface OrderList
     status: string
     createdAt: string;
     confirmedAt: string
+  }
 
+export interface PaginatedOrders {
+  items: OrderList[];
+  totalCount: number;
+  pageNumber: number;
+  pageSize: number;
+  totalPages: number;
 }

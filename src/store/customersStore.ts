@@ -105,14 +105,46 @@ class CustomersStore {
     this.listeners.forEach(listener => listener());
   }
 
-  async findOrCreateCustomer(customerName: string, arg1: { name: string; coordinates: string; phone: string; }) {
+  async getCustomerById(id: string): Promise<Customer | null> {
+    try {
+      // First check if we have the customer in the store
+      const existingCustomer = this._customers.find(c => c.id === id);
+      if (existingCustomer) {
+        return existingCustomer;
+      }
+
+      // If not in store, fetch from API
+      const response = await axiosInstance.get<Customer>(`/customers/${id}`);
+      const customer = response.data;
+      
+      // Add to store
+      this._customers = [...this._customers, customer];
+      this.notifyListeners();
+      
+      return customer;
+    } catch (error) {
+      console.error("Error fetching customer:", error);
+      return null;
+    }
+  }
+
+  async findOrCreateCustomer(customerName: string, locationData: { name: string; coordinates: string; phone: string; }) {
     let customer = this._customers.find(c => c.name === customerName);
     
     if (customer) {
       return customer;
     }
   
-    customer = await this.addCustomer({ name: customerName, locations: [{ id: 1, name: arg1.name, coordinates: arg1.coordinates, description: "" }], phone: arg1.phone });
+    customer = await this.addCustomer({ 
+      name: customerName, 
+      locations: [{ 
+        id: 0, // Temporary ID, will be replaced by server
+        name: locationData.name, 
+        coordinates: locationData.coordinates, 
+        description: "" 
+      }], 
+      phone: locationData.phone 
+    });
     
     return customer;
   }

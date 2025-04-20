@@ -16,6 +16,7 @@ import DistributorAddOrder from "./pages/distributor/DistributorAddOrder";
 import DistributorListOrder from "./pages/distributor/DistributorListOrder";
 import { ProtectedRoute } from "./components/authGuard";
 import { useAuth } from "./context/AuthContext";
+import ViewOrder from "./pages/admin/ViewOrder";
 
 // ✅ Authentication & Role-Based Access
 
@@ -70,6 +71,10 @@ function App() {
       <Route
         path="/admin/orders/edit/:id"
         element={<ProtectedRoute allowedRoles={["Admin"]}><EditOrder /></ProtectedRoute>}
+      />
+      <Route
+        path="/admin/orders/view/:id"
+        element={<ProtectedRoute allowedRoles={["Admin"]}><ViewOrder /></ProtectedRoute>}
       />
       <Route
         path="/admin/distributors"

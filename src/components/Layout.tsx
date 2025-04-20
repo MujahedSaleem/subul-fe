@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
@@ -14,8 +14,8 @@ import {
 import Button from './Button';
 import IconButton from './IconButton';
 import { useError } from "../context/ErrorContext";
-import { useAuth } from "../context/AuthContext"; // ✅ Import AuthContext
-import { initializeStores } from '../store/initializeStores';
+import { useAuth } from "../context/AuthContext";
+import { Typography } from '@material-tailwind/react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -23,36 +23,17 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children, title }) => {
-  const { state, dispatch } = useError(); // ✅ Get global error state
-  const { logout } = useAuth(); // ✅ Get logoutUser function from AuthContext
+  const { state, dispatch } = useError();
+  const { logout } = useAuth();
 
   const navigate = useNavigate();
   const location = useLocation();
   const isAdmin = location.pathname.startsWith('/admin');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(false);
 
-  useEffect(() => {
-    if (isAdmin) {
-      const initStores = async () => {
-        try {
-          setIsInitializing(true);
-          await initializeStores();
-        } catch (error) {
-          console.error('Failed to initialize stores:', error);
-          dispatch({ type: 'SET_ERROR', payload: 'فشل تحميل البيانات، يرجى المحاولة لاحقًا' });
-        } finally {
-          setIsInitializing(false);
-        }
-      };
-      initStores();
-    }
-  }, [isAdmin, dispatch]);
-
-  // Handle logout by calling logoutUser function from AuthContext
   const handleLogout = () => {
-    logout(); // Call logoutUser from AuthContext to handle logout logic
-    navigate('/login'); // Redirect to login page after logging out
+    logout();
+    navigate('/login');
   };
 
   const menuItems = isAdmin ? [
@@ -63,17 +44,6 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
   ] : [
     { path: '/distributor/orders', label: 'الطلبات', icon: faBox },
   ];
-
-  if (isInitializing) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
-          <p className="mt-4 text-slate-600">جاري تحميل البيانات...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -120,7 +90,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
 
           <div className="p-4 border-t border-slate-100">
             <Button
-              onClick={handleLogout} // Use handleLogout to logout
+              onClick={handleLogout}
               variant="danger"
               icon={faRightFromBracket}
               block
@@ -135,7 +105,16 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
       <div className={`transition-all duration-300 ${isSidebarOpen ? 'lg:mr-64' : 'mr-0 lg:mr-64'}`}>
         <header className="bg-white shadow-sm h-16 fixed left-0 right-0 top-0 z-20 lg:right-64">
           <div className="px-4 lg:px-8 h-full flex items-center justify-between">
-            <h1 className="text-xl lg:text-2xl font-semibold text-slate-800">{title}</h1>
+            <Typography
+              variant="h4"
+              color="blue-gray"
+              className="text-xl lg:text-2xl font-semibold"
+              placeholder=""
+              onPointerEnterCapture={() => {}}
+              onPointerLeaveCapture={() => {}}
+            >
+              {title}
+            </Typography>
             <IconButton 
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className="lg:hidden"
