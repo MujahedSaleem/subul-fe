@@ -43,7 +43,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
     setIsSearching(true);
     // Only search for customer if this is a new order or if we don't have a customer yet
     if (!order?.customer?.id && order?.customer?.phone && isValidPhoneNumber(order?.customer?.phone)) {
-      const existingCustomer = await customersStore.findCustomerByPhone(order?.customer?.phone);
+          const existingCustomer = await customersStore.findCustomerByPhone(order?.customer?.phone);
       if (existingCustomer !== undefined && existingCustomer !== null) {
         setIsNewCustomer(false);
         setOrder((prev) => ({
@@ -185,15 +185,15 @@ const OrderForm: React.FC<OrderFormProps> = ({
             <p className="text-yellow-800 text-sm">لا توجد إحداثيات متوفرة لهذا الموقع</p>
             <p className="text-yellow-600 text-xs mt-1">يمكنك تحديد الموقع الحالي لتحديث الإحداثيات</p>
           </div>
-          <IconButton 
-            onClick={handleSetLocation}
-            icon={faMapLocation}
+                <IconButton 
+                  onClick={handleSetLocation}
+                  icon={faMapLocation}
             variant="warning"
-            size="lg"
-            loading={getttingGpsLocation}
+                  size="lg"
+                  loading={getttingGpsLocation}
             title="استخدام الموقع الحالي"
           />
-        </div>
+      </div>
       )}
 
       <DistributorSelector

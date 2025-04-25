@@ -52,14 +52,14 @@ const ViewOrder: React.FC = () => {
           return;
         }
 
-        console.log('Fetching orders...');
+        
         if (!ordersStore.isLoadingData) {
           await ordersStore.fetchOrders();
         }
 
         // After fetching all orders, try to get the specific order
         const orderData = await ordersStore.getOrderById(Number(id));
-        console.log('Fetched order data:', orderData);
+        
 
         if (!orderData) {
           const errorMsg = `Order with ID ${id} not found`;
@@ -88,7 +88,7 @@ const ViewOrder: React.FC = () => {
   }, [id, dispatch]);
 
   // Debug render
-  console.log('Render state:', { isLoading, error, order, id });
+  
 
   const formatDate = (date: string): string => {
     if (!date) return '';

@@ -153,7 +153,7 @@ class OrdersStore {
     try {
       const response = await axiosInstance.post<OrderList>('/orders', order);
       const newOrder = response.data;
-      this._orders = [...this._orders, newOrder];
+        this._orders = [...this._orders, newOrder];
       this.notifyListeners();
       return newOrder;
     } catch (error) {

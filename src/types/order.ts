@@ -10,18 +10,24 @@ export interface OrderRequest {
   statusString: 'New' | 'Pending' | 'Confirmed' | 'Draft';
   distributorId?: string;
 }
-export interface OrderList
-  {
-    id: number;
-    orderNumber: string;
-    customer: Customer;
-    location: Location;
-    distributor: Distributor;
-    cost: number;
-    status: string
-    createdAt: string;
-    confirmedAt: string
-  }
+
+export interface DistributorInfo {
+  id: string;
+  name: string;
+  phone: string;
+}
+
+export interface OrderList {
+  id: number;
+  orderNumber: string;
+  customer: Customer;
+  location: Location;
+  distributor: DistributorInfo;
+  cost: number;
+  status: string;
+  createdAt: string;
+  confirmedAt: string;
+}
 
 export interface PaginatedOrders {
   items: OrderList[];

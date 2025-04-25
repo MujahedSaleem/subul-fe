@@ -42,7 +42,7 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
   children,
   addedOption
 }) => {
-  console.log("value", value)
+  
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);

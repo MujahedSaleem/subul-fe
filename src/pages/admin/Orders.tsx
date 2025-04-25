@@ -33,7 +33,7 @@ const Orders: React.FC = () => {
     const unsubscribeDistributors = distributorsStore.subscribe(() => {
       setActiveDistributors(distributorsStore.distributors.filter(d => d.isActive));
     });
-
+  
     const fetchData = async () => {
       setIsLoading(true);
       try {
@@ -50,12 +50,12 @@ const Orders: React.FC = () => {
         console.error("Error fetching data:", error);
       }
     };
-
+  
     fetchData();
-
+  
     return () => {
-      unsubscribeOrders();
-      unsubscribeDistributors();
+      unsubscribeOrders(); 
+      unsubscribeDistributors(); 
     };
   }, [currentPage, pageSize, selectedDistributor, selectedStatus, dateFrom, dateTo]);
 
@@ -63,7 +63,7 @@ const Orders: React.FC = () => {
     if (window.confirm('Are you sure you want to delete this order?')) {
       setIsLoading(true);
       try {
-        await ordersStore.deleteOrder(id);
+      await ordersStore.deleteOrder(id);
         await ordersStore.fetchOrders(currentPage, pageSize, {
           distributorId: selectedDistributor,
           status: selectedStatus,
@@ -73,7 +73,7 @@ const Orders: React.FC = () => {
       } catch (error) {
         console.error("Error deleting order:", error);
       } finally {
-        setIsLoading(false);
+      setIsLoading(false);
       }
     }
   };
@@ -92,7 +92,7 @@ const Orders: React.FC = () => {
       } catch (error) {
         console.error("Error confirming order:", error);
       } finally {
-        setIsLoading(false);
+      setIsLoading(false);
       }
     }
   };
@@ -112,10 +112,10 @@ const Orders: React.FC = () => {
       if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
         const googleMapsUrl = `geo:0,0?q=${encodeURIComponent(latitude)},${encodeURIComponent(longitude)}`;
         window.location.href = googleMapsUrl;
-      } else {
+          } else {
         const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(latitude)},${encodeURIComponent(longitude)}`;
         window.open(url, '_blank');
-      }
+            }
     } else {
       alert('لا توجد إحداثيات متوفرة لهذا الموقع');
     }
@@ -203,10 +203,10 @@ const Orders: React.FC = () => {
                 onClick={() => navigate('/admin/orders/add')} 
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
               >
-                إضافة طلب
-              </Button>
+          إضافة طلب
+          </Button>
             </div>
-          </CardHeader>
+        </CardHeader>
 
           <CardBody 
             className="p-6"
@@ -215,20 +215,20 @@ const Orders: React.FC = () => {
             onPointerLeaveCapture={undefined}
           >
             <div className="space-y-6">
-              <OrderFilter
-                showFilters={showFilters}
-                setShowFilters={setShowFilters}
-                selectedDistributor={selectedDistributor}
+            <OrderFilter
+        showFilters={showFilters}
+        setShowFilters={setShowFilters}
+        selectedDistributor={selectedDistributor}
                 setSelectedDistributor={handleDistributorChange}
                 selectedStatus={selectedStatus}
                 setSelectedStatus={handleStatusChange}
-                dateFrom={dateFrom}
+        dateFrom={dateFrom}
                 setDateFrom={handleDateFromChange}
-                dateTo={dateTo}
+        dateTo={dateTo}
                 setDateTo={handleDateToChange}
-                resetFilters={resetFilters}
-                activeDistributors={activeDistributors}
-              />
+        resetFilters={resetFilters}
+        activeDistributors={activeDistributors}
+      />
 
               {isLoading ? (
                 <div className="flex justify-center items-center py-12">
@@ -245,15 +245,15 @@ const Orders: React.FC = () => {
                 </div>
               ) : (
                 <>
-                  <OrderTable
+          <OrderTable
                     orders={ordersStore.orders}
-                    handleDelete={handleDelete}
-                    handleConfirmOrder={handleConfirmOrder}
-                    handleCallCustomer={handleCallCustomer}
-                    handleOpenLocation={handleOpenLocation}
-                    formatDate={formatDate}
-                    formatCurrency={formatCurrency}
-                  />
+          handleDelete={handleDelete}
+          handleConfirmOrder={handleConfirmOrder}
+          handleCallCustomer={handleCallCustomer}
+          handleOpenLocation={handleOpenLocation}
+          formatDate={formatDate}
+          formatCurrency={formatCurrency}
+        />
                   <div className="flex justify-between items-center mt-4">
                     <div className="flex items-center gap-2">
                       <Typography 
@@ -303,7 +303,7 @@ const Orders: React.FC = () => {
                 </>
               )}
             </div>
-          </CardBody>
+        </CardBody>
         </Card>
 
         {isCallModalOpen && customerPhone && (
@@ -312,7 +312,7 @@ const Orders: React.FC = () => {
             onClose={() => setIsCallModalOpen(false)}
             phone={customerPhone}
           />
-        )}
+        )}      
       </div>
     </Layout>
   );

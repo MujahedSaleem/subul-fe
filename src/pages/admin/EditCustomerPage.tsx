@@ -7,7 +7,7 @@ const EditCustomerPage: React.FC = () => {
   const { id } = useParams();
 
   const handleCustomerUpdated = (updatedCustomer: any) => {
-    console.log("Customer updated:", updatedCustomer);
+    
     // Optionally navigate back to the customer list or perform other actions
   };
 

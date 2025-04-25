@@ -55,7 +55,7 @@ const LocationSelector : React.FC<LocationSelectorProps> =(
             locations: [...(prev.customer?.locations ?? []), newLocation],
           };
           return {
-            ...prev,
+          ...prev,
             customer: updatedCustomer,
             location: newLocation,
             locationId: newLocation.id
@@ -64,7 +64,7 @@ const LocationSelector : React.FC<LocationSelectorProps> =(
         setSelectedLocationName(newLocationName);
       }
     };
-    
+
     const handleSaveCustomer = (updatedCustomer: Customer) => {
       setOrder((prev: OrderList | undefined) => {
         if (!prev) return prev;
@@ -97,7 +97,7 @@ const LocationSelector : React.FC<LocationSelectorProps> =(
 
     // If no customer is selected yet, or customer has no locations array, show empty state
     if (!customer?.locations) {
-      return (
+    return (
         <div className="flex flex-col">
           <label htmlFor="location" className="text-sm font-medium text-slate-700">
             الموقع
@@ -134,15 +134,15 @@ const LocationSelector : React.FC<LocationSelectorProps> =(
             </Option>
           ))}
         </SearchableDropdown>
-        
+
         {/* Add Location Modal */}
         <AddLocationModal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
+              isOpen={isModalOpen}
+              onClose={() => setIsModalOpen(false)}
           onAdd={(location) => handleAddLocation(location.name)}
-        />
-      </div>
+              />
+        </div>
     );
-};
+  };
 
 export default LocationSelector;

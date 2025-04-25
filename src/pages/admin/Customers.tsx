@@ -19,22 +19,22 @@ const Customers: React.FC = () => {
     const fetchCustomers = async () => {
       try {
         setIsLoading(true);
-        await customersStore.fetchCustomers();
+          await customersStore.fetchCustomers();
       } catch (error) {
         console.error("Error fetching customers:", error);
       } finally {
         setIsLoading(false);
       }
     };
-
+  
     fetchCustomers();
 
     const unsubscribe = customersStore.subscribe(() => {
       setCustomers(customersStore.customers);
     });
-
+  
     setCustomers(customersStore.customers);
-
+  
     return () => unsubscribe();
   }, []);
 
@@ -42,7 +42,7 @@ const Customers: React.FC = () => {
     if (window.confirm('هل أنت متأكد من حذف هذا العميل؟')) {
       setIsLoading(true);
       try {
-        await customersStore.deleteCustomer(id);
+      await customersStore.deleteCustomer(id);
       } catch (error) {
         console.error("Error deleting customer:", error);
       } finally {
@@ -114,8 +114,8 @@ const Customers: React.FC = () => {
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
               >
                 <FontAwesomeIcon icon={faPlus} />
-                إضافة عميل
-              </Button>
+            إضافة عميل
+          </Button>
             </div>
           </div>
         </CardHeader>

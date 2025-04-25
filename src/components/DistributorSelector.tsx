@@ -26,14 +26,14 @@ const DistributorSelector: React.FC<DistributorSelectorProps> = ({
         setIsLoading(true);
         setError(null);
         await distributorsStore.fetchDistributors(true); // Force refresh to ensure we have latest data
-      } catch (error) {
-        console.error("Error fetching distributors:", error);
+        } catch (error) {
+          console.error("Error fetching distributors:", error);
         if (isMounted) {
           setError('حدث خطأ أثناء تحميل قائمة الموزعين');
         }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
+        } finally {
+          if (isMounted) {
+            setIsLoading(false);
         }
       }
     };
@@ -79,14 +79,14 @@ const DistributorSelector: React.FC<DistributorSelectorProps> = ({
       <label htmlFor="distributor" className="text-sm font-medium text-slate-700">
         الموزع
       </label>
-      {/* Hidden input to enforce required validation */}
-      <input 
-        type="text" 
+        {/* Hidden input to enforce required validation */}
+        <input 
+                type="text" 
         value={selectedDistributorId} 
-        required 
-        onChange={() => {}} // Prevent React warning
-        style={{ display: "none" }} 
-      />
+                required 
+                onChange={() => {}} // Prevent React warning
+                style={{ display: "none" }} 
+            />
       <Select
         id="distributor"
         value={selectedDistributorId}
@@ -109,8 +109,8 @@ const DistributorSelector: React.FC<DistributorSelectorProps> = ({
       >
         {activeDistributors.length > 0 ? (
           activeDistributors.map(distributor => (
-            <Option key={distributor.id} value={distributor.id}>
-              {`${distributor.firstName} ${distributor.lastName}`}
+          <Option key={distributor.id} value={distributor.id}>
+            {`${distributor.firstName} ${distributor.lastName}`}
             </Option>
           ))
         ) : (

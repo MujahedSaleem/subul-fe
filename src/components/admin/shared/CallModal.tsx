@@ -1,5 +1,5 @@
 import React from 'react';
-import { faPhone, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { faXmark } from '@fortawesome/free-solid-svg-icons';
 import { faWhatsapp } from '@fortawesome/free-brands-svg-icons';
 import Button from '../../Button';
 import IconButton from '../../IconButton';
@@ -27,11 +27,6 @@ const CallModal: React.FC<CallModalProps> = ({ phone, isOpen, onClose }) => {
     onClose();
   };
 
-  const handlePhoneCall = (formattedPhone: string) => {
-    window.location.href = `tel:${formattedPhone}`;
-    onClose();
-  };
-
   return (
     <div className="modal-overlay">
       <div className="modal-container">
@@ -47,7 +42,7 @@ const CallModal: React.FC<CallModalProps> = ({ phone, isOpen, onClose }) => {
             </div>
             
             <h3 className="text-lg font-semibold text-slate-900">
-              اختر طريقة الاتصال
+              اختر رقم الواتساب
             </h3>
           </div>
           
@@ -58,7 +53,6 @@ const CallModal: React.FC<CallModalProps> = ({ phone, isOpen, onClose }) => {
                   <div className="text-sm font-medium text-slate-700">
                     {formattedPhone}
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
                     <Button
                       onClick={() => handleWhatsAppCall(formattedPhone.replace('+', ''))}
                       variant="success"
@@ -68,16 +62,6 @@ const CallModal: React.FC<CallModalProps> = ({ phone, isOpen, onClose }) => {
                     >
                       واتساب
                     </Button>
-                    <Button
-                      onClick={() => handlePhoneCall(formattedPhone)}
-                      variant="primary"
-                      icon={faPhone}
-                      size="md"
-                      block
-                    >
-                      اتصال
-                    </Button>
-                  </div>
                 </div>
               ))}
             </div>

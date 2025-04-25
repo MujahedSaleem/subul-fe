@@ -36,14 +36,20 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
   selectedStatus,
   setSelectedStatus,
 }) => {
-  const getSelectedDistributor = (id: string) => {
-    if (!selectedDistributor) return '';
-    const selectedDist = activeDistributors.find(d => d.id === id);
-    if (!selectedDist) return '';
+  const getSelectedDistributorLabel = () => {
+    if (!selectedDistributor) return 'جميع الموزعين';
+    const selectedDist = activeDistributors.find(d => d.id === selectedDistributor);
+    if (!selectedDist) return 'جميع الموزعين';
     return `${selectedDist.firstName} ${selectedDist.lastName}`;
   };
 
-  const hasActiveFilters = selectedDistributor || dateFrom || dateTo;
+  const getSelectedStatusLabel = () => {
+    if (!selectedStatus) return 'الكل';
+    const status = statusOptions.find(s => s.value === selectedStatus);
+    return status ? status.label : 'الكل';
+  };
+
+  const hasActiveFilters = selectedDistributor || dateFrom || dateTo || selectedStatus;
 
   const statusOptions = [
     { value: 'New', label: 'جديد' },
@@ -86,7 +92,7 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
             onPointerEnterCapture={undefined}
             onPointerLeaveCapture={undefined}
           >
-            {activeDistributors.length} طلب متاح
+            {activeDistributors.length} موزع نشط
           </Typography>
         )}
       </div>
@@ -104,9 +110,9 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
             onPointerEnterCapture={undefined}
             onPointerLeaveCapture={undefined}
           >
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {/* Distributor Filter */}
-              <div className="space-y-2">
+              <div className="space-y-2 md:order-4">
                 <Typography 
                   variant="small" 
                   color="blue-gray"
@@ -120,17 +126,31 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
                 <Select
                   value={selectedDistributor || ''}
                   onChange={(e) => {
-                    console.log('Selected distributor:', e);
+                    
                     setSelectedDistributor(e || null);
                   }}
-                  className="border border-blue-gray-200 rounded-lg"
+                  selected={(element) => {
+                    const selectedDist = activeDistributors.find(d => d.id === selectedDistributor);
+                    return (
+                      <span className="text-right block truncate">
+                        {selectedDist ? `${selectedDist.firstName} ${selectedDist.lastName}` : 'جميع الموزعين'}
+                      </span>
+                    );
+                  }}
+                  label={getSelectedDistributorLabel()}
+                  className="border border-blue-gray-200 rounded-lg leading-tight text-right"
+                  labelProps={{
+                    className: "text-right before:text-right after:text-right"
+                  }}
+                  menuProps={{ className: "text-right" }}
+                  containerProps={{ className: "min-w-[200px] text-right" }}
                   placeholder={undefined}
                   onPointerEnterCapture={undefined}
                   onPointerLeaveCapture={undefined}
                 >
-                  <Option value="">جميع الموزعين</Option>
+                  <Option value="" className="leading-tight text-right">جميع الموزعين</Option>
                   {activeDistributors.map(d => (
-                    <Option key={d.id} value={d.id}>
+                    <Option key={d.id} value={d.id} className="leading-tight text-right">
                       {`${d.firstName} ${d.lastName}`}
                     </Option>
                   ))}
@@ -138,7 +158,7 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
               </div>
 
               {/* Status Filter */}
-              <div className="space-y-2">
+              <div className="space-y-2 md:order-3">
                 <Typography 
                   variant="small" 
                   color="blue-gray"
@@ -152,14 +172,28 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
                 <Select
                   value={selectedStatus || ''}
                   onChange={(e) => setSelectedStatus(e || null)}
-                  className="border border-blue-gray-200 rounded-lg"
+                  selected={(element) => {
+                    const status = statusOptions.find(s => s.value === selectedStatus);
+                    return (
+                      <span className="text-right block truncate">
+                        {status ? status.label : 'الكل'}
+                      </span>
+                    );
+                  }}
+                  label={getSelectedStatusLabel()}
+                  className="border border-blue-gray-200 rounded-lg leading-tight text-right"
+                  labelProps={{
+                    className: "text-right before:text-right after:text-right"
+                  }}
+                  menuProps={{ className: "text-right" }}
+                  containerProps={{ className: "min-w-[200px] text-right" }}
                   placeholder={undefined}
                   onPointerEnterCapture={undefined}
                   onPointerLeaveCapture={undefined}
                 >
-                  <Option value="">الكل</Option>
+                  <Option value="" className="leading-tight text-right">الكل</Option>
                   {statusOptions.map((status) => (
-                    <Option key={status.value} value={status.value}>
+                    <Option key={status.value} value={status.value} className="leading-tight text-right">
                       {status.label}
                     </Option>
                   ))}
@@ -167,7 +201,7 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
               </div>
 
               {/* Date From Filter */}
-              <div className="space-y-2">
+              <div className="space-y-2 md:order-2">
                 <Typography 
                   variant="small" 
                   color="blue-gray"
@@ -191,7 +225,7 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
               </div>
 
               {/* Date To Filter */}
-              <div className="space-y-2">
+              <div className="space-y-2 md:order-1">
                 <Typography 
                   variant="small" 
                   color="blue-gray"

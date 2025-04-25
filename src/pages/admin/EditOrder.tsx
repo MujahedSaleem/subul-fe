@@ -87,9 +87,9 @@ const EditOrder: React.FC = () => {
       // Check if there are any changes to the customer
       const originalCustomer = await customersStore.getCustomerById(order.customer.id);
       if (!originalCustomer) {
-        navigate('/admin/orders');
-        return;
-      }
+      navigate('/admin/orders');
+      return;
+    }
 
       const hasCustomerChanges = JSON.stringify({
         name: order.customer.name,
@@ -104,11 +104,11 @@ const EditOrder: React.FC = () => {
       // Only update if there are changes
       if (hasOrderChanges) {
         const orderRequest: OrderRequest = {
-          id: order.id,
-          orderNumber: order.orderNumber,
-          customerId: order.customer.id,
+      id: order.id,
+      orderNumber: order.orderNumber,
+      customerId: order.customer.id,
           locationId: order.location?.id,
-          cost: order.cost,
+      cost: order.cost,
           distributorId: order.distributor?.id,
           statusString: order.status as 'New' | 'Pending' | 'Confirmed' | 'Draft'
         };
@@ -122,7 +122,7 @@ const EditOrder: React.FC = () => {
       navigate('/admin/orders');
     } catch (error) {
       console.error('Error handling back navigation:', error);
-      navigate('/admin/orders');
+    navigate('/admin/orders');
     }
   };
 
@@ -141,7 +141,7 @@ const EditOrder: React.FC = () => {
           l => l.coordinates === order.location.coordinates || l.id === order.location.id
         );
 
-        const confirmedOrder = {
+    const confirmedOrder = {
           id: order.id,
           orderNumber: order.orderNumber,
           customerId: updatedCustomer.id,
@@ -149,12 +149,12 @@ const EditOrder: React.FC = () => {
           cost: order.cost,
           distributorId: order.distributor.id,
           statusString: 'New'
-        } as OrderRequest;
+    } as OrderRequest;
 
         await ordersStore.updateOrder(confirmedOrder);
         await ordersStore.confirmOrder(confirmedOrder.id);
-        shouldSaveOnUnmount.current = false;
-        navigate('/admin/orders');
+    shouldSaveOnUnmount.current = false;
+    navigate('/admin/orders');
       }
     } catch (error) {
       console.error('Error confirming order:', error);
@@ -226,18 +226,18 @@ const EditOrder: React.FC = () => {
           
           {/* Form Section */}
           <div className="p-6 sm:p-8">
-            <OrderForm
-              order={order}
+      <OrderForm
+        order={order}
               setOrder={(newOrder) => {
                 if (newOrder) {
                   setOrder(newOrder as OrderList);
                 }
               }}
-              onSubmit={handleSubmit}
-              onBack={handleBack}
+        onSubmit={handleSubmit}
+        onBack={handleBack}
               title="حفظ التغييرات"
-              isEdit={true}
-            />
+        isEdit={true}
+      />
           </div>
         </div>
       </div>

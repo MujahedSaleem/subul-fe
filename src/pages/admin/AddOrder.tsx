@@ -148,14 +148,14 @@ const AddOrder: React.FC = () => {
           
           {/* Form Section */}
           <div className="p-6 sm:p-8">
-            <OrderForm
-              order={order}
-              setOrder={setOrder}
-              onSubmit={handleSubmit}
-              onBack={handleBack}
-              title="تأكيد الطلبية"
-              isEdit={false}
-            />
+      <OrderForm
+        order={order}
+        setOrder={setOrder}
+        onSubmit={handleSubmit}
+        onBack={handleBack}
+        title="تأكيد الطلبية"
+        isEdit={false}
+      />
           </div>
         </div>
       </div>

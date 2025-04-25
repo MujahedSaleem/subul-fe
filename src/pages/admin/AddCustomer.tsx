@@ -24,7 +24,7 @@ const AddCustomer: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Submitting customer:", customer);
+    
 
     const newCustomer = await customersStore.addCustomer(customer);
 

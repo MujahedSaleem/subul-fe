@@ -40,7 +40,7 @@ const EditCustomer = forwardRef(({ customerId, onCustomerUpdated, onCloseModal }
     getCustomerData: () => customer,
     saveChanges: async () => {
       if (!customer) return;
-      console.log("Saving customer:", customer);
+      
       const success = await customersStore.updateCustomer(customer);
       if (success) {
         onCustomerUpdated(customer); // Notify parent component of the update
@@ -58,7 +58,7 @@ const EditCustomer = forwardRef(({ customerId, onCustomerUpdated, onCloseModal }
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customer) return;
-    console.log("Saving customer:", customer);
+    
     const success = await customersStore.updateCustomer(customer);
     if (!success) {
       dispatch({ type: "SET_ERROR", payload: "خطأ في تعديل العميل، حاول مجددًا" });

@@ -21,9 +21,9 @@ const Distributors: React.FC = () => {
   
     // Always fetch fresh data when component mounts
     distributorsStore.fetchDistributors(true).catch(error => {
-      console.error("Error fetching distributors:", error);
+        console.error("Error fetching distributors:", error);
     });
-
+  
     return () => unsubscribe();
   }, []);
 
@@ -44,7 +44,7 @@ const Distributors: React.FC = () => {
     if (window.confirm('هل أنت متأكد من حذف هذا الموزع؟')) {
       setIsLoading(true);
       try {
-        await distributorsStore.deleteDistributor(id);
+      await distributorsStore.deleteDistributor(id);
         // Refresh the list after deletion
         await distributorsStore.fetchDistributors(true);
       } catch (error) {
