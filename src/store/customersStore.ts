@@ -7,6 +7,7 @@ class CustomersStore {
   private listeners: (() => void)[] = [];
   private _isLoading: boolean = false;
   private _isInitialized: boolean = false;
+  private ongoingRequests: Map<string, Promise<Customer>> = new Map();
 
   private constructor() {}
 
@@ -107,23 +108,40 @@ class CustomersStore {
 
   async getCustomerById(id: string): Promise<Customer | null> {
     try {
-      // First check if we have the customer in the store
-      const existingCustomer = this._customers.find(c => c.id === id);
+      // Check if there's already an ongoing request for this ID
+      const existingRequest = this.ongoingRequests.get(id);
+      if (existingRequest) {
+        return existingRequest;
+      }
+
+      // Check if the customer exists in the store
+      const existingCustomer = this._customers.find(customer => customer.id === id);
       if (existingCustomer) {
         return existingCustomer;
       }
 
-      // If not in store, fetch from API
-      const response = await axiosInstance.get<Customer>(`/customers/${id}`);
-      const customer = response.data;
-      
-      // Add to store
-      this._customers = [...this._customers, customer];
-      this.notifyListeners();
-      
-      return customer;
+      // Create a new request promise
+      const requestPromise = (async () => {
+        try {
+          const response = await axiosInstance.get<Customer>(`/customers/${id}`);
+          const customer = response.data;
+          
+          // Add the customer to the store without triggering a full refresh
+          this._customers = [...this._customers, customer];
+          
+          return customer;
+        } finally {
+          // Clean up the request from the map when done
+          this.ongoingRequests.delete(id);
+        }
+      })();
+
+      // Store the promise in the map
+      this.ongoingRequests.set(id, requestPromise);
+
+      return requestPromise;
     } catch (error) {
-      console.error("Error fetching customer:", error);
+      console.error('Error fetching customer:', error);
       return null;
     }
   }

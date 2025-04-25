@@ -62,39 +62,67 @@ const EditOrder: React.FC = () => {
   }, [id, navigate]);
 
   const handleBack = async () => {
-    if (!order || order.status === 'Confirmed') {
-      navigate('/admin/orders');
-      return;
-    }
+    if (!order) return;
 
     try {
-      // Update customer first
-      const updatedCustomer = await customersStore.updateCustomer(order.customer);
-      
-      if (updatedCustomer) {
-        // Find the selected location
-        const selectedLocation = updatedCustomer.locations?.find(
-          l => l.coordinates === order?.location?.coordinates || l.id === order?.location?.id
-        );
+      // Check if there are any changes to the order
+      const originalOrder = await ordersStore.getOrderById(order.id);
+      if (!originalOrder) {
+        navigate('/admin/orders');
+        return;
+      }
 
-        // Update the order with the new location
-        const updatedOrder = {
+      const hasOrderChanges = JSON.stringify({
+        cost: order.cost,
+        status: order.status,
+        distributor: order.distributor,
+        locationId: order.location?.id
+      }) !== JSON.stringify({
+        cost: originalOrder.cost,
+        status: originalOrder.status,
+        distributor: originalOrder.distributor,
+        locationId: originalOrder.location?.id
+      });
+
+      // Check if there are any changes to the customer
+      const originalCustomer = await customersStore.getCustomerById(order.customer.id);
+      if (!originalCustomer) {
+        navigate('/admin/orders');
+        return;
+      }
+
+      const hasCustomerChanges = JSON.stringify({
+        name: order.customer.name,
+        phone: order.customer.phone,
+        locations: order.customer.locations
+      }) !== JSON.stringify({
+        name: originalCustomer.name,
+        phone: originalCustomer.phone,
+        locations: originalCustomer.locations
+      });
+
+      // Only update if there are changes
+      if (hasOrderChanges) {
+        const orderRequest: OrderRequest = {
           id: order.id,
           orderNumber: order.orderNumber,
-          customerId: updatedCustomer.id,
-          locationId: selectedLocation?.id,
+          customerId: order.customer.id,
+          locationId: order.location?.id,
           cost: order.cost,
-          statusString: 'Pending',
-          distributorId: order?.distributor?.id,
-        } as OrderRequest;
-
-        await ordersStore.updateOrder(updatedOrder);
-        shouldSaveOnUnmount.current = false;
-        navigate('/admin/orders');
+          distributorId: order.distributor?.id,
+          statusString: order.status as 'New' | 'Pending' | 'Confirmed' | 'Draft'
+        };
+        await ordersStore.updateOrder(orderRequest);
       }
+
+      if (hasCustomerChanges) {
+        await customersStore.updateCustomer(order.customer);
+      }
+
+      navigate('/admin/orders');
     } catch (error) {
-      console.error('Error saving order:', error);
-      dispatch({ type: 'SET_ERROR', payload: 'حدث خطأ أثناء حفظ التغييرات' });
+      console.error('Error handling back navigation:', error);
+      navigate('/admin/orders');
     }
   };
 

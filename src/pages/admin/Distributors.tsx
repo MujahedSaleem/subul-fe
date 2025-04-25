@@ -15,25 +15,18 @@ const Distributors: React.FC = () => {
   const [selectedDistributorId, setSelectedDistributorId] = useState<string | null>(null);
 
   useEffect(() => {
-    setIsLoading(true); // Start loading
+    const unsubscribe = distributorsStore.subscribe(() => {
+      setIsLoading(distributorsStore.isLoadingData);
+    });
   
-    const unsubscribe = distributorsStore.subscribe(() => setIsLoading(false)); // Subscribe first
-  
-    const fetchAndSubscribe = async () => {
-      try {
-        if (!distributorsStore.isLoadingData) {
-          await distributorsStore.fetchDistributors();
-        }
-      } catch (error) {
-        console.error("Error fetching distributors:", error);
-        setIsLoading(false); // Ensure loading stops even if there's an error
-      }
-    };
-  
-    fetchAndSubscribe();
-  
-    return () => unsubscribe(); // Cleanup subscription on unmount
+    // Always fetch fresh data when component mounts
+    distributorsStore.fetchDistributors(true).catch(error => {
+      console.error("Error fetching distributors:", error);
+    });
+
+    return () => unsubscribe();
   }, []);
+
   const handleSavePassword = async (oldPassword: string, newPassword: string, confirmPassword: string) => {
     if (!selectedDistributorId) return { status: 400, error: 'No distributor selected' };
     try {
@@ -50,7 +43,15 @@ const Distributors: React.FC = () => {
   const handleDelete = async (id: string) => {
     if (window.confirm('هل أنت متأكد من حذف هذا الموزع؟')) {
       setIsLoading(true);
-      await distributorsStore.deleteDistributor(id);
+      try {
+        await distributorsStore.deleteDistributor(id);
+        // Refresh the list after deletion
+        await distributorsStore.fetchDistributors(true);
+      } catch (error) {
+        console.error("Error deleting distributor:", error);
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 

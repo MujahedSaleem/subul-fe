@@ -136,6 +136,19 @@ const OrderForm: React.FC<OrderFormProps> = ({
     }
   };
 
+  const handleLocationChange = async (location: Location) => {
+    if (!order?.customer) return;
+
+    setOrder(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        location: location,
+        locationId: location.id
+      };
+    });
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <h2 className="text-xl font-semibold text-slate-800 mb-6">تفاصيل الطلب</h2>

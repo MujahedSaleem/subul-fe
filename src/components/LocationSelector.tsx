@@ -1,9 +1,10 @@
-import React, {useState, useRef,  } from "react";
-import { Customer } from "../types/customer";
+import React, {useState, useRef, useEffect } from "react";
+import { Customer, Location } from "../types/customer";
 import { OrderList } from "../types/order";
 import Modal from "./modal";
 import EditCustomer from "./EditCustomer";
-import { SearchableDropdown ,Option } from "./distributor/shared/SearchableDropdown";
+import { SearchableDropdown, Option } from "./distributor/shared/SearchableDropdown";
+import { AddLocationModal } from "./AddLocationModal";
 
 interface LocationSelectorProps {
   order: OrderList | undefined;
@@ -18,14 +19,20 @@ const LocationSelector : React.FC<LocationSelectorProps> =(
   { order, setOrder, disabled, customer, isNewCustomer, isDistributor },
 ) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedLocationName, setSelectedLocationName] = useState("");
     const childRef = useRef<any>(null);
+    
+    useEffect(() => {
+      if (order?.location?.name) {
+        setSelectedLocationName(order.location.name);
+      }
+    }, [order?.location?.name]);
+
     const setNewLocationName = (newLocationName: string) => {
       if (newLocationName.trim() !== '') {
         // Check if the location already exists
         const existingLocation = customer?.locations?.some(
-          (location) => 
-            JSON.stringify(location.coordinates) === JSON.stringify('')
-          || location.name === newLocationName
+          (location) => location.name === newLocationName
         );
     
         if (existingLocation) {
@@ -33,31 +40,28 @@ const LocationSelector : React.FC<LocationSelectorProps> =(
         }
     
         // Create new location object
-        const newLocation = {
+        const newLocation: Location = {
           id: 0, // ID for a new location
           name: newLocationName,
           coordinates: '',
-          description: '',
+          description: ''
         };
     
-        // Update state with the new location
+        // Update state with the new location and customer
         setOrder((prev: OrderList | undefined) => {
           if (!prev) return prev;
-          return {
-            ...prev,
-            customer: {
-              ...prev.customer,
-              locations: [...(prev.customer?.locations ?? []), newLocation],
-            }
+          const updatedCustomer = {
+            ...prev.customer,
+            locations: [...(prev.customer?.locations ?? []), newLocation],
           };
-        });
-        setOrder((prev: OrderList | undefined) => {
-          if (!prev) return prev;
           return {
             ...prev,
+            customer: updatedCustomer,
             location: newLocation,
+            locationId: newLocation.id
           };
         });
+        setSelectedLocationName(newLocationName);
       }
     };
     
@@ -69,69 +73,75 @@ const LocationSelector : React.FC<LocationSelectorProps> =(
       setIsModalOpen(false);
     };
 
-    return (
-      !disabled && (
+    const handleLocationSelect = (value: string | number) => {
+      if (!customer) return;
+      
+      const locationId = parseInt(value.toString());
+      const selectedLocation = customer.locations.find(loc => loc.id === locationId);
+      if (!selectedLocation) return;
+      
+      setOrder(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          location: selectedLocation,
+          locationId: locationId
+        };
+      });
+      setSelectedLocationName(selectedLocation.name);
+    };
+
+    const handleAddLocation = (newLocationName: string) => {
+      setNewLocationName(newLocationName);
+    };
+
+    // If no customer is selected yet, or customer has no locations array, show empty state
+    if (!customer?.locations) {
+      return (
         <div className="flex flex-col">
-          <label className="text-sm font-medium text-slate-700">الموقع</label>
-          <div className="flex items-center space-x-2">
+          <label htmlFor="location" className="text-sm font-medium text-slate-700">
+            الموقع
+          </label>
+          <SearchableDropdown
+            value={selectedLocationName}
+            onChange={() => {}}
+            disabled={true}
+            placeholder={customer ? "لا توجد مواقع متاحة" : "الرجاء اختيار العميل أولاً"}
+            className="block w-full"
+          >
+            <Option value="" key="empty">لا توجد مواقع</Option>
+          </SearchableDropdown>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col">
+        <label htmlFor="location" className="text-sm font-medium text-slate-700">
+          الموقع
+        </label>
         <SearchableDropdown
-          key={JSON.stringify(customer?.locations)} // Force re-render when locations change
-          value={order?.location?.name}
-          onChange={(e) => {
-            // Find the selected location from customer's locations
-            const selectedLocation = customer?.locations?.find(loc => loc.id === e);
-            if (selectedLocation) {
-              setOrder((prev: OrderList | undefined) => {
-                if (!prev) return prev;
-                return { 
-                  ...prev, 
-                  location: selectedLocation 
-                };
-              });
-            }
-          }}
-          onAddOption={(newLocation) => {
-            setNewLocationName(newLocation);
-          }}
+          value={selectedLocationName}
+          onChange={handleLocationSelect}
+          onAddOption={!disabled ? handleAddLocation : undefined}
           disabled={disabled}
-          className="block w-full pr-10 pl-3 py-2.5 border border-slate-200 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200 ease-in-out"
+          placeholder="اختر الموقع"
+          className="block w-full"
         >
-          {customer?.locations?.filter(location => location?.name?.trim()).map((location) => (
-            <Option key={location.id} value={location.id}>
+          {customer.locations.map(location => (
+            <Option key={location.id} value={location.id.toString()}>
               {location.name}
             </Option>
           ))}
         </SearchableDropdown>
+        
+        {/* Add Location Modal */}
+        <AddLocationModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onAdd={(location) => handleAddLocation(location.name)}
+        />
       </div>
-
-          {customer && !isNewCustomer && !isDistributor && (
-            <button
-              type="button"
-              onClick={() => setIsModalOpen(true)}
-              disabled={disabled}
-              className="mt-2 text-sm text-primary-500 hover:underline"
-            >
-              إضافة موقع جديد
-            </button>
-          )}
-    
-          {/* Modal for Editing Customer */}
-          {isModalOpen && (
-            <Modal
-              isOpen={isModalOpen}
-              onClose={() => setIsModalOpen(false)}
-              title="تعديل بيانات العميل"
-            >
-              <EditCustomer
-                customerId={customer?.id?.toString() ?? ''}
-                onCustomerUpdated={handleSaveCustomer}
-                onCloseModal={() => setIsModalOpen(false)}
-                ref={childRef}
-              />
-            </Modal>
-          )}
-        </div>
-      )
     );
 };
 

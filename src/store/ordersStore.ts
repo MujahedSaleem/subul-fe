@@ -12,6 +12,7 @@ class OrdersStore {
   private _totalPages: number = 0;
   private listeners: (() => void)[] = [];
   private pendingGetOrderById: Map<number, Promise<OrderList | null>> = new Map();
+  private ongoingRequests: Map<number, Promise<OrderList>> = new Map();
 
   private constructor() {}
 
@@ -109,43 +110,43 @@ class OrdersStore {
   }
 
   async getOrderById(id: number): Promise<OrderList | null> {
-    // Check if we already have the order in the store
-    const existingOrder = this.orders.find(order => order.id === id);
-    if (existingOrder) {
-      return existingOrder;
-    }
-
-    // Check if there's already a pending request for this order
-    const pendingRequest = this.pendingGetOrderById.get(id);
-    if (pendingRequest) {
-      return pendingRequest;
-    }
-
-    // Create a new request
-    const request = (async () => {
-      try {
-        const response = await axiosInstance.get<OrderList>(`/orders/${id}`);
-        const order = response.data;
-        
-        // Add the order to the store
-        this._orders = [...this._orders, order];
-        
-        // Remove the pending request
-        this.pendingGetOrderById.delete(id);
-        
-        return order;
-      } catch (error) {
-        console.error('Error fetching order:', error);
-        // Remove the pending request on error
-        this.pendingGetOrderById.delete(id);
-        return null;
+    try {
+      // Check if there's already an ongoing request for this ID
+      const existingRequest = this.ongoingRequests.get(id);
+      if (existingRequest) {
+        return existingRequest;
       }
-    })();
 
-    // Store the pending request
-    this.pendingGetOrderById.set(id, request);
+      // Check if the order exists in the store
+      const existingOrder = this.orders.find(order => order.id === id);
+      if (existingOrder) {
+        return existingOrder;
+      }
 
-    return request;
+      // Create a new request promise
+      const requestPromise = (async () => {
+        try {
+          const response = await axiosInstance.get<OrderList>(`/orders/${id}`);
+          const order = response.data;
+          
+          // Add the order to the store without triggering a full refresh
+          this._orders = [...this._orders, order];
+          
+          return order;
+        } finally {
+          // Clean up the request from the map when done
+          this.ongoingRequests.delete(id);
+        }
+      })();
+
+      // Store the promise in the map
+      this.ongoingRequests.set(id, requestPromise);
+
+      return requestPromise;
+    } catch (error) {
+      console.error('Error fetching order:', error);
+      return null;
+    }
   }
 
   async addOrder(order: Partial<OrderRequest>): Promise<OrderList> {

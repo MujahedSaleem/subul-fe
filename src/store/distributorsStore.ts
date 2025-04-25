@@ -42,8 +42,10 @@ class DistributorsStore {
     this.listeners.forEach(listener => listener());
   }
 
-  async fetchDistributors() {
-    if (this._isLoading || this._isInitialized) return;
+  async fetchDistributors(forceRefresh = false) {
+    if (this._isLoading) return;
+    if (!forceRefresh && this._distributors.length > 0) return;
+    
     this._isLoading = true;
     try {
       const response = await axiosInstance.get<Distributor[]>('/distributors');
@@ -55,6 +57,7 @@ class DistributorsStore {
       throw error;
     } finally {
       this._isLoading = false;
+      this.notifyListeners();
     }
   }
 
