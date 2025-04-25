@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { faFilter, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { Select, Option, Input, Card, CardBody, Typography } from '@material-tailwind/react';
 import { Distributor } from '../types/distributor';
@@ -36,34 +36,75 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
   selectedStatus,
   setSelectedStatus,
 }) => {
-  const getSelectedDistributorLabel = () => {
-    if (!selectedDistributor) return 'جميع الموزعين';
-    const selectedDist = activeDistributors.find(d => d.id === selectedDistributor);
-    if (!selectedDist) return 'جميع الموزعين';
-    return `${selectedDist.firstName} ${selectedDist.lastName}`;
-  };
-
-  const getSelectedStatusLabel = () => {
-    if (!selectedStatus) return 'الكل';
-    const status = statusOptions.find(s => s.value === selectedStatus);
-    return status ? status.label : 'الكل';
-  };
-
-  const hasActiveFilters = selectedDistributor || dateFrom || dateTo || selectedStatus;
-
-  const statusOptions = [
+  const statusOptions = useMemo(() => [
     { value: 'New', label: 'جديد' },
     { value: 'Confirmed', label: 'تم التأكيد' },
     { value: 'Pending', label: 'قيد الانتظار' },
     { value: 'Draft', label: 'مسودة' }
-  ];
+  ], []);
+
+  const getSelectedDistributorLabel = useCallback(() => {
+    if (!selectedDistributor) return 'جميع الموزعين';
+    const selectedDist = activeDistributors.find(d => d.id === selectedDistributor);
+    if (!selectedDist) return 'جميع الموزعين';
+    return `${selectedDist.firstName} ${selectedDist.lastName}`;
+  }, [selectedDistributor, activeDistributors]);
+
+  const getSelectedStatusLabel = useCallback(() => {
+    if (!selectedStatus) return 'الكل';
+    const status = statusOptions.find(s => s.value === selectedStatus);
+    return status ? status.label : 'الكل';
+  }, [selectedStatus, statusOptions]);
+
+  const hasActiveFilters = useMemo(() => 
+    selectedDistributor || dateFrom || dateTo || selectedStatus,
+    [selectedDistributor, dateFrom, dateTo, selectedStatus]
+  );
+
+  const handleDistributorChange = useCallback((value: string | undefined) => {
+    setSelectedDistributor(value === undefined ? null : value);
+  }, [setSelectedDistributor]);
+
+  const handleStatusChange = useCallback((value: string | undefined) => {
+    setSelectedStatus(value === undefined ? null : value);
+  }, [setSelectedStatus]);
+
+  const handleDateFromChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setDateFrom(e.target.value);
+  }, [setDateFrom]);
+
+  const handleDateToChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setDateTo(e.target.value);
+  }, [setDateTo]);
+
+  const toggleFilters = useCallback(() => {
+    setShowFilters(!showFilters);
+  }, [showFilters, setShowFilters]);
+
+  const selectedDistributorElement = useMemo(() => {
+    const selectedDist = activeDistributors.find(d => d.id === selectedDistributor);
+    return (
+      <span className="text-right block truncate">
+        {selectedDist ? `${selectedDist.firstName} ${selectedDist.lastName}` : 'جميع الموزعين'}
+      </span>
+    );
+  }, [selectedDistributor, activeDistributors]);
+
+  const selectedStatusElement = useMemo(() => {
+    const status = statusOptions.find(s => s.value === selectedStatus);
+    return (
+      <span className="text-right block truncate">
+        {status ? status.label : 'الكل'}
+      </span>
+    );
+  }, [selectedStatus, statusOptions]);
 
   return (
     <div dir="rtl" className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Button 
-            onClick={() => setShowFilters(!showFilters)} 
+            onClick={toggleFilters} 
             variant={showFilters ? 'gradient' : 'outlined'} 
             color={showFilters ? 'blue' : 'blue-gray'}
             className="flex items-center gap-2"
@@ -78,7 +119,7 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
               color="red"
               className="flex items-center gap-2"
             >
-              <i className="fas fa-times"></i>
+              <FontAwesomeIcon icon={faXmark} />
               إعادة تعيين
             </Button>
           )}
@@ -125,32 +166,31 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
                 </Typography>
                 <Select
                   value={selectedDistributor || ''}
-                  onChange={(e) => {
-                    
-                    setSelectedDistributor(e || null);
-                  }}
-                  selected={(element) => {
-                    const selectedDist = activeDistributors.find(d => d.id === selectedDistributor);
-                    return (
-                      <span className="text-right block truncate">
-                        {selectedDist ? `${selectedDist.firstName} ${selectedDist.lastName}` : 'جميع الموزعين'}
-                      </span>
-                    );
-                  }}
-                  label={getSelectedDistributorLabel()}
+                  onChange={handleDistributorChange}
+                  selected={() => selectedDistributorElement}
+                  label="الموزع"
                   className="border border-blue-gray-200 rounded-lg leading-tight text-right"
                   labelProps={{
                     className: "text-right before:text-right after:text-right"
                   }}
-                  menuProps={{ className: "text-right" }}
-                  containerProps={{ className: "min-w-[200px] text-right" }}
+                  menuProps={{ 
+                    className: "text-right",
+                    lockScroll: false
+                  }}
+                  containerProps={{ 
+                    className: "min-w-[200px] text-right",
+                  }}
+                  animate={{
+                    mount: { y: 0, scale: 1 },
+                    unmount: { y: -25, scale: 0.95 },
+                  }}
                   placeholder={undefined}
                   onPointerEnterCapture={undefined}
                   onPointerLeaveCapture={undefined}
                 >
                   <Option value="" className="leading-tight text-right">جميع الموزعين</Option>
                   {activeDistributors.map(d => (
-                    <Option key={d.id} value={d.id} className="leading-tight text-right">
+                    <Option key={d.id} value={d.id} className="leading-tight text-right" disabled={!d.isActive}>
                       {`${d.firstName} ${d.lastName}`}
                     </Option>
                   ))}
@@ -171,22 +211,24 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
                 </Typography>
                 <Select
                   value={selectedStatus || ''}
-                  onChange={(e) => setSelectedStatus(e || null)}
-                  selected={(element) => {
-                    const status = statusOptions.find(s => s.value === selectedStatus);
-                    return (
-                      <span className="text-right block truncate">
-                        {status ? status.label : 'الكل'}
-                      </span>
-                    );
-                  }}
-                  label={getSelectedStatusLabel()}
+                  onChange={handleStatusChange}
+                  selected={() => selectedStatusElement}
+                  label="الحالة"
                   className="border border-blue-gray-200 rounded-lg leading-tight text-right"
                   labelProps={{
                     className: "text-right before:text-right after:text-right"
                   }}
-                  menuProps={{ className: "text-right" }}
-                  containerProps={{ className: "min-w-[200px] text-right" }}
+                  menuProps={{ 
+                    className: "text-right",
+                    lockScroll: false
+                  }}
+                  containerProps={{ 
+                    className: "min-w-[200px] text-right"
+                  }}
+                  animate={{
+                    mount: { y: 0, scale: 1 },
+                    unmount: { y: -25, scale: 0.95 },
+                  }}
                   placeholder={undefined}
                   onPointerEnterCapture={undefined}
                   onPointerLeaveCapture={undefined}
@@ -215,8 +257,14 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
                 <Input
                   type="datetime-local"
                   value={dateFrom}
-                  onChange={e => setDateFrom(e.target.value)}
-                  className="border border-blue-gray-200 rounded-lg"
+                  onChange={handleDateFromChange}
+                  className="border border-blue-gray-200 rounded-lg !text-right"
+                  containerProps={{
+                    className: "min-w-[200px]"
+                  }}
+                  labelProps={{
+                    className: "text-right"
+                  }}
                   placeholder={undefined}
                   onPointerEnterCapture={undefined}
                   onPointerLeaveCapture={undefined}
@@ -239,8 +287,14 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
                 <Input
                   type="datetime-local"
                   value={dateTo}
-                  onChange={e => setDateTo(e.target.value)}
-                  className="border border-blue-gray-200 rounded-lg"
+                  onChange={handleDateToChange}
+                  className="border border-blue-gray-200 rounded-lg !text-right"
+                  containerProps={{
+                    className: "min-w-[200px]"
+                  }}
+                  labelProps={{
+                    className: "text-right"
+                  }}
                   placeholder={undefined}
                   onPointerEnterCapture={undefined}
                   onPointerLeaveCapture={undefined}
@@ -255,4 +309,4 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
   );
 };
 
-export default OrderFilter;
+export default React.memo(OrderFilter);

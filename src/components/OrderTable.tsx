@@ -69,15 +69,7 @@ const OrderTable: React.FC<OrderTableProps> = ({
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
       {orders.map((order) => {
-        // Log each order's distributor details
-        
-        console.log('Distributor details:', {
-          id: order.distributor?.id,
-          userName: order.distributor?.userName,
-          firstName: order.distributor?.firstName,
-          lastName: order.distributor?.lastName,
-          phone: order.distributor?.phone
-        });
+  
         
         return (
           <Card 
