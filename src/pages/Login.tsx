@@ -8,18 +8,17 @@ import { useAuth } from '../context/AuthContext';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { login, loading } = useAuth(); // Destructure the login method and loading state from context
+  const { login } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false); // Local loading state
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true); // Set loading to true while logging in
+    setIsLoading(true);
 
     try {
-      await login(username, password); // Call login method from AuthContext
-      // After successful login, redirect user based on their role
+      await login(username, password);
       const userType = localStorage.getItem("userType");
       if (userType === 'Admin') {
         navigate("/admin");
@@ -30,35 +29,38 @@ const Login: React.FC = () => {
       console.error("Login error:", error);
       alert("Login failed. Please check your credentials.");
     } finally {
-      setIsLoading(false); // Set loading to false after the login attempt
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center py-6">
-      <div className="w-[420px] mx-4">
-        <div className="text-center mb-8">
-          <div className="inline-flex justify-center items-center w-16 h-16 bg-primary-500 rounded-lg">
-            <FontAwesomeIcon icon={faRightToBracket} className="h-8 w-8 text-white" />
+    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-primary-50 via-white to-primary-100">
+      <div className="w-full max-w-md space-y-8">
+        {/* Logo and Title Section */}
+        <div className="text-center">
+          <div className="flex justify-center">
+            <div className="p-4 bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl shadow-xl transform hover:scale-105 transition-transform duration-300">
+              <FontAwesomeIcon icon={faRightToBracket} className="h-10 w-10 text-white" />
+            </div>
           </div>
-          <h1 className="mt-6 text-4xl font-bold text-slate-900">
+          <h1 className="mt-6 text-5xl font-extrabold text-slate-900 tracking-tight">
             سُبل
           </h1>
-          <p className="mt-2 text-lg text-slate-600">
+          <p className="mt-4 text-xl text-slate-600 tracking-wide">
             نظام إدارة الطلبات
           </p>
         </div>
 
-        <div className="bg-white shadow-xl rounded-2xl">
-          <form className="p-8" onSubmit={handleSubmit}>
-            <div className="space-y-6">
-              <div>
-                <label htmlFor="username" className="block text-sm font-medium text-slate-700 mb-1">
-                  اسم المستخدم
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                    <FontAwesomeIcon icon={faUser} className="h-5 w-5 text-slate-400" />
+        {/* Login Form Section */}
+        <div className="mt-10 bg-white/70 backdrop-blur-lg rounded-3xl shadow-2xl p-8 space-y-8 border border-white/20">
+          <form className="space-y-6" onSubmit={handleSubmit}>
+            {/* Username Input */}
+            <div className="relative group">
+              <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+                <FontAwesomeIcon 
+                  icon={faUser} 
+                  className="h-5 w-5 text-slate-400 group-focus-within:text-primary-500 transition-colors duration-200" 
+                />
                   </div>
                   <Input
                     id="username"
@@ -67,19 +69,23 @@ const Login: React.FC = () => {
                     required
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="block w-full pr-10 pl-3 py-2.5 border border-slate-200 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                className="block w-full pr-12 border-slate-200 rounded-xl shadow-sm 
+                  focus:ring-primary-500/20 focus:border-primary-500 
+                  bg-white/50 backdrop-blur-sm transition-all duration-200"
+                label="اسم المستخدم"
                     placeholder="أدخل اسم المستخدم"
+                autoComplete="username"
+                crossOrigin={undefined}
                   />
                 </div>
-              </div>
 
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1">
-                  كلمة المرور
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                    <FontAwesomeIcon icon={faLock} className="h-5 w-5 text-slate-400" />
+            {/* Password Input */}
+            <div className="relative group">
+              <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+                <FontAwesomeIcon 
+                  icon={faLock} 
+                  className="h-5 w-5 text-slate-400 group-focus-within:text-primary-500 transition-colors duration-200" 
+                />
                   </div>
                   <Input
                     id="password"
@@ -88,12 +94,18 @@ const Login: React.FC = () => {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="block w-full pr-10 pl-3 py-2.5 border border-slate-200 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                className="block w-full pr-12 border-slate-200 rounded-xl shadow-sm 
+                  focus:ring-primary-500/20 focus:border-primary-500 
+                  bg-white/50 backdrop-blur-sm transition-all duration-200"
+                label="كلمة المرور"
                     placeholder="أدخل كلمة المرور"
+                autoComplete="current-password"
+                crossOrigin={undefined}
                   />
-                </div>
               </div>
 
+            {/* Submit Button */}
+            <div className="pt-4">
               <Button
                 type="submit"
                 variant="primary"
@@ -102,8 +114,18 @@ const Login: React.FC = () => {
                 icon={faRightToBracket}
                 loading={isLoading}
                 disabled={!username || !password}
+                className="relative overflow-hidden group bg-gradient-to-br from-primary-500 to-primary-600 
+                  hover:from-primary-600 hover:to-primary-700 transition-all duration-300 
+                  rounded-xl py-3 shadow-lg hover:shadow-xl 
+                  transform hover:-translate-y-0.5"
               >
+                <span className="relative z-10 text-lg font-semibold tracking-wide">
                 دخول
+                </span>
+                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 
+                  transform translate-x-[-200%] group-hover:translate-x-[200%] 
+                  transition-transform duration-1000">
+                </div>
               </Button>
             </div>
           </form>

@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useEffect } from 'react';
 import { faFilter, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { Select, Option, Input, Card, CardBody, Typography } from '@material-tailwind/react';
 import { Distributor } from '../types/distributor';
@@ -6,20 +6,25 @@ import Button from './Button';
 import IconButton from './IconButton';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faXmark } from '@fortawesome/free-solid-svg-icons';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { fetchOrders } from '../store/slices/orderSlice';
+import { RootState } from '../store/store';
 
 interface OrderFilterProps {
   showFilters: boolean;
   setShowFilters: React.Dispatch<React.SetStateAction<boolean>>;
   selectedDistributor: string | null;
-  setSelectedDistributor: React.Dispatch<React.SetStateAction<string | null>>;
+  setSelectedDistributor: (value: string | null) => void;
   dateFrom: string;
-  setDateFrom: React.Dispatch<React.SetStateAction<string>>;
+  setDateFrom: (value: string) => void;
   dateTo: string;
-  setDateTo: React.Dispatch<React.SetStateAction<string>>;
+  setDateTo: (value: string) => void;
   resetFilters: () => void;
   activeDistributors: Distributor[];
   selectedStatus: string | null;
   setSelectedStatus: (status: string | null) => void;
+  currentPage?: number;
+  pageSize?: number;
 }
 
 const OrderFilter: React.FC<OrderFilterProps> = ({
@@ -35,7 +40,25 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
   activeDistributors,
   selectedStatus,
   setSelectedStatus,
+  currentPage = 1,
+  pageSize = 10,
 }) => {
+  const dispatch = useAppDispatch();
+  const { isLoading } = useAppSelector((state: RootState) => state.orders);
+
+  useEffect(() => {
+    dispatch(fetchOrders({
+      pageNumber: currentPage,
+      pageSize,
+      filters: {
+        distributorId: selectedDistributor,
+        status: selectedStatus,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined
+      }
+    }));
+  }, [dispatch, currentPage, pageSize, selectedDistributor, selectedStatus, dateFrom, dateTo]);
+
   const statusOptions = useMemo(() => [
     { value: 'New', label: 'جديد' },
     { value: 'Confirmed', label: 'تم التأكيد' },
@@ -130,8 +153,8 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
             color="blue-gray"
             className="font-medium"
             placeholder={undefined}
-            onPointerEnterCapture={undefined}
-            onPointerLeaveCapture={undefined}
+            
+            
           >
             {activeDistributors.length} موزع نشط
           </Typography>
@@ -142,14 +165,14 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
         <Card 
           className="w-full"
           placeholder={undefined}
-          onPointerEnterCapture={undefined}
-          onPointerLeaveCapture={undefined}
+          
+          
         >
           <CardBody 
             className="p-4"
             placeholder={undefined}
-            onPointerEnterCapture={undefined}
-            onPointerLeaveCapture={undefined}
+            
+            
           >
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {/* Distributor Filter */}
@@ -159,8 +182,8 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
                   color="blue-gray"
                   className="font-medium"
                   placeholder={undefined}
-                  onPointerEnterCapture={undefined}
-                  onPointerLeaveCapture={undefined}
+                  
+                  
                 >
                   الموزع
                 </Typography>
@@ -185,8 +208,8 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
                     unmount: { y: -25, scale: 0.95 },
                   }}
                   placeholder={undefined}
-                  onPointerEnterCapture={undefined}
-                  onPointerLeaveCapture={undefined}
+                  
+                  
                 >
                   <Option value="" className="leading-tight text-right">جميع الموزعين</Option>
                   {activeDistributors.map(d => (
@@ -204,8 +227,8 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
                   color="blue-gray"
                   className="font-medium"
                   placeholder={undefined}
-                  onPointerEnterCapture={undefined}
-                  onPointerLeaveCapture={undefined}
+                  
+                  
                 >
                   الحالة
                 </Typography>
@@ -230,8 +253,8 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
                     unmount: { y: -25, scale: 0.95 },
                   }}
                   placeholder={undefined}
-                  onPointerEnterCapture={undefined}
-                  onPointerLeaveCapture={undefined}
+                  
+                  
                 >
                   <Option value="" className="leading-tight text-right">الكل</Option>
                   {statusOptions.map((status) => (
@@ -249,8 +272,8 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
                   color="blue-gray"
                   className="font-medium"
                   placeholder={undefined}
-                  onPointerEnterCapture={undefined}
-                  onPointerLeaveCapture={undefined}
+                  
+                  
                 >
                   من تاريخ
                 </Typography>
@@ -266,8 +289,8 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
                     className: "text-right"
                   }}
                   placeholder={undefined}
-                  onPointerEnterCapture={undefined}
-                  onPointerLeaveCapture={undefined}
+                  
+                  
                   crossOrigin={undefined}
                 />
               </div>
@@ -279,8 +302,8 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
                   color="blue-gray"
                   className="font-medium"
                   placeholder={undefined}
-                  onPointerEnterCapture={undefined}
-                  onPointerLeaveCapture={undefined}
+                  
+                  
                 >
                   إلى تاريخ
                 </Typography>
@@ -296,8 +319,8 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
                     className: "text-right"
                   }}
                   placeholder={undefined}
-                  onPointerEnterCapture={undefined}
-                  onPointerLeaveCapture={undefined}
+                  
+                  
                   crossOrigin={undefined}
                 />
               </div>

@@ -61,16 +61,16 @@ const Customers: React.FC = () => {
       <Card 
         className="h-full w-full shadow-lg"
         placeholder=""
-        onPointerEnterCapture={() => {}}
-        onPointerLeaveCapture={() => {}}
+        
+        
       >
         <CardHeader 
           floated={false} 
           shadow={false} 
           className="rounded-none bg-white p-6"
           placeholder=""
-          onPointerEnterCapture={() => {}}
-          onPointerLeaveCapture={() => {}}
+          
+          
         >
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div className="flex flex-col gap-1">
@@ -79,8 +79,8 @@ const Customers: React.FC = () => {
                 color="blue-gray"
                 className="font-bold"
                 placeholder=""
-                onPointerEnterCapture={() => {}}
-                onPointerLeaveCapture={() => {}}
+                
+                
               >
                 العملاء
               </Typography>
@@ -89,8 +89,8 @@ const Customers: React.FC = () => {
                 color="blue-gray"
                 className="font-normal"
                 placeholder=""
-                onPointerEnterCapture={() => {}}
-                onPointerLeaveCapture={() => {}}
+                
+                
               >
                 إدارة العملاء وإضافة عملاء جدد
               </Typography>
@@ -104,8 +104,8 @@ const Customers: React.FC = () => {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   crossOrigin={undefined}
                   placeholder=""
-                  onPointerEnterCapture={() => {}}
-                  onPointerLeaveCapture={() => {}}
+                  
+                  
                 />
               </div>
               <Button 
@@ -124,8 +124,8 @@ const Customers: React.FC = () => {
           <CardBody 
             className="text-center py-12"
             placeholder=""
-            onPointerEnterCapture={() => {}}
-            onPointerLeaveCapture={() => {}}
+            
+            
           >
             <div className="flex flex-col items-center gap-4">
               <FontAwesomeIcon 
@@ -137,8 +137,8 @@ const Customers: React.FC = () => {
                 color="blue-gray"
                 className="font-medium"
                 placeholder=""
-                onPointerEnterCapture={() => {}}
-                onPointerLeaveCapture={() => {}}
+                
+                
               >
                 جاري تحميل البيانات...
               </Typography>
@@ -148,8 +148,8 @@ const Customers: React.FC = () => {
           <CardBody 
             className="overflow-auto px-6"
             placeholder=""
-            onPointerEnterCapture={() => {}}
-            onPointerLeaveCapture={() => {}}
+            
+            
           >
             {filteredCustomers.length === 0 ? (
               <div className="text-center py-12">
@@ -158,8 +158,8 @@ const Customers: React.FC = () => {
                   color="blue-gray"
                   className="font-medium"
                   placeholder=""
-                  onPointerEnterCapture={() => {}}
-                  onPointerLeaveCapture={() => {}}
+                  
+                  
                 >
                   لا يوجد عملاء
                 </Typography>
@@ -168,8 +168,8 @@ const Customers: React.FC = () => {
                   color="blue-gray"
                   className="mt-2"
                   placeholder=""
-                  onPointerEnterCapture={() => {}}
-                  onPointerLeaveCapture={() => {}}
+                  
+                  
                 >
                   {searchQuery ? 'لم يتم العثور على نتائج للبحث' : 'قم بإضافة عميل جديد'}
                 </Typography>
@@ -181,24 +181,24 @@ const Customers: React.FC = () => {
                     key={customer.id}
                     className="hover:shadow-lg transition-shadow duration-300"
                     placeholder=""
-                    onPointerEnterCapture={() => {}}
-                    onPointerLeaveCapture={() => {}}
+                    
+                    
                   >
                     <CardHeader
                       floated={false}
                       shadow={false}
                       className="rounded-t-lg bg-gradient-to-r from-blue-600 to-blue-800 p-4"
                       placeholder=""
-                      onPointerEnterCapture={() => {}}
-                      onPointerLeaveCapture={() => {}}
+                      
+                      
                     >
                       <Typography
                         variant="h5"
                         color="white"
                         className="font-bold"
                         placeholder=""
-                        onPointerEnterCapture={() => {}}
-                        onPointerLeaveCapture={() => {}}
+                        
+                        
                       >
                         {customer.name}
                       </Typography>
@@ -206,8 +206,8 @@ const Customers: React.FC = () => {
                     <CardBody
                       className="p-4"
                       placeholder=""
-                      onPointerEnterCapture={() => {}}
-                      onPointerLeaveCapture={() => {}}
+                      
+                      
                     >
                       <div className="space-y-4">
                         <div className="flex items-center gap-2">
@@ -217,8 +217,8 @@ const Customers: React.FC = () => {
                             color="blue-gray"
                             className="font-medium"
                             placeholder=""
-                            onPointerEnterCapture={() => {}}
-                            onPointerLeaveCapture={() => {}}
+                            
+                            
                           >
                             {customer.phone}
                           </Typography>
@@ -231,8 +231,8 @@ const Customers: React.FC = () => {
                               color="blue-gray"
                               className="font-medium"
                               placeholder=""
-                              onPointerEnterCapture={() => {}}
-                              onPointerLeaveCapture={() => {}}
+                              
+                              
                             >
                               المواقع
                             </Typography>
@@ -248,8 +248,8 @@ const Customers: React.FC = () => {
                                   color="blue-gray"
                                   className="font-medium"
                                   placeholder=""
-                                  onPointerEnterCapture={() => {}}
-                                  onPointerLeaveCapture={() => {}}
+                                  
+                                  
                                 >
                                   {location.name}
                                 </Typography>
@@ -258,8 +258,8 @@ const Customers: React.FC = () => {
                                   color="blue-gray"
                                   className="text-xs mt-1"
                                   placeholder=""
-                                  onPointerEnterCapture={() => {}}
-                                  onPointerLeaveCapture={() => {}}
+                                  
+                                  
                                 >
                                   {location.coordinates}
                                 </Typography>

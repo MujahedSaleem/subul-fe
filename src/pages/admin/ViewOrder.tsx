@@ -116,8 +116,8 @@ const ViewOrder: React.FC = () => {
               color="blue-gray"
               className="text-center"
               placeholder=""
-              onPointerEnterCapture={() => {}}
-              onPointerLeaveCapture={() => {}}
+              
+              
             >
               جاري تحميل البيانات...
             </Typography>
@@ -137,8 +137,8 @@ const ViewOrder: React.FC = () => {
               color="blue-gray"
               className="mb-2"
               placeholder=""
-              onPointerEnterCapture={() => {}}
-              onPointerLeaveCapture={() => {}}
+              
+              
             >
               {error || 'لم يتم العثور على الطلب'}
             </Typography>
@@ -175,8 +175,8 @@ const ViewOrder: React.FC = () => {
         <Card 
           className="w-full"
           placeholder=""
-          onPointerEnterCapture={() => {}}
-          onPointerLeaveCapture={() => {}}
+          
+          
         >
           <CardHeader
             className={`p-4 ${
@@ -185,8 +185,8 @@ const ViewOrder: React.FC = () => {
                 : 'bg-gradient-to-r from-blue-50 to-blue-100'
             }`}
             placeholder=""
-            onPointerEnterCapture={() => {}}
-            onPointerLeaveCapture={() => {}}
+            
+            
           >
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
@@ -195,8 +195,8 @@ const ViewOrder: React.FC = () => {
                   color="blue-gray"
                   className="font-bold"
                   placeholder=""
-                  onPointerEnterCapture={() => {}}
-                  onPointerLeaveCapture={() => {}}
+                  
+                  
                 >
                   تفاصيل الطلب #{order.orderNumber}
                 </Typography>
@@ -215,8 +215,8 @@ const ViewOrder: React.FC = () => {
           <CardBody 
             className="p-6 space-y-6"
             placeholder=""
-            onPointerEnterCapture={() => {}}
-            onPointerLeaveCapture={() => {}}
+            
+            
           >
             {/* Order Information */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -226,8 +226,8 @@ const ViewOrder: React.FC = () => {
                   color="blue-gray"
                   className="font-bold mb-3"
                   placeholder=""
-                  onPointerEnterCapture={() => {}}
-                  onPointerLeaveCapture={() => {}}
+                  
+                  
                 >
                   معلومات الطلب
                 </Typography>
@@ -393,8 +393,8 @@ const ViewOrder: React.FC = () => {
                           variant="paragraph"
                           className="font-medium"
                           placeholder=""
-                          onPointerEnterCapture={() => {}}
-                          onPointerLeaveCapture={() => {}}
+                          
+                          
                         >
                           {order.distributor.name}
                         </Typography>

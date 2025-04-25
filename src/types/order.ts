@@ -36,3 +36,10 @@ export interface PaginatedOrders {
   pageSize: number;
   totalPages: number;
 }
+
+export interface OrderFilters {
+  distributorId?: string;
+  status?: string;
+  page?: number;
+  pageSize?: number;
+}

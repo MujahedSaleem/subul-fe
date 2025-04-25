@@ -110,8 +110,8 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
               color="blue-gray"
               className="text-xl lg:text-2xl font-semibold"
               placeholder=""
-              onPointerEnterCapture={() => {}}
-              onPointerLeaveCapture={() => {}}
+              
+              
             >
               {title}
             </Typography>

@@ -104,8 +104,8 @@ const DistributorSelector: React.FC<DistributorSelectorProps> = ({
         label='اختر الموزع'
         className="block w-full pr-10 pl-3 py-2.5 border border-slate-200 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
         placeholder="اختر الموزع"
-        onPointerEnterCapture={() => {}}
-        onPointerLeaveCapture={() => {}}
+        
+        
       >
         {activeDistributors.length > 0 ? (
           activeDistributors.map(distributor => (

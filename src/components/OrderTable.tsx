@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { faPhone, faLocationDot, faCircleCheck, faTrash, faPenToSquare, faEye, faUser, faCalendar, faMoneyBill, faCheckCircle, faUserTie } from '@fortawesome/free-solid-svg-icons';
+import { faPhone, faLocationDot, faCircleCheck, faTrash, faPenToSquare, faEye, faUser, faCalendar, faMoneyBill, faCheckCircle, faUserTie, faHourglassHalf, faPencil } from '@fortawesome/free-solid-svg-icons';
 import { faWhatsapp } from '@fortawesome/free-brands-svg-icons';
 import { Card, CardBody, Typography as MuiTypography } from '@material-tailwind/react';
 import { useNavigate } from 'react-router-dom';
@@ -20,17 +20,6 @@ interface OrderTableProps {
   formatCurrency: (amount: number) => string;
 }
 
-const Typography = ({ children, ...props }: any) => (
-  <MuiTypography
-    {...props}
-    placeholder={undefined}
-    onPointerEnterCapture={undefined}
-    onPointerLeaveCapture={undefined}
-  >
-    {children}
-  </MuiTypography>
-);
-
 const OrderTable: React.FC<OrderTableProps> = ({
   orders,
   handleDelete,
@@ -43,6 +32,46 @@ const OrderTable: React.FC<OrderTableProps> = ({
   const navigate = useNavigate();
   const [isCallModalOpen, setIsCallModalOpen] = useState(false);
   const [selectedCustomerPhone, setSelectedCustomerPhone] = useState('');
+
+  const getStatusConfig = (status: string) => {
+    switch (status) {
+      case 'Confirmed':
+        return {
+          icon: faCheckCircle,
+          color: 'text-green-600',
+          bgColor: 'bg-green-50',
+          label: 'تم التأكيد'
+        };
+      case 'Pending':
+        return {
+          icon: faHourglassHalf,
+          color: 'text-yellow-600',
+          bgColor: 'bg-yellow-50',
+          label: 'قيد الانتظار'
+        };
+      case 'New':
+        return {
+          icon: faCircleCheck,
+          color: 'text-blue-600',
+          bgColor: 'bg-blue-50',
+          label: 'جديد'
+        };
+      case 'Draft':
+        return {
+          icon: faPencil,
+          color: 'text-gray-600',
+          bgColor: 'bg-gray-50',
+          label: 'مسودة'
+        };
+      default:
+        return {
+          icon: faCircleCheck,
+          color: 'text-gray-600',
+          bgColor: 'bg-gray-50',
+          label: status
+        };
+    }
+  };
 
   const handleDirectCall = (phone: string) => {
     const cleaned = phone?.replace(/\D/g, '');
@@ -57,33 +86,24 @@ const OrderTable: React.FC<OrderTableProps> = ({
     }
   };
 
-  const formatShekel = (amount: number): string => {
-    return new Intl.NumberFormat('he-IL', { 
-      style: 'currency', 
-      currency: 'ILS',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
-  };
-
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
       {orders.map((order) => {
-  
+        const statusConfig = getStatusConfig(order.status);
         
         return (
           <Card 
             key={order.id}
-            className="w-full bg-green-50 hover:shadow-md transition-all duration-300"
+            className={`w-full ${statusConfig.bgColor} hover:shadow-md transition-all duration-300`}
+            onPointerEnterCapture={() => {}}
+            onPointerLeaveCapture={() => {}}
             placeholder={undefined}
-            onPointerEnterCapture={undefined}
-            onPointerLeaveCapture={undefined}
           >
             <CardBody 
               className="p-4"
+              onPointerEnterCapture={() => {}}
+              onPointerLeaveCapture={() => {}}
               placeholder={undefined}
-              onPointerEnterCapture={undefined}
-              onPointerLeaveCapture={undefined}
             >
               <div className="flex justify-between items-start mb-2">
                 <div className="flex gap-2">
@@ -116,106 +136,107 @@ const OrderTable: React.FC<OrderTableProps> = ({
                     </>
                   )}
                 </div>
-                <Typography 
-                  variant="small"
-                  className="text-gray-600"
-                >
-                  {formatDate(order.createdAt)}
-                </Typography>
+                
+                <div className="flex items-center gap-2">
+                  <FontAwesomeIcon 
+                    icon={statusConfig.icon}
+                    className={`w-5 h-5 ${statusConfig.color}`}
+                  />
+                  <MuiTypography 
+                    variant="small"
+                    className={`font-medium ${statusConfig.color}`}
+                    onPointerEnterCapture={() => {}}
+                    onPointerLeaveCapture={() => {}}
+                    placeholder={undefined}
+                  >
+                    {statusConfig.label}
+                  </MuiTypography>
+                </div>
               </div>
 
-              <Typography 
-                variant="h6"
-                className="font-bold mb-3"
-              >
-                #{order.orderNumber}
-              </Typography>
-
-              <div className="space-y-3">
+              <div className="space-y-2 mt-4">
+                {/* Customer Info */}
                 <div className="flex items-center gap-2">
-                  <FontAwesomeIcon icon={faUser} className="w-5 h-5 text-blue-600" />
-                  <div className="flex-1">
-                    <Typography 
-                      variant="small"
-                      className="font-medium"
-                    >
-                      {order.customer?.name}
-                    </Typography>
-                    <Typography 
-                      variant="small"
-                      className="text-gray-600"
-                    >
-                      {order.customer?.phone}
-                    </Typography>
-                  </div>
-                  <div className="flex gap-1">
+                  <FontAwesomeIcon icon={faUser} className="w-4 h-4 text-blue-gray-500" />
+                  <MuiTypography 
+                    variant="small" 
+                    color="blue-gray"
+                    className="font-medium"
+                    onPointerEnterCapture={() => {}}
+                    onPointerLeaveCapture={() => {}}
+                    placeholder={undefined}
+                  >
+                    {order.customer?.name}
+                  </MuiTypography>
+                </div>
+
+                {/* Distributor Info */}
+                <div className="flex items-center gap-2">
+                  <FontAwesomeIcon icon={faUserTie} className="w-4 h-4 text-blue-gray-500" />
+                  <MuiTypography 
+                    variant="small" 
+                    color="blue-gray"
+                    className="font-medium"
+                    onPointerEnterCapture={() => {}}
+                    onPointerLeaveCapture={() => {}}
+                    placeholder={undefined}
+                  >
+                    {order.distributor?.name}
+                  </MuiTypography>
+                </div>
+
+                {/* Order Number */}
+                <div className="flex items-center gap-2">
+                  <FontAwesomeIcon icon={faCalendar} className="w-4 h-4 text-blue-gray-500" />
+                  <MuiTypography 
+                    variant="small" 
+                    color="blue-gray"
+                    className="font-medium"
+                    onPointerEnterCapture={() => {}}
+                    onPointerLeaveCapture={() => {}}
+                    placeholder={undefined}
+                  >
+                    {order.orderNumber}
+                  </MuiTypography>
+                </div>
+
+                {/* Cost */}
+                <div className="flex items-center gap-2">
+                  <FontAwesomeIcon icon={faMoneyBill} className="w-4 h-4 text-blue-gray-500" />
+                  <MuiTypography 
+                    variant="small" 
+                    color="blue-gray"
+                    className="font-medium"
+                    onPointerEnterCapture={() => {}}
+                    onPointerLeaveCapture={() => {}}
+                    placeholder={undefined}
+                  >
+                    {formatCurrency(order.cost)}
+                  </MuiTypography>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2 mt-4">
+                  {order.customer?.phone && (
                     <IconButton
                       icon={faPhone}
-                      onClick={() => handleDirectCall(order.customer?.phone || '')}
+                      onClick={() => handleCallCustomer(order.customer)}
                       color="blue"
                       className="hover:bg-blue-100"
                       size="md"
-                      title="Direct Call"
+                      title="Call Customer"
                     />
+                  )}
+                  {order.location && (
                     <IconButton
-                      icon={faWhatsapp}
-                      onClick={() => handleWhatsAppCall(order.customer)}
-                      color="green"
-                      className="hover:bg-green-100"
+                      icon={faLocationDot}
+                      onClick={() => handleOpenLocation(order.location)}
+                      color="blue"
+                      className="hover:bg-blue-100"
                       size="md"
-                      title="WhatsApp Call"
+                      title="View Location"
                     />
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <FontAwesomeIcon icon={faUserTie} className="w-5 h-5 text-indigo-600" />
-                  <Typography 
-                    variant="small"
-                    className="font-medium"
-                  >
-                    {order.distributor ? (
-                      <span>
-                        {order.distributor.name}
-                      </span>
-                    ) : (
-                      'No distributor assigned'
-                    )}
-                  </Typography>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <FontAwesomeIcon icon={faLocationDot} className="w-5 h-5 text-green-600" />
-                  <Typography 
-                    variant="small"
-                    className="font-medium cursor-pointer hover:text-green-600 transition-colors"
-                    onClick={() => handleOpenLocation(order.location)}
-                  >
-                    {order.location?.name}
-                  </Typography>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <FontAwesomeIcon icon={faMoneyBill} className="w-5 h-5 text-purple-600" />
-                  <Typography 
-                    variant="small"
-                    className="font-medium"
-                  >
-                    {formatShekel(order.cost)}
-                  </Typography>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <FontAwesomeIcon 
-                    icon={order.status === 'Confirmed' ? faCheckCircle : faCircleCheck} 
-                    className={`w-5 h-5 ${order.status === 'Confirmed' ? 'text-green-600' : 'text-yellow-600'}`} 
-                  />
-                  <Typography 
-                    variant="small"
-                    className={`font-medium ${order.status === 'Confirmed' ? 'text-green-600' : 'text-yellow-600'}`}
-                  >
-                    {order.status === 'Confirmed' ? 'Confirmed' : 'Pending'}
-                  </Typography>
+                  )}
                 </div>
               </div>
 
@@ -228,7 +249,7 @@ const OrderTable: React.FC<OrderTableProps> = ({
                     className="flex items-center gap-2 w-full justify-center"
                   >
                     <FontAwesomeIcon icon={faCircleCheck} className="w-5 h-5" />
-                    Confirm Order
+                    تأكيد الطلب
                   </Button>
                 </div>
               )}
