@@ -1,4 +1,4 @@
-import React, {useState, useRef, useEffect } from "react";
+import React, { useState, useEffect, forwardRef } from "react";
 import { Customer, Location } from "../types/customer";
 import { OrderList } from "../types/order";
 import Modal from "./modal";
@@ -15,12 +15,12 @@ interface LocationSelectorProps {
   isDistributor?: boolean;
 }
 
-const LocationSelector : React.FC<LocationSelectorProps> =(
+const LocationSelector = forwardRef<HTMLDivElement, LocationSelectorProps>((
   { order, setOrder, disabled, customer, isNewCustomer, isDistributor },
+  ref
 ) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedLocationName, setSelectedLocationName] = useState("");
-    const childRef = useRef<any>(null);
     
     useEffect(() => {
       if (order?.location?.name) {
@@ -44,7 +44,9 @@ const LocationSelector : React.FC<LocationSelectorProps> =(
           id: 0, // ID for a new location
           name: newLocationName,
           coordinates: '',
-          description: ''
+          address: '',
+          isActive: true,
+          customerId: customer?.id || ''
         };
     
         // Update state with the new location and customer
@@ -97,8 +99,8 @@ const LocationSelector : React.FC<LocationSelectorProps> =(
 
     // If no customer is selected yet, or customer has no locations array, show empty state
     if (!customer?.locations) {
-    return (
-        <div className="flex flex-col">
+      return (
+        <div ref={ref} className="flex flex-col">
           <label htmlFor="location" className="text-sm font-medium text-slate-700">
             الموقع
           </label>
@@ -116,7 +118,7 @@ const LocationSelector : React.FC<LocationSelectorProps> =(
     }
 
     return (
-      <div className="flex flex-col">
+      <div ref={ref} className="flex flex-col">
         <label htmlFor="location" className="text-sm font-medium text-slate-700">
           الموقع
         </label>
@@ -137,12 +139,14 @@ const LocationSelector : React.FC<LocationSelectorProps> =(
 
         {/* Add Location Modal */}
         <AddLocationModal
-              isOpen={isModalOpen}
-              onClose={() => setIsModalOpen(false)}
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
           onAdd={(location) => handleAddLocation(location.name)}
-              />
-        </div>
+        />
+      </div>
     );
-  };
+});
+
+LocationSelector.displayName = 'LocationSelector';
 
 export default LocationSelector;

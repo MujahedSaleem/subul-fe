@@ -19,6 +19,8 @@ const EditOrder: React.FC = () => {
   const shouldSaveOnUnmount = useRef(true);
   const [isLoading, setIsLoading] = useState(true);
   const [order, setOrder] = useState<OrderList | null>(null);
+  const [originalOrder, setOriginalOrder] = useState<OrderList | null>(null);
+  const [originalCustomer, setOriginalCustomer] = useState<Customer | null>(null);
 
   useEffect(() => {
     const loadOrder = async () => {
@@ -40,15 +42,20 @@ const EditOrder: React.FC = () => {
           if (orderData.customer?.id) {
             const customerData = await customersStore.getCustomerById(orderData.customer.id.toString());
             if (customerData) {
-              setOrder({
+              const fullOrderData = {
                 ...orderData,
                 customer: customerData
-              });
+              };
+              setOrder(fullOrderData);
+              setOriginalOrder(fullOrderData);
+              setOriginalCustomer(customerData);
             } else {
               setOrder(orderData);
+              setOriginalOrder(orderData);
             }
           } else {
             setOrder(orderData);
+            setOriginalOrder(orderData);
           }
         } else {
           navigate('/admin/orders');
@@ -65,16 +72,10 @@ const EditOrder: React.FC = () => {
   }, [id, navigate]);
 
   const handleBack = async () => {
-    if (!order) return;
+    if (!order || !originalOrder || !originalCustomer) return;
 
     try {
       // Check if there are any changes to the order
-      const originalOrder = await ordersStore.getOrderById(order.id);
-      if (!originalOrder) {
-        navigate('/admin/orders');
-        return;
-      }
-
       const hasOrderChanges = JSON.stringify({
         cost: order.cost,
         status: order.status,
@@ -88,12 +89,6 @@ const EditOrder: React.FC = () => {
       });
 
       // Check if there are any changes to the customer
-      const originalCustomer = await customersStore.getCustomerById(order.customer.id);
-      if (!originalCustomer) {
-        navigate('/admin/orders');
-        return;
-      }
-
       const hasCustomerChanges = JSON.stringify({
         name: order.customer.name,
         phone: order.customer.phone,
@@ -207,40 +202,23 @@ const EditOrder: React.FC = () => {
                   </div>
                 </div>
               </div>
-              {order.distributor && order.distributor.userName && (
-                <div className="flex items-center gap-2 bg-gray-50 px-4 py-2 rounded-lg">
-                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                    <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium text-gray-700">
-                      {order.distributor.userName || `${order.distributor.firstName} ${order.distributor.lastName}`}
-                    </div>
-                    {order.distributor.phone && (
-                      <div className="text-xs text-gray-500">{order.distributor.phone}</div>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
           
           {/* Form Section */}
           <div className="p-6 sm:p-8">
-      <OrderForm
-        order={order}
+            <OrderForm
+              order={order}
               setOrder={(newOrder) => {
                 if (newOrder) {
                   setOrder(newOrder as OrderList);
                 }
               }}
-        onSubmit={handleSubmit}
-        onBack={handleBack}
+              onSubmit={handleSubmit}
+              onBack={handleBack}
               title="حفظ التغييرات"
-        isEdit={true}
-      />
+              isEdit={true}
+            />
           </div>
         </div>
       </div>

@@ -9,6 +9,7 @@ class DistributorsStore {
   private _isLoading: boolean = false;
   private _isInitialized: boolean = false;
   private listeners: (() => void)[] = [];
+  private pendingFetch: Promise<void> | null = null;
 
   private constructor() {}
 
@@ -43,22 +44,36 @@ class DistributorsStore {
   }
 
   async fetchDistributors(forceRefresh = false) {
-    if (this._isLoading) return;
-    if (!forceRefresh && this._distributors.length > 0) return;
-    
-    this._isLoading = true;
-    try {
-      const response = await axiosInstance.get<Distributor[]>('/distributors');
-      this._distributors = response.data;
-      this._isInitialized = true;
-      this.notifyListeners();
-    } catch (error) {
-      console.error('Failed to fetch distributors:', error);
-      throw error;
-    } finally {
-      this._isLoading = false;
-      this.notifyListeners();
+    if (!forceRefresh && this._distributors.length > 0) {
+      return;
     }
+
+    if (this.pendingFetch) {
+      return this.pendingFetch;
+    }
+
+    this._isLoading = true;
+    this.notifyListeners();
+
+    this.pendingFetch = new Promise<void>(async (resolve, reject) => {
+      try {
+        const response = await axiosInstance.get<Distributor[]>('/distributors');
+        this._distributors = response.data;
+        this._isInitialized = true;
+        this._isLoading = false;
+        this.notifyListeners();
+        resolve();
+      } catch (error) {
+        console.error('Failed to fetch distributors:', error);
+        this._isLoading = false;
+        this.notifyListeners();
+        reject(error);
+      } finally {
+        this.pendingFetch = null;
+      }
+    });
+
+    return this.pendingFetch;
   }
 
   async addDistributor(distributor: Omit<Distributor, 'id' | 'createdAt'>): Promise<string> {

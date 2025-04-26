@@ -15,40 +15,27 @@ const DistributorSelector: React.FC<DistributorSelectorProps> = ({
   setOrder,
   disabled,
 }) => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(distributorsStore.isLoadingData);
+  const [distributors, setDistributors] = useState<Distributor[]>(distributorsStore.distributors);
 
   useEffect(() => {
-    let isMounted = true;
+    const unsubscribe = distributorsStore.subscribe(() => {
+      setIsLoading(distributorsStore.isLoadingData);
+      setDistributors(distributorsStore.distributors);
+    });
 
-    const fetchDistributors = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        await distributorsStore.fetchDistributors(true); // Force refresh to ensure we have latest data
-        } catch (error) {
-          console.error("Error fetching distributors:", error);
-        if (isMounted) {
-          setError('حدث خطأ أثناء تحميل قائمة الموزعين');
-        }
-        } finally {
-          if (isMounted) {
-            setIsLoading(false);
-        }
-      }
-    };
+    // Only fetch if not already loaded
+    if (!distributorsStore.isInitialized) {
+      distributorsStore.fetchDistributors().catch(console.error);
+    }
 
-    fetchDistributors();
-
-    return () => {
-      isMounted = false;
-    };
+    return unsubscribe;
   }, []);
 
-  const activeDistributors = distributorsStore.distributors.filter(d => d.isActive);
+  const activeDistributors = distributors.filter(d => d.isActive);
   const selectedDistributorId = order?.distributor?.id || '';
 
-  if (isLoading) {
+  if (isLoading && distributors.length === 0) {
     return (
       <div className="flex flex-col">
         <label htmlFor="distributor" className="text-sm font-medium text-slate-700">
@@ -61,32 +48,19 @@ const DistributorSelector: React.FC<DistributorSelectorProps> = ({
     );
   }
 
-  if (error) {
-    return (
-      <div className="flex flex-col">
-        <label htmlFor="distributor" className="text-sm font-medium text-slate-700">
-          الموزع
-        </label>
-        <div className="mt-1 p-2 text-sm text-red-600 bg-red-50 rounded-md">
-          {error}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col">
       <label htmlFor="distributor" className="text-sm font-medium text-slate-700">
         الموزع
       </label>
-        {/* Hidden input to enforce required validation */}
-        <input 
-                type="text" 
+      {/* Hidden input to enforce required validation */}
+      <input 
+        type="text" 
         value={selectedDistributorId} 
-                required 
-                onChange={() => {}} // Prevent React warning
-                style={{ display: "none" }} 
-            />
+        required 
+        onChange={() => {}} // Prevent React warning
+        style={{ display: "none" }} 
+      />
       <Select
         id="distributor"
         value={selectedDistributorId}
@@ -97,20 +71,24 @@ const DistributorSelector: React.FC<DistributorSelectorProps> = ({
           
           setOrder((prev: OrderList) => ({
             ...prev,
-            distributor: selectedDistributor
+            distributor: {
+              id: selectedDistributor.id,
+              name: `${selectedDistributor.firstName} ${selectedDistributor.lastName}`,
+              phone: selectedDistributor.phone || ''
+            }
           }));
         }}
         disabled={disabled}
         label='اختر الموزع'
         className="block w-full pr-10 pl-3 py-2.5 border border-slate-200 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
         placeholder="اختر الموزع"
-        
-        
+        onPointerEnterCapture={() => {}}
+        onPointerLeaveCapture={() => {}}
       >
         {activeDistributors.length > 0 ? (
           activeDistributors.map(distributor => (
-          <Option key={distributor.id} value={distributor.id}>
-            {`${distributor.firstName} ${distributor.lastName}`}
+            <Option key={distributor.id} value={distributor.id}>
+              {`${distributor.firstName} ${distributor.lastName}`}
             </Option>
           ))
         ) : (
