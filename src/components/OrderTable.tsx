@@ -165,10 +165,14 @@ const OrderTable: React.FC<OrderTableProps> = ({
                   <MuiTypography 
                     variant="small" 
                     color="blue-gray"
-                    className="text-gray-500"
+                    className="text-gray-500 font-bold"
                     placeholder={undefined}
                   >
-                    {formatDate(order.createdAt)}
+                    {new Date(order.createdAt).toLocaleDateString('en-GB', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric'
+                    })}
                   </MuiTypography>
                 </div>
 

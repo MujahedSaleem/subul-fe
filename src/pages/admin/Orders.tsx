@@ -44,12 +44,19 @@ const Orders = () => {
   });
 
   useEffect(() => {
-    if (!distributorsStore.distributors.length) {
-      distributorsStore.fetchDistributors();
-    }
+    const loadDistributors = async () => {
+      try {
+        await distributorsStore.fetchDistributors(true); // Force refresh to ensure we have latest data
+      } catch (error) {
+        console.error("Error fetching distributors:", error);
+      }
+    };
+
+    loadDistributors();
 
     const unsubscribeDistributors = distributorsStore.subscribe(() => {
-      setActiveDistributors(distributorsStore.distributors.filter(d => d.isActive));
+      const activeDistributors = distributorsStore.distributors.filter(d => d.isActive);
+      setActiveDistributors(activeDistributors);
     });
 
     return () => {
@@ -58,7 +65,14 @@ const Orders = () => {
   }, []);
 
   useEffect(() => {
-    dispatch(fetchOrders(filters));
+    dispatch(fetchOrders({
+      page: filters.page,
+      pageSize: filters.pageSize,
+      distributorId: filters.distributorId,
+      status: filters.status,
+      dateFrom: filters.dateFrom || undefined,
+      dateTo: filters.dateTo || undefined
+    }));
   }, [dispatch, filters]);
 
   const handleDelete = async (id: number) => {

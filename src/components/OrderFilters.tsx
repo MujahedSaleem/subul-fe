@@ -43,22 +43,6 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
   currentPage = 1,
   pageSize = 10,
 }) => {
-  const dispatch = useAppDispatch();
-  const { isLoading } = useAppSelector((state: RootState) => state.orders);
-
-  useEffect(() => {
-    dispatch(fetchOrders({
-      pageNumber: currentPage,
-      pageSize,
-      filters: {
-        distributorId: selectedDistributor,
-        status: selectedStatus,
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo || undefined
-      }
-    }));
-  }, [dispatch, currentPage, pageSize, selectedDistributor, selectedStatus, dateFrom, dateTo]);
-
   const statusOptions = useMemo(() => [
     { value: 'New', label: 'جديد' },
     { value: 'Confirmed', label: 'تم التأكيد' },
@@ -163,8 +147,6 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
             color="blue-gray"
             className="font-medium"
             placeholder={undefined}
-            
-            
           >
             {activeDistributors.length} موزع نشط
           </Typography>
@@ -175,14 +157,10 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
         <Card 
           className="w-full"
           placeholder={undefined}
-          
-          
         >
           <CardBody 
             className="p-4"
             placeholder={undefined}
-            
-            
           >
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {/* Distributor Filter */}
@@ -219,7 +197,12 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
                 >
                   <Option value="" className="leading-tight text-right">جميع الموزعين</Option>
                   {activeDistributors.map(d => (
-                    <Option key={d.id} value={d.id} className="leading-tight text-right" disabled={!d.isActive}>
+                    <Option 
+                      key={d.id} 
+                      value={d.id} 
+                      className="leading-tight text-right"
+                      disabled={!d.isActive}
+                    >
                       {`${d.firstName} ${d.lastName}`}
                     </Option>
                   ))}
