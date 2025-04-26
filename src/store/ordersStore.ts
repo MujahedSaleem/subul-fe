@@ -27,6 +27,14 @@ class OrdersStore {
     return this._orders;
   }
 
+  get isLoadingData(): boolean {
+    return this._isLoading;
+  }
+
+  get isInitialized(): boolean {
+    return this._isInitialized;
+  }
+
   get total(): number {
     return this._total;
   }
@@ -41,14 +49,6 @@ class OrdersStore {
 
   get totalPages(): number {
     return this._totalPages;
-  }
-
-  get isLoading(): boolean {
-    return this._isLoading;
-  }
-
-  get isInitialized(): boolean {
-    return this._isInitialized;
   }
 
   subscribe(listener: () => void): () => void {
@@ -70,7 +70,8 @@ class OrdersStore {
       status?: string | null;
       dateFrom?: string;
       dateTo?: string;
-    } = {}
+    } = {},
+    forceRefresh: boolean = false
   ) {
     if (this._isLoading) return;
     
@@ -93,7 +94,12 @@ class OrdersStore {
         params.append('toDate', filters.dateTo);
       }
 
-      const response = await axiosInstance.get<PaginatedOrders>(`/orders?${params.toString()}`);
+      const headers: Record<string, string> = {};
+      if (forceRefresh) {
+        headers['Cache-Control'] = 'no-cache';
+      }
+
+      const response = await axiosInstance.get<PaginatedOrders>(`/orders?${params.toString()}`, { headers });
       this._orders = response.data.items;
       this._total = response.data.totalCount;
       this._page = response.data.pageNumber;
@@ -153,8 +159,10 @@ class OrdersStore {
     try {
       const response = await axiosInstance.post<OrderList>('/orders', order);
       const newOrder = response.data;
-        this._orders = [...this._orders, newOrder];
-      this.notifyListeners();
+      
+      // Instead of just adding to the local array, fetch fresh data
+      await this.fetchOrders(this._page, this._pageSize, {}, true);
+      
       return newOrder;
     } catch (error) {
       console.error('Failed to add order:', error);

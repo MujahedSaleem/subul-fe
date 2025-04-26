@@ -97,25 +97,6 @@ const LocationSelector = forwardRef<HTMLDivElement, LocationSelectorProps>((
       setNewLocationName(newLocationName);
     };
 
-    // If no customer is selected yet, or customer has no locations array, show empty state
-    if (!customer?.locations) {
-      return (
-        <div ref={ref} className="flex flex-col">
-          <label htmlFor="location" className="text-sm font-medium text-slate-700">
-            الموقع
-          </label>
-          <SearchableDropdown
-            value={selectedLocationName}
-            onChange={() => {}}
-            disabled={true}
-            placeholder={customer ? "لا توجد مواقع متاحة" : "الرجاء اختيار العميل أولاً"}
-            className="block w-full"
-          >
-            <Option value="" key="empty">لا توجد مواقع</Option>
-          </SearchableDropdown>
-        </div>
-      );
-    }
 
     return (
       <div ref={ref} className="flex flex-col">
@@ -130,7 +111,7 @@ const LocationSelector = forwardRef<HTMLDivElement, LocationSelectorProps>((
           placeholder="اختر الموقع"
           className="block w-full"
         >
-          {customer.locations.map(location => (
+          {customer?.locations?.map(location => (
             <Option key={location.id} value={location.id.toString()}>
               {location.name}
             </Option>

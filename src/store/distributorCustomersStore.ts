@@ -92,8 +92,7 @@ export class DistributorCustomersStore {
   async addOrder(order: Partial<OrderRequest>): Promise<OrderList> {
     try {
       const response = await axiosInstance.post<OrderList>('/distributors/orders', order);
-      this._orders = [...this._orders, response.data];
-      this.notifyListeners();
+      await this.fetchOrders();
       return response.data;
     } catch (error) {
       console.error('Failed to add order:', error);
