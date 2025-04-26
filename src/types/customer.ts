@@ -1,8 +1,12 @@
 export interface Location {
   id: number;
   name: string;
-  coordinates: string;
-  description: string;
+  address: string;
+  coordinates?: string;
+  latitude?: number;
+  longitude?: number;
+  isActive: boolean;
+  customerId: string;
 }
 
 export interface Customer {

@@ -94,18 +94,14 @@ const OrderTable: React.FC<OrderTableProps> = ({
         return (
           <Card 
             key={order.id}
-            className={`w-full ${statusConfig.bgColor} hover:shadow-md transition-all duration-300`}
-            onPointerEnterCapture={() => {}}
-            onPointerLeaveCapture={() => {}}
+            className={`w-full ${statusConfig.bgColor} hover:shadow-lg transition-all duration-300 rounded-xl overflow-hidden border border-gray-100`}
             placeholder={undefined}
           >
             <CardBody 
-              className="p-4"
-              onPointerEnterCapture={() => {}}
-              onPointerLeaveCapture={() => {}}
+              className="p-6"
               placeholder={undefined}
             >
-              <div className="flex justify-between items-start mb-2">
+              <div className="flex justify-between items-start mb-4">
                 <div className="flex gap-2">
                   <IconButton
                     icon={faEye}
@@ -137,16 +133,14 @@ const OrderTable: React.FC<OrderTableProps> = ({
                   )}
                 </div>
                 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white shadow-sm">
                   <FontAwesomeIcon 
                     icon={statusConfig.icon}
-                    className={`w-5 h-5 ${statusConfig.color}`}
+                    className={`w-4 h-4 ${statusConfig.color}`}
                   />
                   <MuiTypography 
                     variant="small"
                     className={`font-medium ${statusConfig.color}`}
-                    onPointerEnterCapture={() => {}}
-                    onPointerLeaveCapture={() => {}}
                     placeholder={undefined}
                   >
                     {statusConfig.label}
@@ -154,16 +148,37 @@ const OrderTable: React.FC<OrderTableProps> = ({
                 </div>
               </div>
 
-              <div className="space-y-2 mt-4">
+              <div className="space-y-4 mt-4">
+                {/* Order Number and Date */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FontAwesomeIcon icon={faCalendar} className="w-4 h-4 text-blue-gray-500" />
+                    <MuiTypography 
+                      variant="small" 
+                      color="blue-gray"
+                      className="font-medium"
+                      placeholder={undefined}
+                    >
+                      {order.orderNumber}
+                    </MuiTypography>
+                  </div>
+                  <MuiTypography 
+                    variant="small" 
+                    color="blue-gray"
+                    className="text-gray-500"
+                    placeholder={undefined}
+                  >
+                    {formatDate(order.createdAt)}
+                  </MuiTypography>
+                </div>
+
                 {/* Customer Info */}
-                <div className="flex items-center gap-2">
-                  <FontAwesomeIcon icon={faUser} className="w-4 h-4 text-blue-gray-500" />
+                <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                  <FontAwesomeIcon icon={faUser} className="w-4 h-4 text-blue-600" />
                   <MuiTypography 
                     variant="small" 
                     color="blue-gray"
                     className="font-medium"
-                    onPointerEnterCapture={() => {}}
-                    onPointerLeaveCapture={() => {}}
                     placeholder={undefined}
                   >
                     {order.customer?.name}
@@ -171,88 +186,83 @@ const OrderTable: React.FC<OrderTableProps> = ({
                 </div>
 
                 {/* Distributor Info */}
-                <div className="flex items-center gap-2">
-                  <FontAwesomeIcon icon={faUserTie} className="w-4 h-4 text-blue-gray-500" />
+                <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                  <FontAwesomeIcon icon={faUserTie} className="w-4 h-4 text-blue-600" />
                   <MuiTypography 
                     variant="small" 
                     color="blue-gray"
                     className="font-medium"
-                    onPointerEnterCapture={() => {}}
-                    onPointerLeaveCapture={() => {}}
                     placeholder={undefined}
                   >
                     {order.distributor?.name}
                   </MuiTypography>
                 </div>
 
-                {/* Order Number */}
-                <div className="flex items-center gap-2">
-                  <FontAwesomeIcon icon={faCalendar} className="w-4 h-4 text-blue-gray-500" />
+                {/* Location Info */}
+                <div 
+                  className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
+                  onClick={() => handleOpenLocation(order.location)}
+                >
+                  <FontAwesomeIcon icon={faLocationDot} className="w-4 h-4 text-blue-600" />
                   <MuiTypography 
                     variant="small" 
                     color="blue-gray"
                     className="font-medium"
-                    onPointerEnterCapture={() => {}}
-                    onPointerLeaveCapture={() => {}}
                     placeholder={undefined}
                   >
-                    {order.orderNumber}
+                    {order.location?.name || 'الموقع'}
                   </MuiTypography>
                 </div>
 
                 {/* Cost */}
-                <div className="flex items-center gap-2">
-                  <FontAwesomeIcon icon={faMoneyBill} className="w-4 h-4 text-blue-gray-500" />
+                <div className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <FontAwesomeIcon icon={faMoneyBill} className="w-4 h-4 text-green-600" />
+                    <MuiTypography 
+                      variant="small" 
+                      color="blue-gray"
+                      className="font-medium"
+                      placeholder={undefined}
+                    >
+                      التكلفة
+                    </MuiTypography>
+                  </div>
                   <MuiTypography 
                     variant="small" 
-                    color="blue-gray"
-                    className="font-medium"
-                    onPointerEnterCapture={() => {}}
-                    onPointerLeaveCapture={() => {}}
+                    color="green"
+                    className="font-bold"
                     placeholder={undefined}
                   >
                     {formatCurrency(order.cost)}
                   </MuiTypography>
                 </div>
 
-                {/* Actions */}
-                <div className="flex gap-2 mt-4">
-                  {order.customer?.phone && (
-                    <IconButton
-                      icon={faPhone}
-                      onClick={() => handleCallCustomer(order.customer)}
+                {/* Action Buttons */}
+                <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="text"
                       color="blue"
-                      className="hover:bg-blue-100"
-                      size="md"
-                      title="Call Customer"
-                    />
-                  )}
-                  {order.location && (
-                    <IconButton
-                      icon={faLocationDot}
-                      onClick={() => handleOpenLocation(order.location)}
-                      color="blue"
-                      className="hover:bg-blue-100"
-                      size="md"
-                      title="View Location"
-                    />
-                  )}
+                      className="flex items-center gap-2"
+                      onClick={() => handleDirectCall(order.customer?.phone || '')}
+                    >
+                      <FontAwesomeIcon icon={faPhone} className="w-4 h-4" />
+                      <span>اتصال</span>
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="text"
+                      color="green"
+                      className="flex items-center gap-2"
+                      onClick={() => handleWhatsAppCall(order.customer)}
+                    >
+                      <FontAwesomeIcon icon={faWhatsapp} className="w-4 h-4" />
+                      <span>واتساب</span>
+                    </Button>
+                  </div>
                 </div>
               </div>
-
-              {order.status === 'New' && (
-                <div className="mt-4">
-                  <Button
-                    variant="gradient"
-                    color="green"
-                    onClick={() => handleConfirmOrder(order)}
-                    className="flex items-center gap-2 w-full justify-center"
-                  >
-                    <FontAwesomeIcon icon={faCircleCheck} className="w-5 h-5" />
-                    تأكيد الطلب
-                  </Button>
-                </div>
-              )}
             </CardBody>
           </Card>
         );

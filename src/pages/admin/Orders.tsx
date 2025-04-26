@@ -10,6 +10,7 @@ import { Distributor } from '../../types/distributor';
 import OrderFilter from '../../components/OrderFilters';
 import OrderTable from '../../components/OrderTable';
 import Button from '../../components/Button';
+import Pagination from '../../components/Pagination';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchOrders, deleteOrder, confirmOrder } from '../../store/slices/orderSlice';
 import { RootState } from '../../store/store';
@@ -23,10 +24,10 @@ interface FilterState {
   pageSize: number;
 }
 
-const Orders: React.FC = () => {
+const Orders = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
-  const { orders, isLoading, error } = useAppSelector((state: RootState) => state.orders);
+  const { orders, total, page, pageSize, totalPages, isLoading, error } = useAppSelector((state: RootState) => state.orders);
   
   const [isCallModalOpen, setIsCallModalOpen] = useState(false);
   const [customerPhone, setCustomerPhone] = useState('');
@@ -42,7 +43,6 @@ const Orders: React.FC = () => {
     pageSize: 10
   });
 
-  // Fetch distributors only once on mount
   useEffect(() => {
     if (!distributorsStore.distributors.length) {
       distributorsStore.fetchDistributors();
@@ -57,18 +57,8 @@ const Orders: React.FC = () => {
     };
   }, []);
 
-  // Single effect for fetching orders
   useEffect(() => {
-    dispatch(fetchOrders({
-      pageNumber: filters.page,
-      pageSize: filters.pageSize,
-      filters: {
-        distributorId: filters.distributorId,
-        status: filters.status,
-        dateFrom: filters.dateFrom || undefined,
-        dateTo: filters.dateTo || undefined
-      }
-    }));
+    dispatch(fetchOrders(filters));
   }, [dispatch, filters]);
 
   const handleDelete = async (id: number) => {
@@ -162,17 +152,24 @@ const Orders: React.FC = () => {
   };
 
   const handleOpenLocation = (location: Location) => {
-    if (location?.coordinates) {
-      const [latitude, longitude] = location.coordinates.split(',').map(coord => coord.trim());
-      if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-        const googleMapsUrl = `geo:0,0?q=${encodeURIComponent(latitude)},${encodeURIComponent(longitude)}`;
-        window.location.href = googleMapsUrl;
-      } else {
-        const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(latitude)},${encodeURIComponent(longitude)}`;
-        window.open(url, '_blank');
-      }
-    } else {
+    if (!location) {
+      alert('No location provided');
+      return;
+    }
+    if (!location?.coordinates) {
       alert('No coordinates available for this location');
+      return;
+    }
+    const [latitude, longitude] = location.coordinates.split(',').map(Number);
+
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobileDevice) {
+      const googleMapsUrl = `geo:${latitude},${longitude}?q=${latitude},${longitude}`;
+      window.location.href = googleMapsUrl;
+    } else {
+      const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
+      window.open(url, '_blank');
     }
   };
 
@@ -181,20 +178,26 @@ const Orders: React.FC = () => {
       <Card 
         className="h-full w-full"
         placeholder={undefined}
-        
-        
+        onPointerEnterCapture={() => {}}
+        onPointerLeaveCapture={() => {}}
       >
         <CardHeader 
           floated={false} 
           shadow={false} 
           className="rounded-none"
           placeholder={undefined}
-          
-          
+          onPointerEnterCapture={() => {}}
+          onPointerLeaveCapture={() => {}}
         >
           <div className="mb-4 flex flex-col justify-between gap-8 md:flex-row md:items-center">
             <div>
-              <Typography variant="h5" color="blue-gray" placeholder={undefined} >
+              <Typography 
+                variant="h5" 
+                color="blue-gray" 
+                placeholder={undefined}
+                onPointerEnterCapture={() => {}}
+                onPointerLeaveCapture={() => {}}
+              >
                 Orders
               </Typography>
             </div>
@@ -210,7 +213,12 @@ const Orders: React.FC = () => {
           </div>
         </CardHeader>
 
-        <CardBody className="p-6" placeholder={undefined} >
+        <CardBody 
+          className="p-6" 
+          placeholder={undefined}
+          onPointerEnterCapture={() => {}}
+          onPointerLeaveCapture={() => {}}
+        >
           <div className="space-y-6">
             <OrderFilter
               showFilters={showFilters}
@@ -236,15 +244,25 @@ const Orders: React.FC = () => {
                 {error}
               </div>
             ) : (
-              <OrderTable 
-                orders={orders}
-                handleDelete={handleDelete}
-                handleConfirmOrder={handleConfirmOrder}
-                handleCallCustomer={handleCallCustomer}
-                handleOpenLocation={handleOpenLocation}
-                formatDate={(date) => new Date(date).toLocaleDateString()}
-                formatCurrency={(amount) => amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-              />
+              <>
+                <OrderTable 
+                  orders={orders}
+                  handleDelete={handleDelete}
+                  handleConfirmOrder={handleConfirmOrder}
+                  handleCallCustomer={handleCallCustomer}
+                  handleOpenLocation={handleOpenLocation}
+                  formatDate={(date) => new Date(date).toLocaleDateString()}
+                  formatCurrency={(amount) => amount.toLocaleString('en-US', { style: 'currency', currency: 'ILS' })}
+                />
+                <Pagination
+                  currentPage={page}
+                  totalPages={totalPages}
+                  pageSize={pageSize}
+                  totalItems={total}
+                  onPageChange={handlePageChange}
+                  onPageSizeChange={handlePageSizeChange}
+                />
+              </>
             )}
           </div>
         </CardBody>

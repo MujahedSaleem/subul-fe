@@ -38,8 +38,10 @@ export interface PaginatedOrders {
 }
 
 export interface OrderFilters {
-  distributorId?: string;
-  status?: string;
+  distributorId?: string | null;
+  status?: string | null;
   page?: number;
   pageSize?: number;
+  dateFrom?: string;
+  dateTo?: string;
 }

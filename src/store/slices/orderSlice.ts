@@ -23,43 +23,49 @@ const initialState: OrdersState = {
   error: null,
 };
 
-interface FetchOrdersParams {
-  pageNumber?: number;
-  pageSize?: number;
-  filters?: {
-    distributorId?: string | null;
-    status?: string | null;
-    dateFrom?: string;
-    dateTo?: string;
-  };
+interface CacheEntry {
+  data: PaginatedOrders;
+  etag: string;
+  timestamp: number;
 }
 
-// Helper function to generate cache key
-const generateCacheKey = (params: FetchOrdersParams): string => {
-  return JSON.stringify({
-    pageNumber: params.pageNumber || 1,
-    pageSize: params.pageSize || 10,
-    filters: {
-      distributorId: params.filters?.distributorId || null,
-      status: params.filters?.status || null,
-      dateFrom: params.filters?.dateFrom || null,
-      dateTo: params.filters?.dateTo || null
-    }
-  });
-};
+// Cache duration (60 seconds)
+const CACHE_DURATION = 60 * 1000;
 
-// Cache expiration time (5 minutes)
-const CACHE_EXPIRATION = 5 * 60 * 1000;
+// Cache storage
+const cache = new Map<string, CacheEntry>();
 
 // Separate maps for different types of requests
 const pendingFetchRequests = new Map<string, Promise<PaginatedOrders>>();
 const pendingConfirmRequests = new Map<string, Promise<OrderList>>();
 const pendingDeleteRequests = new Map<string, Promise<number>>();
 
+// Helper function to generate cache key
+const generateCacheKey = (filters: OrderFilters): string => {
+  return JSON.stringify({
+    page: filters.page || 1,
+    pageSize: filters.pageSize || 10,
+    distributorId: filters.distributorId || null,
+    status: filters.status || null,
+    dateFrom: filters.dateFrom || null,
+    dateTo: filters.dateTo || null
+  });
+};
+
+// Helper function to check if cache entry is valid
+const isCacheValid = (entry: CacheEntry): boolean => {
+  return Date.now() - entry.timestamp < CACHE_DURATION;
+};
+
+// Helper function to clear cache entries related to orders
+const clearOrdersCache = () => {
+  cache.clear();
+};
+
 export const fetchOrders = createAsyncThunk<PaginatedOrders, OrderFilters>(
   'orders/fetchOrders',
   async (filters, { rejectWithValue }) => {
-    const requestKey = JSON.stringify(filters);
+    const requestKey = generateCacheKey(filters);
     const existingRequest = pendingFetchRequests.get(requestKey);
     
     if (existingRequest) {
@@ -67,7 +73,42 @@ export const fetchOrders = createAsyncThunk<PaginatedOrders, OrderFilters>(
     }
 
     try {
-      const promise = axiosInstance.get<PaginatedOrders>('/orders', { params: filters }).then(response => response.data);
+      const cachedEntry = cache.get(requestKey);
+      const headers: Record<string, string> = {};
+      
+      if (cachedEntry && isCacheValid(cachedEntry)) {
+        headers['If-None-Match'] = cachedEntry.etag;
+      }
+
+      const promise = axiosInstance.get<PaginatedOrders>('/orders', {
+        params: {
+          pageNumber: filters.page || 1,
+          pageSize: filters.pageSize || 10,
+          distributorId: filters.distributorId,
+          status: filters.status,
+          dateFrom: filters.dateFrom,
+          dateTo: filters.dateTo
+        },
+        headers,
+        validateStatus: (status) => status === 200 || status === 304
+      }).then(response => {
+        if (response.status === 304 && cachedEntry) {
+          // Return cached data if server indicates nothing has changed
+          return cachedEntry.data;
+        }
+
+        const etag = response.headers['etag'];
+        if (etag) {
+          // Store the new response in cache with its ETag
+          cache.set(requestKey, {
+            data: response.data,
+            etag: etag,
+            timestamp: Date.now()
+          });
+        }
+        return response.data;
+      });
+
       pendingFetchRequests.set(requestKey, promise);
       const result = await promise;
       pendingFetchRequests.delete(requestKey);
@@ -93,7 +134,10 @@ export const deleteOrder = createAsyncThunk<number, number>(
     }
 
     try {
-      const promise = axiosInstance.delete(`/orders/${orderId}`).then(() => orderId);
+      const promise = axiosInstance.delete(`/orders/${orderId}`).then(() => {
+        clearOrdersCache(); // Clear cache after successful deletion
+        return orderId;
+      });
       pendingDeleteRequests.set(requestKey, promise);
       const result = await promise;
       pendingDeleteRequests.delete(requestKey);
@@ -119,7 +163,10 @@ export const confirmOrder = createAsyncThunk<OrderList, number>(
     }
 
     try {
-      const promise = axiosInstance.post<OrderList>(`/orders/${orderId}/confirm`).then(response => response.data);
+      const promise = axiosInstance.post<OrderList>(`/orders/${orderId}/confirm`).then(response => {
+        clearOrdersCache(); // Clear cache after successful confirmation
+        return response.data;
+      });
       pendingConfirmRequests.set(requestKey, promise);
       const result = await promise;
       pendingConfirmRequests.delete(requestKey);

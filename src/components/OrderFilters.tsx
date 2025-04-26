@@ -93,12 +93,22 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
   }, [setSelectedStatus]);
 
   const handleDateFromChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setDateFrom(e.target.value);
-  }, [setDateFrom]);
+    const newDateFrom = e.target.value;
+    if (dateTo && newDateFrom && new Date(newDateFrom) > new Date(dateTo)) {
+      alert('تاريخ البداية يجب أن يكون أصغر من أو يساوي تاريخ النهاية');
+      return;
+    }
+    setDateFrom(newDateFrom);
+  }, [dateTo, setDateFrom]);
 
   const handleDateToChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setDateTo(e.target.value);
-  }, [setDateTo]);
+    const newDateTo = e.target.value;
+    if (dateFrom && newDateTo && new Date(newDateTo) < new Date(dateFrom)) {
+      alert('تاريخ النهاية يجب أن يكون أكبر من أو يساوي تاريخ البداية');
+      return;
+    }
+    setDateTo(newDateTo);
+  }, [dateFrom, setDateTo]);
 
   const toggleFilters = useCallback(() => {
     setShowFilters(!showFilters);
@@ -182,8 +192,6 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
                   color="blue-gray"
                   className="font-medium"
                   placeholder={undefined}
-                  
-                  
                 >
                   الموزع
                 </Typography>
@@ -208,8 +216,6 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
                     unmount: { y: -25, scale: 0.95 },
                   }}
                   placeholder={undefined}
-                  
-                  
                 >
                   <Option value="" className="leading-tight text-right">جميع الموزعين</Option>
                   {activeDistributors.map(d => (
@@ -227,8 +233,6 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
                   color="blue-gray"
                   className="font-medium"
                   placeholder={undefined}
-                  
-                  
                 >
                   الحالة
                 </Typography>
@@ -253,8 +257,6 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
                     unmount: { y: -25, scale: 0.95 },
                   }}
                   placeholder={undefined}
-                  
-                  
                 >
                   <Option value="" className="leading-tight text-right">الكل</Option>
                   {statusOptions.map((status) => (
@@ -266,14 +268,12 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
               </div>
 
               {/* Date From Filter */}
-              <div className="space-y-2 md:order-2">
+              <div className="space-y-2 md:order-1">
                 <Typography 
                   variant="small" 
                   color="blue-gray"
                   className="font-medium"
                   placeholder={undefined}
-                  
-                  
                 >
                   من تاريخ
                 </Typography>
@@ -289,21 +289,17 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
                     className: "text-right"
                   }}
                   placeholder={undefined}
-                  
-                  
                   crossOrigin={undefined}
                 />
               </div>
 
               {/* Date To Filter */}
-              <div className="space-y-2 md:order-1">
+              <div className="space-y-2 md:order-2">
                 <Typography 
                   variant="small" 
                   color="blue-gray"
                   className="font-medium"
                   placeholder={undefined}
-                  
-                  
                 >
                   إلى تاريخ
                 </Typography>
@@ -319,8 +315,6 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
                     className: "text-right"
                   }}
                   placeholder={undefined}
-                  
-                  
                   crossOrigin={undefined}
                 />
               </div>
