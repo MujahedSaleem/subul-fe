@@ -1,18 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import Layout from '../../components/Layout';
 import OrderForm from '../../components/OrderForm';
-import { ordersStore } from '../../store/ordersStore';
 import type { OrderList, OrderRequest } from '../../types/order';
 import { customersStore } from '../../store/customersStore';
 import { useError } from '../../context/ErrorContext';
-import { Customer, Location } from '../../types/customer';
-import { Distributor } from '../../types/distributor';
+import { Customer } from '../../types/customer';
+import { updateOrder, confirmOrder } from '../../store/slices/orderSlice';
+import { ordersStore } from '../../store/ordersStore';
+import type { AppDispatch } from '../../store/store';
 
 const EditOrder: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { dispatch } = useError();
+  const dispatch = useDispatch<AppDispatch>();
+  const { dispatch: errorDispatch } = useError();
   const shouldSaveOnUnmount = useRef(true);
   const [isLoading, setIsLoading] = useState(true);
   const [order, setOrder] = useState<OrderList | null>(null);
@@ -87,9 +90,9 @@ const EditOrder: React.FC = () => {
       // Check if there are any changes to the customer
       const originalCustomer = await customersStore.getCustomerById(order.customer.id);
       if (!originalCustomer) {
-      navigate('/admin/orders');
-      return;
-    }
+        navigate('/admin/orders');
+        return;
+      }
 
       const hasCustomerChanges = JSON.stringify({
         name: order.customer.name,
@@ -104,15 +107,15 @@ const EditOrder: React.FC = () => {
       // Only update if there are changes
       if (hasOrderChanges) {
         const orderRequest: OrderRequest = {
-      id: order.id,
-      orderNumber: order.orderNumber,
-      customerId: order.customer.id,
+          id: order.id,
+          orderNumber: order.orderNumber,
+          customerId: order.customer.id,
           locationId: order.location?.id,
-      cost: order.cost,
+          cost: order.cost,
           distributorId: order.distributor?.id,
           statusString: order.status as 'New' | 'Pending' | 'Confirmed' | 'Draft'
         };
-        await ordersStore.updateOrder(orderRequest);
+        await dispatch(updateOrder(orderRequest)).unwrap();
       }
 
       if (hasCustomerChanges) {
@@ -122,7 +125,7 @@ const EditOrder: React.FC = () => {
       navigate('/admin/orders');
     } catch (error) {
       console.error('Error handling back navigation:', error);
-    navigate('/admin/orders');
+      navigate('/admin/orders');
     }
   };
 
@@ -141,7 +144,7 @@ const EditOrder: React.FC = () => {
           l => l.coordinates === order.location.coordinates || l.id === order.location.id
         );
 
-    const confirmedOrder = {
+        const confirmedOrder = {
           id: order.id,
           orderNumber: order.orderNumber,
           customerId: updatedCustomer.id,
@@ -149,16 +152,16 @@ const EditOrder: React.FC = () => {
           cost: order.cost,
           distributorId: order.distributor.id,
           statusString: 'New'
-    } as OrderRequest;
+        } as OrderRequest;
 
-        await ordersStore.updateOrder(confirmedOrder);
-        await ordersStore.confirmOrder(confirmedOrder.id);
-    shouldSaveOnUnmount.current = false;
-    navigate('/admin/orders');
+        await dispatch(updateOrder(confirmedOrder)).unwrap();
+        await dispatch(confirmOrder(confirmedOrder.id)).unwrap();
+        shouldSaveOnUnmount.current = false;
+        navigate('/admin/orders');
       }
     } catch (error) {
       console.error('Error confirming order:', error);
-      dispatch({ type: 'SET_ERROR', payload: 'حدث خطأ أثناء تأكيد الطلب' });
+      errorDispatch({ type: 'SET_ERROR', payload: 'حدث خطأ أثناء تأكيد الطلب' });
     }
   };
 

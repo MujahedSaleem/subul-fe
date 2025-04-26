@@ -118,7 +118,7 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
       <input
         ref={inputRef}
         type="text"
-        value={query || selectedLabel} // Display query text, not selectedLabel
+        value={query || selectedLabel}
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
         onClick={()=>setIsOpen(true)}
@@ -127,9 +127,9 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
         disabled={disabled}
       />
 
-      {isOpen && !disabled && (
-        <div id="dropdownSearch" className="z-10 bg-white rounded-lg shadow-sm w-60 dark:bg-gray-700 mt-2 absolute">
-          <ul className="h-48 px-3 pb-3 overflow-y-auto text-sm text-gray-700 dark:text-gray-200"          >
+      {isOpen && (
+        <div id="dropdownSearch" className="z-10 bg-white rounded-lg shadow-sm w-full dark:bg-gray-700 mt-2 absolute">
+          <ul className="max-h-48 px-3 pb-3 overflow-y-auto text-sm text-gray-700 dark:text-gray-200">
             {addedOption}
             {filteredOptions.length > 0 ? (
               filteredOptions.map((option, index) => (
@@ -137,8 +137,10 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                   key={option.props.value}
                   value={option.props.value}
                   onClick={() => handleSelect(option)}
-                  className={`cursor-pointer text-sm py-2 rounded-md ${
-                    highlightedIndex === index ? "bg-blue-600 text-white" : "hover:bg-blue-100"
+                  className={`cursor-pointer text-sm py-2 rounded-md text-right ${
+                    String(option.props.children).toLowerCase() === String(selectedLabel).toLowerCase() 
+                      ? "bg-blue-500 text-white" 
+                      : "bg-white text-gray-900 hover:bg-blue-100"
                   }`}
                 >
                   {option.props.children}
@@ -146,7 +148,7 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
               ))
             ) : (
               <li
-                className="px-4 py-2 text-gray-500 cursor-pointer rounded-md hover:bg-gray-100"
+                className="px-4 py-2 text-gray-500 cursor-pointer rounded-md hover:bg-gray-100 text-right"
               >
                 لا يوجد مواقع
               </li>
@@ -156,7 +158,7 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
               String(option.props.children).toLowerCase() === query.toLowerCase()
             ) && (
               <li
-                className="px-4 py-2 text-blue-600 cursor-pointer rounded-md hover:bg-blue-100"
+                className="px-4 py-2 text-blue-600 cursor-pointer rounded-md hover:bg-blue-50 text-right"
                 onClick={() => {
                   onAddOption(query.trim());
                   setQuery("");

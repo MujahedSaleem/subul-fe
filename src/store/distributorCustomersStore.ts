@@ -104,6 +104,7 @@ export class DistributorCustomersStore {
   async updateOrder(order: OrderRequest): Promise<boolean> {
     try {
       const response = await axiosInstance.put<OrderList>(`/distributors/orders/${order.id}`, order);
+      await axiosInstance.post("/orders/clear-cache");
       this._orders = this._orders.map(o => o.id === response.data.id ? response.data : o);
       this.notifyListeners();
       return true;

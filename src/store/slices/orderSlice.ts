@@ -40,6 +40,14 @@ const pendingFetchRequests = new Map<string, Promise<PaginatedOrders>>();
 const pendingConfirmRequests = new Map<string, Promise<OrderList>>();
 const pendingDeleteRequests = new Map<string, Promise<number>>();
 
+// Add a flag to track if we need to bypass cache
+let shouldBypassCache = false;
+
+// Helper function to set bypass cache flag
+const setBypassCache = () => {
+  shouldBypassCache = true;
+};
+
 // Helper function to generate cache key
 const generateCacheKey = (filters: OrderFilters): string => {
   return JSON.stringify({
@@ -60,6 +68,7 @@ const isCacheValid = (entry: CacheEntry): boolean => {
 // Helper function to clear cache entries related to orders
 const clearOrdersCache = () => {
   cache.clear();
+  setBypassCache();
 };
 
 export const fetchOrders = createAsyncThunk<PaginatedOrders, OrderFilters>(
@@ -76,7 +85,10 @@ export const fetchOrders = createAsyncThunk<PaginatedOrders, OrderFilters>(
       const cachedEntry = cache.get(requestKey);
       const headers: Record<string, string> = {};
       
-      if (cachedEntry && isCacheValid(cachedEntry)) {
+      if (shouldBypassCache) {
+        headers['Cache-Control'] = 'no-cache';
+        shouldBypassCache = false; // Reset flag after using it
+      } else if (cachedEntry && isCacheValid(cachedEntry)) {
         headers['If-None-Match'] = cachedEntry.etag;
       }
 
@@ -93,13 +105,11 @@ export const fetchOrders = createAsyncThunk<PaginatedOrders, OrderFilters>(
         validateStatus: (status) => status === 200 || status === 304
       }).then(response => {
         if (response.status === 304 && cachedEntry) {
-          // Return cached data if server indicates nothing has changed
           return cachedEntry.data;
         }
 
         const etag = response.headers['etag'];
         if (etag) {
-          // Store the new response in cache with its ETag
           cache.set(requestKey, {
             data: response.data,
             etag: etag,
@@ -135,7 +145,7 @@ export const deleteOrder = createAsyncThunk<number, number>(
 
     try {
       const promise = axiosInstance.delete(`/orders/${orderId}`).then(() => {
-        clearOrdersCache(); // Clear cache after successful deletion
+        clearOrdersCache(); // This will also set shouldBypassCache flag
         return orderId;
       });
       pendingDeleteRequests.set(requestKey, promise);
@@ -164,7 +174,7 @@ export const confirmOrder = createAsyncThunk<OrderList, number>(
 
     try {
       const promise = axiosInstance.post<OrderList>(`/orders/${orderId}/confirm`).then(response => {
-        clearOrdersCache(); // Clear cache after successful confirmation
+        clearOrdersCache(); // This will also set shouldBypassCache flag
         return response.data;
       });
       pendingConfirmRequests.set(requestKey, promise);
@@ -177,6 +187,35 @@ export const confirmOrder = createAsyncThunk<OrderList, number>(
         return rejectWithValue(error.response?.data?.message || 'Failed to confirm order');
       }
       return rejectWithValue('Failed to confirm order');
+    }
+  }
+);
+
+export const updateOrder = createAsyncThunk<OrderList, OrderRequest>(
+  'orders/updateOrder',
+  async (order, { rejectWithValue }) => {
+    const requestKey = `update-${order.id}`;
+    const existingRequest = pendingConfirmRequests.get(requestKey);
+    
+    if (existingRequest) {
+      return existingRequest;
+    }
+
+    try {
+      const promise = axiosInstance.put<OrderList>(`/orders/${order.id}`, order).then(response => {
+        clearOrdersCache(); // This will also set shouldBypassCache flag
+        return response.data;
+      });
+      pendingConfirmRequests.set(requestKey, promise);
+      const result = await promise;
+      pendingConfirmRequests.delete(requestKey);
+      return result;
+    } catch (error) {
+      pendingConfirmRequests.delete(requestKey);
+      if (error instanceof AxiosError) {
+        return rejectWithValue(error.response?.data?.message || 'Failed to update order');
+      }
+      return rejectWithValue('Failed to update order');
     }
   }
 );
@@ -228,6 +267,21 @@ const ordersSlice = createSlice({
         }
       })
       .addCase(confirmOrder.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(updateOrder.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(updateOrder.fulfilled, (state, action) => {
+        state.isLoading = false;
+        const index = state.orders.findIndex(order => order.id === action.payload.id);
+        if (index !== -1) {
+          state.orders[index] = action.payload;
+        }
+      })
+      .addCase(updateOrder.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
       });
