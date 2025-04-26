@@ -1,6 +1,8 @@
 import axiosInstance from "../utils/axiosInstance";
 import { Customer, DistributorCreateCustomerRequest, Location } from "../types/customer";
 import { OrderList, OrderRequest } from "../types/order";
+import { useAppDispatch } from "../store/hooks";
+import { fetchDistributorOrders, confirmDistributorOrder, deleteDistributorOrder, updateDistributorOrder } from "../store/slices/distributorOrdersSlice";
 
 export class DistributorCustomersStore {
 
@@ -92,7 +94,6 @@ export class DistributorCustomersStore {
   async addOrder(order: Partial<OrderRequest>): Promise<OrderList> {
     try {
       const response = await axiosInstance.post<OrderList>('/distributors/orders', order);
-      await this.fetchOrders();
       return response.data;
     } catch (error) {
       console.error('Failed to add order:', error);
@@ -103,9 +104,6 @@ export class DistributorCustomersStore {
   async updateOrder(order: OrderRequest): Promise<boolean> {
     try {
       const response = await axiosInstance.put<OrderList>(`/distributors/orders/${order.id}`, order);
-      await axiosInstance.post("/orders/clear-cache");
-      this._orders = this._orders.map(o => o.id === response.data.id ? response.data : o);
-      this.notifyListeners();
       return true;
     } catch (error) {
       console.error('Failed to update order:', error);
@@ -116,10 +114,6 @@ export class DistributorCustomersStore {
   async confirmOrder(id: number): Promise<boolean> {
     try {
       await axiosInstance.post(`/distributors/orders/${id}/confirm`);
-      this._orders = this._orders.map(o =>
-        o.id === id ? { ...o, status: 'Confirmed', confirmedAt: new Date().toISOString() } : o
-      );
-      this.notifyListeners();
       return true;
     } catch (error) {
       console.error('Failed to confirm order:', error);
@@ -130,8 +124,6 @@ export class DistributorCustomersStore {
   async deleteOrder(id: number): Promise<boolean> {
     try {
       await axiosInstance.delete(`/distributors/orders/${id}`);
-      this._orders = this._orders.filter(o => o.id !== id);
-      this.notifyListeners();
       return true;
     } catch (error) {
       console.error('Failed to delete order:', error);

@@ -10,7 +10,7 @@ const axiosInstance = axios.create({
   },
 });
 
-// Interceptor to add access token to headers
+// Request interceptor
 axiosInstance.interceptors.request.use(
   (config) => {
     const accessToken = localStorage.getItem('accessToken');
@@ -24,14 +24,14 @@ axiosInstance.interceptors.request.use(
   }
 );
 
-// Interceptor to handle token expiration and refresh
+// Response interceptor
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
     // If the error is due to an expired token
-    if (error.response.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
       // Attempt to refresh the token
