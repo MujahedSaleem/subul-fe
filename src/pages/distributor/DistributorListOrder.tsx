@@ -47,12 +47,12 @@ const DistributorListOrder: React.FC = () => {
       }
       if (!order?.customer?.id || !order.cost) {
         alert('Cannot confirm order. Customer data or cost is incomplete.');
-        return;
-      }
+      return;
+    }
       if (window.confirm('هل أنت متأكد من تأكيد هذا الطلب؟')) {
         await confirmOrder(order.id);
       }
-    } catch (error) {
+      } catch (error) {
       console.error('Failed to confirm order:', error);
     }
   };
@@ -67,13 +67,13 @@ const DistributorListOrder: React.FC = () => {
 
   const handleCallCustomer = (customer: Customer) => {
     setSelectedCustomer(customer);
-    setIsCallModalOpen(true);
+      setIsCallModalOpen(true);
   };
 
   const handleOpenLocation = (location: Location) => {
     if (location.coordinates) {
       window.open(`https://www.google.com/maps/search/?api=1&query=${location.coordinates}`, '_blank');
-    }
+      }
   };
 
   const getStatusConfig = (status: string) => {
@@ -167,7 +167,7 @@ const DistributorListOrder: React.FC = () => {
           onPointerLeaveCapture={() => {}}
         >
           <div className="space-y-6">
-            {isLoading ? (
+          {isLoading ? (
               <div className="text-center py-8">جاري التحميل...</div>
             ) : error ? (
               <div className="text-center py-8 text-red-500">حدث خطأ أثناء تحميل الطلبات</div>
@@ -363,7 +363,7 @@ const DistributorListOrder: React.FC = () => {
                   <div className="col-span-full text-center py-8 text-slate-500">
                     لا توجد طلبات حالية
                   </div>
-                )}
+          )}
               </div>
             )}
           </div>
@@ -375,7 +375,7 @@ const DistributorListOrder: React.FC = () => {
         onClose={() => setIsCallModalOpen(false)}
         phone={selectedCustomer?.phone || ''}
       />
-    </Layout>
+      </Layout>
   );
 };
 

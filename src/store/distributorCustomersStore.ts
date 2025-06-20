@@ -1,3 +1,6 @@
+/// <reference types="node" />
+/// <reference lib="es2015" />
+
 import axiosInstance from "../utils/axiosInstance";
 import { Customer, DistributorCreateCustomerRequest, Location } from "../types/customer";
 import { OrderList, OrderRequest } from "../types/order";
@@ -11,6 +14,8 @@ export class DistributorCustomersStore {
   private _orders: OrderList[] = [];
   private listeners: (() => void)[] = [];
   private _isLoading: boolean = false;
+  private pendingRequests: Map<string, Promise<any>> = new Map();
+  private pendingCustomerFetches: Map<string, Promise<Customer | null>> = new Map();
 
   private constructor() {}
 
@@ -35,14 +40,24 @@ export class DistributorCustomersStore {
     const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
     return `ORD${timestamp}`;
   };
-  async findCustomerByPhone(phone: string): Promise<Customer | null> {
-    try {
-      const response = await axiosInstance.get<Customer>(`/distributors/customers`, {params:{phone:phone}});
-      return response.data;
-    } catch (error) {
-      console.error("Error finding customer:", error);
-      return null;
+  async findCustomerByPhone(phone: string): Promise<any> {
+    const existingRequest = this.pendingCustomerFetches.get(phone);
+    if (existingRequest) {
+      return existingRequest;
     }
+
+    const promise = new Promise<Customer | null>(async (resolve) => {
+      try {
+      const response = await axiosInstance.get<Customer>(`/distributors/customers`, {params:{phone:phone}});
+        resolve(response.data);
+      } catch (error) {
+        console.error("Error fetching customer by phone:", error);
+        resolve(null);
+      }
+    });
+
+    this.pendingCustomerFetches.set(phone, promise);
+    return promise;
   }
 
   async addCustomer(customer: Partial<DistributorCreateCustomerRequest>) {
@@ -82,13 +97,34 @@ export class DistributorCustomersStore {
   }
 
   async getOrderById(id: number): Promise<OrderList | null> {
-    try {
-      const response = await axiosInstance.get<OrderList>(`/distributors/orders/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error('Failed to get order:', error);
-      return null;
+    const requestKey = `getOrderById-${id}`;
+    
+    // Check if there's already a pending request for this ID
+    const existingRequest = this.pendingRequests.get(requestKey);
+    if (existingRequest) {
+      return existingRequest;
     }
+
+    // Create a new request
+    const requestPromise = (async () => {
+      try {
+        const response = await axiosInstance.get<OrderList>(`/distributors/orders/${id}`);
+        const order = response.data;
+        if (order) {
+          // Add the order to the store without triggering a full refresh
+          this._orders = [...this._orders, order];
+        }
+        return order;
+      } finally {
+        // Clean up the request from the map when done
+        this.pendingRequests.delete(requestKey);
+      }
+    })();
+
+    // Store the promise in the map
+    this.pendingRequests.set(requestKey, requestPromise);
+
+    return requestPromise;
   }
 
   async addOrder(order: Partial<OrderRequest>): Promise<OrderList> {

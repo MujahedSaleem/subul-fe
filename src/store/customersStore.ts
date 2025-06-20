@@ -1,5 +1,5 @@
 import axiosInstance from "../utils/axiosInstance";
-import { Customer } from "../types/customer";
+import { Customer, Location } from "../types/customer";
 
 class CustomersStore {
   private static instance: CustomersStore;
@@ -22,7 +22,7 @@ class CustomersStore {
     return this._customers;
   }
 
-  get isLoadingData(): boolean {
+  get isLoading(): boolean {
     return this._isLoading;
   }
 
@@ -62,40 +62,63 @@ class CustomersStore {
     }
   }
 
-  async addCustomer(customer: Partial<Customer>) {
+  async addCustomer(customer: Omit<Customer, 'id'>) {
     try {
       const response = await axiosInstance.post<Customer>("/customers", customer);
-      this._customers = [...this._customers, response.data];
+      const newCustomer = response.data;
+      this._customers = [...this._customers, newCustomer];
       this.notifyListeners();
-      return response.data;
+      return newCustomer;
     } catch (error) {
       console.error("Error adding customer:", error);
+      throw error;
     }
   }
 
   async updateCustomer(customer: Customer) {
     try {
       const response = await axiosInstance.put<Customer>(`/customers/${customer.id}`, customer);
-      const newCustomer = response.data;
-      this._customers = this._customers.map((c) => (c.id === customer.id ? newCustomer : c));
+      const updatedCustomer = response.data;
+      const index = this._customers.findIndex(c => c.id === updatedCustomer.id);
+      if (index !== -1) {
+        this._customers[index] = updatedCustomer;
+      }
       this.notifyListeners();
-      return newCustomer;
+      return updatedCustomer;
     } catch (error) {
       console.error("Error updating customer:", error);
+      throw error;
     }
   }
 
-  async deleteCustomer(id: number) {
+  async updateCustomerLocation(customerId: string, locationId: number, location: { name: string; coordinates: string; address: string }) {
+    try {
+      const response = await axiosInstance.put<Customer>(`/customers/${customerId}/locations/${locationId}`, location);
+      const updatedCustomer = response.data;
+      const index = this._customers.findIndex(c => c.id === updatedCustomer.id);
+      if (index !== -1) {
+        this._customers[index] = updatedCustomer;
+      }
+      this.notifyListeners();
+      return updatedCustomer;
+    } catch (error) {
+      console.error("Error updating customer location:", error);
+      throw error;
+    }
+  }
+
+  async deleteCustomer(id: string) {
     try {
       await axiosInstance.delete(`/customers/${id}`);
-      this._customers = this._customers.filter((c) => c.id !== id);
+      this._customers = this._customers.filter(c => c.id !== id);
       this.notifyListeners();
     } catch (error) {
       console.error("Error deleting customer:", error);
+      throw error;
     }
   }
 
-  subscribe(listener: () => void): () => void {
+  subscribe(listener: () => void) {
     this.listeners.push(listener);
     return () => {
       this.listeners = this.listeners.filter(l => l !== listener);
@@ -108,19 +131,19 @@ class CustomersStore {
 
   async getCustomerById(id: string): Promise<Customer | null> {
     try {
-      // Check if there's already an ongoing request for this ID
-      const existingRequest = this.ongoingRequests.get(id);
-      if (existingRequest) {
-        return existingRequest;
-      }
-
-      // Check if the customer exists in the store
-      const existingCustomer = this._customers.find(customer => customer.id === id);
+      // Check if we already have the customer in our store
+      const existingCustomer = this._customers.find(c => c.id === id);
       if (existingCustomer) {
         return existingCustomer;
       }
 
-      // Create a new request promise
+      // Check if there's an ongoing request for this customer
+      const ongoingRequest = this.ongoingRequests.get(id);
+      if (ongoingRequest) {
+        return ongoingRequest;
+      }
+
+      // Create a new request
       const requestPromise = (async () => {
         try {
           const response = await axiosInstance.get<Customer>(`/customers/${id}`);
@@ -169,3 +192,5 @@ class CustomersStore {
 }
 
 export const customersStore = CustomersStore.getInstance();
+
+
