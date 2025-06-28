@@ -5,7 +5,7 @@ import axiosInstance from "../utils/axiosInstance";
 import { Customer, DistributorCreateCustomerRequest, Location } from "../types/customer";
 import { OrderList, OrderRequest } from "../types/order";
 import { useAppDispatch } from "../store/hooks";
-import { fetchDistributorOrders, confirmDistributorOrder, deleteDistributorOrder, updateDistributorOrder } from "../store/slices/distributorOrdersSlice";
+import { fetchDistributorOrders, confirmDistributorOrder, deleteDistributorOrder, updateDistributorOrder, clearCurrentOrder } from "../store/slices/distributorOrdersSlice";
 
 export class DistributorCustomersStore {
 
@@ -16,6 +16,7 @@ export class DistributorCustomersStore {
   private _isLoading: boolean = false;
   private pendingRequests: Map<string, Promise<any>> = new Map();
   private pendingCustomerFetches: Map<string, Promise<Customer | null>> = new Map();
+  private dispatch: any = null;
 
   private constructor() {}
 
@@ -24,6 +25,11 @@ export class DistributorCustomersStore {
       DistributorCustomersStore.instance = new DistributorCustomersStore();
     }
     return DistributorCustomersStore.instance;
+  }
+
+  // Method to set the Redux dispatch function from a component
+  setDispatch(dispatch: any) {
+    this.dispatch = dispatch;
   }
 
   get isLoadingData(): boolean {
@@ -76,6 +82,12 @@ export class DistributorCustomersStore {
       const response = await axiosInstance.put<Customer>(`/distributors/customers/${customer.id}`, customer);
       const newCustomer = response.data;
       this._customers = this._customers.map((c) => (c.id === customer.id ? newCustomer : c));
+      
+      // Clear the current order cache to ensure fresh data is fetched
+      if (this.dispatch) {
+        this.dispatch(clearCurrentOrder());
+      }
+      
       this.notifyListeners();
       return newCustomer;
     } catch (error) {
@@ -176,13 +188,19 @@ export class DistributorCustomersStore {
       return false;
     }
   }
-  async updateCustomerLocation(customerId: string, location:Location): any {
+  async updateCustomerLocation(customerId: string, location:Location): Promise<boolean> {
     try {
       await axiosInstance.put(`/distributors/customers/${customerId}/locations/${location.id}`, location);
+      
+      // Clear the current order cache to ensure fresh data is fetched when editing orders
+      if (this.dispatch) {
+        this.dispatch(clearCurrentOrder());
+      }
+      
       this.notifyListeners();
       return true;
     } catch (error) {
-      console.error('Failed to deactivate distributor:', error);
+      console.error('Failed to update customer location:', error);
       return false;
     }  }
 

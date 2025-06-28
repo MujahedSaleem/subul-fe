@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import DistributorOrderForm from '../../components/distributor/DistributorOrderForm';
 import type { OrderList, OrderRequest, DistributorInfo } from '../../types/order';
 import { useError } from '../../context/ErrorContext';
 import { Customer, Location } from '../../types/customer';
-import { distributorCustomersStore } from '../../store/distributorCustomersStore';
+import { useDistributorCustomers } from '../../hooks/useDistributorCustomers';
+import { useDistributorOrders } from '../../hooks/useDistributorOrders';
 
 const generateOrderNumber = () => {
   const now = new Date();
@@ -18,6 +19,16 @@ const DistributorAddOrder: React.FC = () => {
   const { dispatch } = useError();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBackLoading, setIsBackLoading] = useState(false);
+
+  const {
+    addCustomer,
+    updateCustomer
+  } = useDistributorCustomers();
+
+  const {
+    addOrder,
+    confirmOrder
+  } = useDistributorOrders();
 
   const [order, setOrder] = useState<OrderList>({
     id: 0,
@@ -40,13 +51,17 @@ const DistributorAddOrder: React.FC = () => {
     setIsBackLoading(true);
     try {
       let newCustomer = null;
-      if (!customer.id)
-        newCustomer = await distributorCustomersStore.addCustomer(customer);
-      else
-        newCustomer = await distributorCustomersStore.updateCustomer(customer);
-      if(newCustomer){
+      if (!customer.id) {
+        const result = await addCustomer(customer);
+        newCustomer = result.payload as Customer;
+      } else {
+        const result = await updateCustomer(customer);
+        newCustomer = result.payload as Customer;
+      }
+      
+      if (newCustomer) {
         const selectedLocation = newCustomer?.locations?.find(l => l.coordinates === customer.locations[0].coordinates);
-        await distributorCustomersStore.addOrder({ 
+        await addOrder({ 
           ...order, 
           customerId: newCustomer?.id,
           locationId: selectedLocation?.id,
@@ -82,12 +97,15 @@ const DistributorAddOrder: React.FC = () => {
       }
 
       let newCustomer = null;
-      if (!order.customer?.id)
-        newCustomer = await distributorCustomersStore.addCustomer(order.customer);
-      else
-        newCustomer = await distributorCustomersStore.updateCustomer(order.customer);
+      if (!order.customer?.id) {
+        const result = await addCustomer(order.customer);
+        newCustomer = result.payload as Customer;
+      } else {
+        const result = await updateCustomer(order.customer);
+        newCustomer = result.payload as Customer;
+      }
 
-      if(newCustomer){
+      if (newCustomer) {
         const selectedLocation = newCustomer?.locations?.find(l => l.coordinates === order.customer.locations[0].coordinates);
         
         const confirmedOrder: OrderRequest = {
@@ -100,9 +118,10 @@ const DistributorAddOrder: React.FC = () => {
           statusString: 'New'
         };
 
-        const newOrder = await distributorCustomersStore.addOrder(confirmedOrder);
+        const orderResult = await addOrder(confirmedOrder);
+        const newOrder = orderResult.payload as OrderList;
         if (newOrder) {
-          await distributorCustomersStore.confirmOrder(newOrder.id);
+          await confirmOrder(newOrder.id);
         }
       }
 

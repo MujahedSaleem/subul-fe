@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import DistributorOrderForm from '../../components/distributor/DistributorOrderForm';
@@ -9,8 +9,8 @@ import { Card, CardBody, CardHeader, Typography } from '@material-tailwind/react
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheckCircle, faClock, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { Button } from '@material-tailwind/react';
-import { distributorCustomersStore } from '../../store/distributorCustomersStore';
 import { useDistributorOrders } from '../../hooks/useDistributorOrders';
+import { useDistributorCustomers } from '../../hooks/useDistributorCustomers';
 
 const DistributorEditOrder: React.FC = () => {
   const { id } = useParams();
@@ -20,6 +20,7 @@ const DistributorEditOrder: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBackLoading, setIsBackLoading] = useState(false);
+  const [orderLoaded, setOrderLoaded] = useState(false);
   
   const {
     orders,
@@ -28,6 +29,11 @@ const DistributorEditOrder: React.FC = () => {
     updateOrder,
     confirmOrder
   } = useDistributorOrders();
+
+  const {
+    updateCustomer,
+    updateCustomerLocation
+  } = useDistributorCustomers();
 
   const [order, setOrder] = useState<OrderList>({
     id: 0,
@@ -58,37 +64,43 @@ const DistributorEditOrder: React.FC = () => {
   });
   const [originalOrder, setOriginalOrder] = useState<OrderList | null>(null);
 
+  // Memoize the order loading function to prevent infinite loops
+  const loadOrder = useCallback(async (orderId: number) => {
+    if (orderLoaded) return; // Prevent multiple loads
+
+    try {
+      setIsLoading(true);
+      await getOrderById(orderId);
+      setOrderLoaded(true);
+    } catch (error) {
+      console.error('Error loading order:', error);
+      navigate('/distributor/orders');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [getOrderById, navigate, orderLoaded]);
+
   useEffect(() => {
-    const loadOrder = async () => {
-      if (!id) {
-        navigate('/distributor/orders');
-        return;
-      }
+    if (!id) {
+      navigate('/distributor/orders');
+      return;
+    }
 
-      try {
-        setIsLoading(true);
-        const orderId = parseInt(id);
-        if (isNaN(orderId)) {
-          navigate('/distributor/orders');
-          return;
-        }
+    const orderId = parseInt(id);
+    if (isNaN(orderId)) {
+      navigate('/distributor/orders');
+      return;
+    }
 
-        // Fetch order data using the distributor orders hook
-        await getOrderById(orderId);
-      } catch (error) {
-        console.error('Error loading order:', error);
-        navigate('/distributor/orders');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadOrder();
-  }, [id, navigate, getOrderById]);
+    // Only load if not already loaded
+    if (!orderLoaded) {
+      loadOrder(orderId);
+    }
+  }, [id, navigate, loadOrder, orderLoaded]);
 
   // Update order state when currentOrder changes
   useEffect(() => {
-    if (currentOrder) {
+    if (currentOrder && orderLoaded) {
       const fullOrderData = {
         ...currentOrder,
         customer: {
@@ -109,9 +121,9 @@ const DistributorEditOrder: React.FC = () => {
       setOriginalOrder(fullOrderData);
       setIsLoading(false);
     }
-  }, [currentOrder]);
+  }, [currentOrder, orderLoaded]);
 
-  const handleBack = async () => {
+  const handleBack = useCallback(async () => {
     if (!order || !originalOrder) return;
 
     setIsBackLoading(true);
@@ -132,67 +144,53 @@ const DistributorEditOrder: React.FC = () => {
       // Check if there are any changes to the customer
       const hasCustomerChanges = JSON.stringify({
         name: order.customer.name,
-        phone: order.customer.phone
+        phone: order.customer.phone,
+        locations: order.customer.locations
       }) !== JSON.stringify({
         name: originalOrder.customer.name,
-        phone: originalOrder.customer.phone
+        phone: originalOrder.customer.phone,
+        locations: originalOrder.customer.locations
       });
 
-      // Check if there are any changes to the location
-      const hasLocationChanges = order.location && originalOrder.location && 
-        JSON.stringify({
-          name: order.location.name,
-          coordinates: order.location.coordinates,
-          address: order.location.address
-        }) !== JSON.stringify({
-          name: originalOrder.location.name,
-          coordinates: originalOrder.location.coordinates,
-          address: originalOrder.location.address
-        });
-
-      // Check if the locations array has changed
-      const haveLocationsChanged = JSON.stringify(order.customer.locations) !== JSON.stringify(originalOrder.customer.locations);
-
-      // If locations changed, update the distributor customer (with all locations)
-      if (haveLocationsChanged) {
-        const updatedCustomer = await distributorCustomersStore.updateCustomer({
+      let finalLocationId = order.location?.id;
+      
+      // Update customer first if there are changes
+      if (hasCustomerChanges) {
+        const result = await updateCustomer({
           id: order.customer.id,
           name: order.customer.name,
           phone: order.customer.phone,
           locations: order.customer.locations
         });
-
+        const updatedCustomer = result.payload as Customer;
+        
         if (updatedCustomer) {
-          // Find the matching location in the updated customer data
-          const updatedLocation = updatedCustomer.locations.find(
-            (loc: Location) => loc.coordinates === order.location?.coordinates && 
-                   loc.name === order.location?.name &&
-                   loc.address === order.location?.address
+          // Find the correct location from the updated customer
+          // This handles the case where new locations get assigned real IDs by the backend
+          const selectedLocation = updatedCustomer.locations.find(
+            (l) => {
+              // For new locations (originally ID 0), match by coordinates and name
+              if (order.location?.id === 0) {
+                return l.coordinates === order.location.coordinates && l.name === order.location.name;
+              }
+              // For existing locations, match by ID or coordinates
+              return l.id === order.location?.id || l.coordinates === order.location?.coordinates;
+            }
           );
-
-          if (updatedLocation) {
-            // Update the order with the new location ID using distributor store
-            const orderRequest: OrderRequest = {
-              id: order.id,
-              orderNumber: order.orderNumber,
-              customerId: updatedCustomer.id,
-              locationId: updatedLocation.id,
-              cost: order.cost,
-              distributorId: order.distributor?.id,
-              statusString: order.status as 'New' | 'Pending' | 'Confirmed' | 'Draft'
-            };
-            await updateOrder(orderRequest);
+          
+          if (selectedLocation) {
+            finalLocationId = selectedLocation.id;
           }
         }
       }
 
-      // Only update if there are changes
-      if (hasOrderChanges && !haveLocationsChanged) {
+      // Update order if there are changes OR if the location ID was updated from customer changes
+      if (hasOrderChanges || finalLocationId !== order.location?.id) {
         const orderRequest: OrderRequest = {
           id: order.id,
           orderNumber: order.orderNumber,
           customerId: order.customer.id,
-          locationId: order.location?.id,
+          locationId: finalLocationId,
           cost: order.cost,
           distributorId: order.distributor?.id,
           statusString: order.status as 'New' | 'Pending' | 'Confirmed' | 'Draft'
@@ -200,66 +198,16 @@ const DistributorEditOrder: React.FC = () => {
         await updateOrder(orderRequest);
       }
 
-      if (hasCustomerChanges) {
-        // Update customer basic info using distributor endpoint
-        const customerUpdate = {
-          id: order.customer.id,
-          name: order.customer.name,
-          phone: order.customer.phone,
-          locations: order.customer.locations
-        };
-        await distributorCustomersStore.updateCustomer(customerUpdate);
-      }
-
-      // Update location using distributor endpoint
-      if (hasLocationChanges && order.location) {
-        const locationUpdate = {
-          id: order.location.id,
-          name: order.location.name,
-          coordinates: order.location.coordinates || '',
-          address: order.location.address,
-          isActive: true,
-          customerId: order.customer.id
-        };
-        const updatedCustomer = await distributorCustomersStore.updateCustomerLocation(
-          order.customer.id,
-          locationUpdate
-        );
-
-        // Update the order in the store with the new location
-        if (updatedCustomer) {
-          // Find the matching location in the updated customer data
-          const updatedLocation = updatedCustomer.locations.find(
-            (loc: Location) => loc.coordinates === locationUpdate.coordinates && 
-                   loc.name === locationUpdate.name &&
-                   loc.address === locationUpdate.address
-          );
-
-          if (updatedLocation) {
-            const orderRequest: OrderRequest = {
-              id: order.id,
-              orderNumber: order.orderNumber,
-              customerId: order.customer.id,
-              locationId: updatedLocation.id,
-              cost: order.cost,
-              distributorId: order.distributor?.id,
-              statusString: order.status as 'New' | 'Pending' | 'Confirmed' | 'Draft'
-            };
-            await updateOrder(orderRequest);
-          }
-        }
-      }
-
       navigate('/distributor/orders');
     } catch (error) {
       console.error('Error handling back navigation:', error);
-      navigate('/distributor/orders');
+      errorDispatch({ type: 'SET_ERROR', payload: 'حدث خطأ أثناء حفظ التغييرات' });
     } finally {
       setIsBackLoading(false);
     }
-  };
+  }, [order, originalOrder, updateCustomer, updateOrder, navigate, errorDispatch]);
 
-  const handleSubmit = async (e?: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!order || order.status === 'Confirmed') {
       navigate('/distributor/orders');
@@ -276,21 +224,7 @@ const DistributorEditOrder: React.FC = () => {
           phone: order.customer.phone,
           locations: order.customer.locations
         };
-        const updatedCustomer = await distributorCustomersStore.updateCustomer(customerUpdate);
-
-        // Update the order in the store with the new customer data
-        if (updatedCustomer) {
-          const orderRequest: OrderRequest = {
-            id: order.id,
-            orderNumber: order.orderNumber,
-            customerId: updatedCustomer.id,
-            locationId: order.location?.id,
-            cost: order.cost,
-            distributorId: order.distributor?.id,
-            statusString: order.status as 'New' | 'Pending' | 'Confirmed' | 'Draft'
-          };
-          await updateOrder(orderRequest);
-        }
+        await updateCustomer(customerUpdate);
       }
 
       // Update location if needed using distributor store
@@ -303,27 +237,7 @@ const DistributorEditOrder: React.FC = () => {
           isActive: true,
           customerId: order.customer.id
         };
-        const updatedCustomer = await distributorCustomersStore.updateCustomerLocation(
-          order.customer.id,
-          locationUpdate
-        );
-
-        // Update the order in the store with the new location
-        if (updatedCustomer) {
-          const updatedLocation = updatedCustomer.locations.find((loc: Location) => loc.id === order.location?.id);
-          if (updatedLocation) {
-            const orderRequest: OrderRequest = {
-              id: order.id,
-              orderNumber: order.orderNumber,
-              customerId: order.customer.id,
-              locationId: updatedLocation.id,
-              cost: order.cost,
-              distributorId: order.distributor?.id,
-              statusString: order.status as 'New' | 'Pending' | 'Confirmed' | 'Draft'
-            };
-            await updateOrder(orderRequest);
-          }
-        }
+        await updateCustomerLocation(order.customer.id, locationUpdate);
       }
 
       const confirmedOrder = {
@@ -346,11 +260,11 @@ const DistributorEditOrder: React.FC = () => {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [order, updateCustomer, updateCustomerLocation, updateOrder, confirmOrder, navigate, errorDispatch]);
 
-  const handleSetOrder = (newOrder: React.SetStateAction<OrderList>) => {
+  const handleSetOrder = useCallback((newOrder: React.SetStateAction<OrderList>) => {
     setOrder(newOrder);
-  };
+  }, []);
 
   if (isLoading) {
     return (

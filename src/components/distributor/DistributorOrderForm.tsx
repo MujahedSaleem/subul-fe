@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { faArrowRight, faMapLocation, faSave } from '@fortawesome/free-solid-svg-icons';
 import type { OrderList } from '../../types/order';
@@ -9,9 +9,9 @@ import CustomerNameInput from '../CustomerNameInput';
 import LocationSelector from '../LocationSelector';
 import CostInput from '../CostInput';
 import { isValidPhoneNumber } from '../../utils/formatters';
-import { distributorCustomersStore } from '../../store/distributorCustomersStore';
 import IconButton from '../IconButton';
 import { getCurrentLocation } from '../../services/locationService';
+import { useDistributorCustomers } from '../../hooks/useDistributorCustomers';
 
 interface DistributorOrderFormProps {
   order: OrderList;
@@ -38,40 +38,58 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [getttingGpsLocation, setGetttingGpsLocation] = useState(false);
   const navigate = useNavigate();
+  
+  const {
+    findByPhone,
+    updateCustomerLocation,
+    isLoading: customersLoading
+  } = useDistributorCustomers();
 
   // Determine if any operation is in progress
-  const isAnyOperationInProgress = isSubmitting || isBackLoading || getttingGpsLocation;
+  const isAnyOperationInProgress = isSubmitting || isBackLoading || getttingGpsLocation || customersLoading;
   
-  useEffect(() => {
-    setIsSearching(true);
-    if (order?.customer?.phone && isValidPhoneNumber(order?.customer?.phone)) {
-      const findCustomer = async () => {
-        try {
-          const existingCustomer = await distributorCustomersStore.findCustomerByPhone(order?.customer?.phone);
-
-          if (existingCustomer) {
-            setIsNewCustomer(false);
-            setOrder((prev) => ({
-              ...prev,
-              customer: existingCustomer
-            }));
-          } else {
-            setIsNewCustomer(true);
-        
-          }
-        } catch (error) {
-          console.error('Error finding customer:', error);
-          setIsNewCustomer(true);
-        } finally {
-          setIsSearching(false);
-        }
-      };
-      findCustomer();
-    } else {
+  // Memoize the phone search to prevent infinite loops
+  const searchCustomerByPhone = useCallback(async (phone: string) => {
+    if (!phone || !isValidPhoneNumber(phone)) {
       setIsNewCustomer(true);
       setIsSearching(false);
+      return;
     }
-  }, [order?.customer?.phone]);
+
+    setIsSearching(true);
+    try {
+      const result = await findByPhone(phone);
+      const existingCustomer = result.payload as Customer | null;
+
+      if (existingCustomer) {
+        setIsNewCustomer(false);
+        setOrder((prev) => ({
+          ...prev,
+          customer: existingCustomer
+        }));
+      } else {
+        setIsNewCustomer(true);
+      }
+    } catch (error) {
+      console.error('Error finding customer:', error);
+      setIsNewCustomer(true);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [findByPhone, setOrder]);
+
+  // Track phone to prevent unnecessary searches
+  const [lastSearchedPhone, setLastSearchedPhone] = useState<string>('');
+  
+  useEffect(() => {
+    const currentPhone = order?.customer?.phone || '';
+    
+    // Only search if phone has changed and is different from last searched
+    if (currentPhone !== lastSearchedPhone) {
+      setLastSearchedPhone(currentPhone);
+      searchCustomerByPhone(currentPhone);
+    }
+  }, [order?.customer?.phone, lastSearchedPhone, searchCustomerByPhone]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,22 +104,26 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
     }
   };
 
-const handleSetLocation = async  (e) => {
-  e.preventDefault()
-  setGetttingGpsLocation(true)
-  const gpsLocation = await getCurrentLocation();
-  distributorCustomersStore.updateCustomerLocation(order?.customer?.id, {...order?.location, coordinates:gpsLocation?.coordinates});
-  setGetttingGpsLocation(false)
-  distributorCustomersStore.subscribe(() => {
-    setGetttingGpsLocation(false);
-    setOrder((prev) => ({
-      ...prev,
-      location:{...prev.location, coordinates:gpsLocation?.coordinates}
-    }));
-
-  });
-
-}
+  const handleSetLocation = useCallback(async (e: React.MouseEvent) => {
+    e.preventDefault()
+    setGetttingGpsLocation(true)
+    try {
+      const gpsLocation = await getCurrentLocation();
+      const updatedLocation = {...order?.location, coordinates: gpsLocation?.coordinates};
+      
+      if (order?.customer?.id && order?.location?.id) {
+        await updateCustomerLocation(order.customer.id, updatedLocation);
+        setOrder((prev) => ({
+          ...prev,
+          location: updatedLocation
+        }));
+      }
+    } catch (error) {
+      console.error('Error updating location:', error);
+    } finally {
+      setGetttingGpsLocation(false);
+    }
+  }, [order?.customer?.id, order?.location, updateCustomerLocation, setOrder]);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
