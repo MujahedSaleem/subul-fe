@@ -18,6 +18,8 @@ const DistributorEditOrder: React.FC = () => {
   const { dispatch: errorDispatch } = useError();
   const shouldSaveOnUnmount = useRef(true);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isBackLoading, setIsBackLoading] = useState(false);
   
   const {
     orders,
@@ -112,6 +114,7 @@ const DistributorEditOrder: React.FC = () => {
   const handleBack = async () => {
     if (!order || !originalOrder) return;
 
+    setIsBackLoading(true);
     try {
       // Check if there are any changes to the order
       const hasOrderChanges = JSON.stringify({
@@ -251,6 +254,8 @@ const DistributorEditOrder: React.FC = () => {
     } catch (error) {
       console.error('Error handling back navigation:', error);
       navigate('/distributor/orders');
+    } finally {
+      setIsBackLoading(false);
     }
   };
 
@@ -261,6 +266,7 @@ const DistributorEditOrder: React.FC = () => {
       return;
     }
 
+    setIsSubmitting(true);
     try {
       // Update customer if needed using distributor store
       if (order.customer) {
@@ -304,7 +310,7 @@ const DistributorEditOrder: React.FC = () => {
 
         // Update the order in the store with the new location
         if (updatedCustomer) {
-          const updatedLocation = updatedCustomer.locations.find(loc => loc.id === order.location?.id);
+          const updatedLocation = updatedCustomer.locations.find((loc: Location) => loc.id === order.location?.id);
           if (updatedLocation) {
             const orderRequest: OrderRequest = {
               id: order.id,
@@ -337,6 +343,8 @@ const DistributorEditOrder: React.FC = () => {
     } catch (error) {
       console.error('Error confirming order:', error);
       errorDispatch({ type: 'SET_ERROR', payload: 'حدث خطأ أثناء تأكيد الطلب' });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -384,7 +392,7 @@ const DistributorEditOrder: React.FC = () => {
                   </span>
                   <div className="flex items-center text-gray-500 text-sm">
                     <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 002 2z" />
                     </svg>
                     {new Date(order.createdAt).toLocaleDateString('ar-SA')}
                   </div>
@@ -402,6 +410,8 @@ const DistributorEditOrder: React.FC = () => {
               onBack={handleBack}
               title="حفظ التغييرات"
               isEdit={true}
+              isSubmitting={isSubmitting}
+              isBackLoading={isBackLoading}
             />
           </div>
         </div>

@@ -20,6 +20,8 @@ interface DistributorOrderFormProps {
   onBack: (customer?: Customer) => void;
   title: string;
   isEdit?: boolean;
+  isSubmitting?: boolean;
+  isBackLoading?: boolean;
 }
 
 const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
@@ -29,13 +31,16 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
   onBack,
   title,
   isEdit = false,
+  isSubmitting = false,
+  isBackLoading = false,
 }) => {
   const [isNewCustomer, setIsNewCustomer] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [getttingGpsLocation, setGetttingGpsLocation] = useState(false);
   const navigate = useNavigate();
 
+  // Determine if any operation is in progress
+  const isAnyOperationInProgress = isSubmitting || isBackLoading || getttingGpsLocation;
   
   useEffect(() => {
     setIsSearching(true);
@@ -70,11 +75,17 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-
-
     onSubmit(e);
   };
+
+  const handleBackClick = () => {
+    if (order?.customer && (order?.customer?.locations?.length || order?.customer?.name || order?.customer?.phone)) {
+      onBack(order?.customer);
+    } else {
+      navigate(-1);
+    }
+  };
+
 const handleSetLocation = async  (e) => {
   e.preventDefault()
   setGetttingGpsLocation(true)
@@ -130,7 +141,7 @@ const handleSetLocation = async  (e) => {
                   variant="danger"
                   size="lg"
                   loading={getttingGpsLocation}
-
+                  disabled={isAnyOperationInProgress}
                   title=" استخدام الموقع الحالي"></IconButton>
       </div>
 
@@ -148,15 +159,11 @@ const handleSetLocation = async  (e) => {
       <div className="flex justify-between items-center mt-6">
         <Button
           type="button"
-          onClick={() => {
-            if (order?.customer && (order?.customer?.locations?.length || order?.customer?.name || order?.customer?.phone)) {
-              onBack(order?.customer);
-            } else {
-              navigate(-1);
-            }
-          }}
+          onClick={handleBackClick}
           variant="secondary"
           icon={faArrowRight}
+          disabled={isAnyOperationInProgress}
+          loading={isBackLoading}
         >
           {isEdit ? 'رجوع للطلبات' : 'إلغاء'}
         </Button>
@@ -164,8 +171,8 @@ const handleSetLocation = async  (e) => {
           type="submit"
           variant="primary"
           icon={faSave}
-          disabled={isEdit && order.status === 'Confirmed'}
-          loading={loading || getttingGpsLocation}
+          disabled={(isEdit && order.status === 'Confirmed') || isAnyOperationInProgress}
+          loading={isSubmitting}
         >
           {title}
         </Button>

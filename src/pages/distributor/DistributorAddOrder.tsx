@@ -16,6 +16,8 @@ const generateOrderNumber = () => {
 const DistributorAddOrder: React.FC = () => {
   const navigate = useNavigate();
   const { dispatch } = useError();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isBackLoading, setIsBackLoading] = useState(false);
 
   const [order, setOrder] = useState<OrderList>({
     id: 0,
@@ -35,6 +37,7 @@ const DistributorAddOrder: React.FC = () => {
       return;
     }
 
+    setIsBackLoading(true);
     try {
       let newCustomer = null;
       if (!customer.id)
@@ -57,6 +60,7 @@ const DistributorAddOrder: React.FC = () => {
         payload: 'فشل حفظ الطلب كمسودة، الرجاء المحاولة لاحقًا.',
       });
     } finally {
+      setIsBackLoading(false);
       navigate('/distributor/orders');
     }
   };
@@ -64,6 +68,7 @@ const DistributorAddOrder: React.FC = () => {
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
+    setIsSubmitting(true);
     let errorMessage = null;
 
     try {
@@ -117,6 +122,8 @@ const DistributorAddOrder: React.FC = () => {
         type: 'SET_ERROR',
         payload: errorMessage || 'حدث خطأ أثناء العملية.',
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -135,7 +142,7 @@ const DistributorAddOrder: React.FC = () => {
                   </span>
                   <div className="flex items-center text-gray-500 text-sm">
                     <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 002 2z" />
                     </svg>
                     {new Date().toLocaleDateString('ar-SA')}
                   </div>
@@ -164,6 +171,8 @@ const DistributorAddOrder: React.FC = () => {
               onBack={handleBack}
               title="تأكيد الطلبية"
               isEdit={false}
+              isSubmitting={isSubmitting}
+              isBackLoading={isBackLoading}
             />
           </div>
         </div>
