@@ -1,28 +1,32 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
 import Layout from '../../components/Layout';
 import DistributorOrderForm from '../../components/distributor/DistributorOrderForm';
 import type { OrderList, OrderRequest } from '../../types/order';
-import { customersStore } from '../../store/customersStore';
 import { useError } from '../../context/ErrorContext';
 import { Customer, Location } from '../../types/customer';
-import { updateOrder, confirmOrder } from '../../store/slices/orderSlice';
-import { getDistributorOrderById } from '../../store/slices/distributorOrdersSlice';
-import type { AppDispatch } from '../../store/store';
 import { Card, CardBody, CardHeader, Typography } from '@material-tailwind/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheckCircle, faClock, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { Button } from '@material-tailwind/react';
 import { distributorCustomersStore } from '../../store/distributorCustomersStore';
+import { useDistributorOrders } from '../../hooks/useDistributorOrders';
 
 const DistributorEditOrder: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const dispatch = useDispatch<AppDispatch>();
   const { dispatch: errorDispatch } = useError();
   const shouldSaveOnUnmount = useRef(true);
   const [isLoading, setIsLoading] = useState(true);
+  
+  const {
+    orders,
+    currentOrder,
+    getOrderById,
+    updateOrder,
+    confirmOrder
+  } = useDistributorOrders();
+
   const [order, setOrder] = useState<OrderList>({
     id: 0,
     orderNumber: '',
@@ -67,31 +71,8 @@ const DistributorEditOrder: React.FC = () => {
           return;
         }
 
-        // Fetch order data using Redux
-        const result = await dispatch(getDistributorOrderById(orderId)).unwrap();
-        if (result) {
-          // Ensure the order has all required data
-          const fullOrderData = {
-            ...result,
-            customer: {
-              ...result.customer,
-              locations: result.customer.locations || []
-            },
-            location: result.location || {
-              id: 0,
-              name: '',
-              address: '',
-              coordinates: '',
-              isActive: true,
-              customerId: result.customer.id
-            }
-          };
-
-          setOrder(fullOrderData);
-          setOriginalOrder(fullOrderData);
-        } else {
-          navigate('/distributor/orders');
-        }
+        // Fetch order data using the distributor orders hook
+        await getOrderById(orderId);
       } catch (error) {
         console.error('Error loading order:', error);
         navigate('/distributor/orders');
@@ -101,7 +82,32 @@ const DistributorEditOrder: React.FC = () => {
     };
 
     loadOrder();
-  }, [id, navigate, dispatch]);
+  }, [id, navigate, getOrderById]);
+
+  // Update order state when currentOrder changes
+  useEffect(() => {
+    if (currentOrder) {
+      const fullOrderData = {
+        ...currentOrder,
+        customer: {
+          ...currentOrder.customer,
+          locations: currentOrder.customer.locations || []
+        },
+        location: currentOrder.location || {
+          id: 0,
+          name: '',
+          address: '',
+          coordinates: '',
+          isActive: true,
+          customerId: currentOrder.customer.id
+        }
+      };
+
+      setOrder(fullOrderData);
+      setOriginalOrder(fullOrderData);
+      setIsLoading(false);
+    }
+  }, [currentOrder]);
 
   const handleBack = async () => {
     if (!order || !originalOrder) return;
@@ -162,7 +168,7 @@ const DistributorEditOrder: React.FC = () => {
           );
 
           if (updatedLocation) {
-            // Update the order with the new location ID
+            // Update the order with the new location ID using distributor store
             const orderRequest: OrderRequest = {
               id: order.id,
               orderNumber: order.orderNumber,
@@ -172,7 +178,7 @@ const DistributorEditOrder: React.FC = () => {
               distributorId: order.distributor?.id,
               statusString: order.status as 'New' | 'Pending' | 'Confirmed' | 'Draft'
             };
-            await dispatch(updateOrder(orderRequest)).unwrap();
+            await updateOrder(orderRequest);
           }
         }
       }
@@ -188,7 +194,7 @@ const DistributorEditOrder: React.FC = () => {
           distributorId: order.distributor?.id,
           statusString: order.status as 'New' | 'Pending' | 'Confirmed' | 'Draft'
         };
-        await dispatch(updateOrder(orderRequest)).unwrap();
+        await updateOrder(orderRequest);
       }
 
       if (hasCustomerChanges) {
@@ -199,25 +205,11 @@ const DistributorEditOrder: React.FC = () => {
           phone: order.customer.phone,
           locations: order.customer.locations
         };
-        const updatedCustomer = await distributorCustomersStore.updateCustomer(customerUpdate);
-
-        // Update the order in the store with the new customer data
-        if (updatedCustomer) {
-          const orderRequest: OrderRequest = {
-            id: order.id,
-            orderNumber: order.orderNumber,
-            customerId: updatedCustomer.id,
-            locationId: order.location?.id,
-            cost: order.cost,
-            distributorId: order.distributor?.id,
-            statusString: order.status as 'New' | 'Pending' | 'Confirmed' | 'Draft'
-          };
-          await dispatch(updateOrder(orderRequest)).unwrap();
-        }
+        await distributorCustomersStore.updateCustomer(customerUpdate);
       }
 
-      if (hasLocationChanges && order.location && originalOrder.location) {
-        // Update location using distributor endpoint
+      // Update location using distributor endpoint
+      if (hasLocationChanges && order.location) {
         const locationUpdate = {
           id: order.location.id,
           name: order.location.name,
@@ -250,7 +242,7 @@ const DistributorEditOrder: React.FC = () => {
               distributorId: order.distributor?.id,
               statusString: order.status as 'New' | 'Pending' | 'Confirmed' | 'Draft'
             };
-            await dispatch(updateOrder(orderRequest)).unwrap();
+            await updateOrder(orderRequest);
           }
         }
       }
@@ -270,7 +262,7 @@ const DistributorEditOrder: React.FC = () => {
     }
 
     try {
-      // Update customer if needed
+      // Update customer if needed using distributor store
       if (order.customer) {
         const customerUpdate = {
           id: order.customer.id,
@@ -278,7 +270,7 @@ const DistributorEditOrder: React.FC = () => {
           phone: order.customer.phone,
           locations: order.customer.locations
         };
-        const updatedCustomer = await customersStore.updateCustomer(customerUpdate);
+        const updatedCustomer = await distributorCustomersStore.updateCustomer(customerUpdate);
 
         // Update the order in the store with the new customer data
         if (updatedCustomer) {
@@ -291,26 +283,28 @@ const DistributorEditOrder: React.FC = () => {
             distributorId: order.distributor?.id,
             statusString: order.status as 'New' | 'Pending' | 'Confirmed' | 'Draft'
           };
-          await dispatch(updateOrder(orderRequest)).unwrap();
+          await updateOrder(orderRequest);
         }
       }
 
-      // Update location if needed
+      // Update location if needed using distributor store
       if (order.location) {
         const locationUpdate = {
+          id: order.location.id,
           name: order.location.name,
           coordinates: order.location.coordinates || '',
-          address: order.location.address
+          address: order.location.address,
+          isActive: true,
+          customerId: order.customer.id
         };
-        const updatedCustomer = await customersStore.updateCustomerLocation(
+        const updatedCustomer = await distributorCustomersStore.updateCustomerLocation(
           order.customer.id,
-          order.location.id,
           locationUpdate
         );
 
         // Update the order in the store with the new location
         if (updatedCustomer) {
-          const updatedLocation = updatedCustomer.locations.find(loc => loc.id === order.location.id);
+          const updatedLocation = updatedCustomer.locations.find(loc => loc.id === order.location?.id);
           if (updatedLocation) {
             const orderRequest: OrderRequest = {
               id: order.id,
@@ -321,7 +315,7 @@ const DistributorEditOrder: React.FC = () => {
               distributorId: order.distributor?.id,
               statusString: order.status as 'New' | 'Pending' | 'Confirmed' | 'Draft'
             };
-            await dispatch(updateOrder(orderRequest)).unwrap();
+            await updateOrder(orderRequest);
           }
         }
       }
@@ -336,8 +330,8 @@ const DistributorEditOrder: React.FC = () => {
         statusString: 'New'
       } as OrderRequest;
 
-      await dispatch(updateOrder(confirmedOrder)).unwrap();
-      await dispatch(confirmOrder(confirmedOrder.id)).unwrap();
+      await updateOrder(confirmedOrder);
+      await confirmOrder(confirmedOrder.id);
       shouldSaveOnUnmount.current = false;
       navigate('/distributor/orders');
     } catch (error) {

@@ -6,7 +6,7 @@ import OrderForm from '../../components/OrderForm';
 import type { OrderList, OrderRequest } from '../../types/order';
 import { customersStore } from '../../store/customersStore';
 import { useError } from '../../context/ErrorContext';
-import { Customer } from '../../types/customer';
+import { Customer, Location, UpdateCustomerRequest, UpdateLocationRequest } from '../../types/customer';
 import { updateOrder, confirmOrder } from '../../store/slices/orderSlice';
 import { ordersStore } from '../../store/ordersStore';
 import type { AppDispatch } from '../../store/store';
@@ -18,9 +18,26 @@ const EditOrder: React.FC = () => {
   const { dispatch: errorDispatch } = useError();
   const shouldSaveOnUnmount = useRef(true);
   const [isLoading, setIsLoading] = useState(true);
+  const [isBackLoading, setIsBackLoading] = useState(false);
+  const [isSubmitLoading, setIsSubmitLoading] = useState(false);
   const [order, setOrder] = useState<OrderList | null>(null);
   const [originalOrder, setOriginalOrder] = useState<OrderList | null>(null);
   const [originalCustomer, setOriginalCustomer] = useState<Customer | null>(null);
+
+  // Helper function to transform Customer to UpdateCustomerRequest format
+  const transformCustomerForUpdate = (customer: Customer): UpdateCustomerRequest => {
+    return {
+      Name: customer.name,
+      Phone: customer.phone,
+      IsActive: true, // Assuming active customers
+      Locations: customer.locations.map((location): UpdateLocationRequest => ({
+        Id: location.id === 0 ? undefined : location.id, // Send undefined for new locations
+        Name: location.name,
+        Coordinates: location.coordinates || '',
+        Description: location.address || '' // Use address as description
+      }))
+    };
+  };
 
   useEffect(() => {
     const loadOrder = async () => {
@@ -74,6 +91,7 @@ const EditOrder: React.FC = () => {
   const handleBack = async () => {
     if (!order || !originalOrder || !originalCustomer) return;
 
+    setIsBackLoading(true);
     try {
       // Check if there are any changes to the order
       const hasOrderChanges = JSON.stringify({
@@ -98,14 +116,40 @@ const EditOrder: React.FC = () => {
         phone: originalCustomer.phone,
         locations: originalCustomer.locations
       });
+      let finalLocationId = order.location?.id;
+      
+      // Update customer first if there are changes
+      if (hasCustomerChanges) {
+        const updateRequest = transformCustomerForUpdate(order.customer);
+        const updatedCustomer = await customersStore.updateCustomerWithFormat(order.customer.id, updateRequest);
+        
+        if (updatedCustomer) {
+          // Find the correct location from the updated customer
+          // This handles the case where new locations get assigned real IDs by the backend
+          const selectedLocation = updatedCustomer.locations.find(
+            (l) => {
+              // For new locations (originally ID 0), match by coordinates and name
+              if (order.location?.id === 0) {
+                return l.coordinates === order.location.coordinates && l.name === order.location.name;
+              }
+              // For existing locations, match by ID or coordinates
+              return l.id === order.location?.id || l.coordinates === order.location?.coordinates;
+            }
+          );
+          
+          if (selectedLocation) {
+            finalLocationId = selectedLocation.id;
+          }
+        }
+      }
 
-      // Only update if there are changes
-      if (hasOrderChanges) {
+      // Update order if there are changes OR if the location ID was updated from customer changes
+      if (hasOrderChanges || finalLocationId !== order.location?.id) {
         const orderRequest: OrderRequest = {
           id: order.id,
           orderNumber: order.orderNumber,
           customerId: order.customer.id,
-          locationId: order.location?.id,
+          locationId: finalLocationId,
           cost: order.cost,
           distributorId: order.distributor?.id,
           statusString: order.status as 'New' | 'Pending' | 'Confirmed' | 'Draft'
@@ -113,14 +157,14 @@ const EditOrder: React.FC = () => {
         await dispatch(updateOrder(orderRequest)).unwrap();
       }
 
-      if (hasCustomerChanges) {
-        await customersStore.updateCustomer(order.customer);
-      }
+   
 
       navigate('/admin/orders');
     } catch (error) {
       console.error('Error handling back navigation:', error);
-      navigate('/admin/orders');
+      errorDispatch({ type: 'SET_ERROR', payload: 'حدث خطأ أثناء حفظ التغييرات' });
+    } finally {
+      setIsBackLoading(false);
     }
   };
 
@@ -131,12 +175,23 @@ const EditOrder: React.FC = () => {
       return;
     }
 
+    setIsSubmitLoading(true);
     try {
-      const updatedCustomer = await customersStore.updateCustomer(order.customer);
+      const updateRequest = transformCustomerForUpdate(order.customer);
+      const updatedCustomer = await customersStore.updateCustomerWithFormat(order.customer.id, updateRequest);
       
       if (updatedCustomer) {
+        // Find the correct location from the updated customer
+        // This handles the case where new locations get assigned real IDs by the backend
         const selectedLocation = updatedCustomer.locations.find(
-          l => l.coordinates === order.location.coordinates || l.id === order.location.id
+          (l) => {
+            // For new locations (originally ID 0), match by coordinates and name
+            if (order.location?.id === 0) {
+              return l.coordinates === order.location.coordinates && l.name === order.location.name;
+            }
+            // For existing locations, match by ID or coordinates
+            return l.id === order.location?.id || l.coordinates === order.location?.coordinates;
+          }
         );
 
         const confirmedOrder = {
@@ -157,6 +212,8 @@ const EditOrder: React.FC = () => {
     } catch (error) {
       console.error('Error confirming order:', error);
       errorDispatch({ type: 'SET_ERROR', payload: 'حدث خطأ أثناء تأكيد الطلب' });
+    } finally {
+      setIsSubmitLoading(false);
     }
   };
 
@@ -218,6 +275,8 @@ const EditOrder: React.FC = () => {
               onBack={handleBack}
               title="حفظ التغييرات"
               isEdit={true}
+              isBackLoading={isBackLoading}
+              isSubmitLoading={isSubmitLoading}
             />
           </div>
         </div>

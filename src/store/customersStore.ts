@@ -1,5 +1,5 @@
 import axiosInstance from "../utils/axiosInstance";
-import { Customer, Location } from "../types/customer";
+import { Customer, Location, UpdateCustomerRequest } from "../types/customer";
 
 class CustomersStore {
   private static instance: CustomersStore;
@@ -87,6 +87,22 @@ class CustomersStore {
       return updatedCustomer;
     } catch (error) {
       console.error("Error updating customer:", error);
+      throw error;
+    }
+  }
+
+  async updateCustomerWithFormat(customerId: string, updateRequest: UpdateCustomerRequest) {
+    try {
+      const response = await axiosInstance.put<Customer>(`/customers/${customerId}`, updateRequest);
+      const updatedCustomer = response.data;
+      const index = this._customers.findIndex(c => c.id === updatedCustomer.id);
+      if (index !== -1) {
+        this._customers[index] = updatedCustomer;
+      }
+      this.notifyListeners();
+      return updatedCustomer;
+    } catch (error) {
+      console.error("Error updating customer with format:", error);
       throw error;
     }
   }
@@ -182,7 +198,9 @@ class CustomersStore {
         id: 0, // Temporary ID, will be replaced by server
         name: locationData.name, 
         coordinates: locationData.coordinates, 
-        description: "" 
+        address: "",
+        isActive: true,
+        customerId: ""
       }], 
       phone: locationData.phone 
     });

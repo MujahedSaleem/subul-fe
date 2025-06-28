@@ -21,6 +21,8 @@ interface OrderFormProps {
   onBack: (customer?: Customer) => void;
   title: string;
   isEdit?: boolean;
+  isBackLoading?: boolean;
+  isSubmitLoading?: boolean;
 }
 
 const OrderForm: React.FC<OrderFormProps> = ({
@@ -30,6 +32,8 @@ const OrderForm: React.FC<OrderFormProps> = ({
   onBack,
   title,
   isEdit = false,
+  isBackLoading = false,
+  isSubmitLoading = false,
 }) => {
   const [isNewCustomer, setIsNewCustomer] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
@@ -220,6 +224,8 @@ const OrderForm: React.FC<OrderFormProps> = ({
           }}
           variant="secondary"
           icon={faArrowRight}
+          disabled={isBackLoading || isSubmitLoading}
+          loading={isBackLoading}
         >
           {isEdit ? 'رجوع للطلبات' : 'إلغاء'}
         </Button>
@@ -227,8 +233,8 @@ const OrderForm: React.FC<OrderFormProps> = ({
           type="submit"
           variant="primary"
           icon={faSave}
-          disabled={isEdit && order.status === 'Confirmed'}
-          loading={loading}
+          disabled={(isEdit && order.status === 'Confirmed') || isBackLoading || isSubmitLoading}
+          loading={isSubmitLoading || loading}
         >
           {title}
         </Button>

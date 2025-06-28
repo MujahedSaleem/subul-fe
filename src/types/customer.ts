@@ -15,7 +15,23 @@ export interface Customer {
   phone: string;
   locations: Location[];
 }
+
 export interface DistributorCreateCustomerRequest extends Customer {
   locationName: string;
   coordinates: string;
+}
+
+// New types for backend API requests
+export interface UpdateLocationRequest {
+  Id?: number;
+  Name: string;
+  Coordinates: string;
+  Description: string;
+}
+
+export interface UpdateCustomerRequest {
+  Name: string;
+  Phone: string;
+  IsActive: boolean;
+  Locations: UpdateLocationRequest[];
 }
