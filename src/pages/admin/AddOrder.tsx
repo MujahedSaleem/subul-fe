@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import Layout from '../../components/Layout';
 import OrderForm from '../../components/OrderForm';
-import { ordersStore } from '../../store/ordersStore';
+import { addOrder, confirmOrder } from '../../store/slices/orderSlice';
 import type { OrderList, OrderRequest } from '../../types/order';
 import { useError } from '../../context/ErrorContext';
 import { Customer } from '../../types/customer';
 import { customersStore } from '../../store/customersStore';
+import type { AppDispatch } from '../../store/store';
 
 const generateOrderNumber = () => {
   const now = new Date();
@@ -16,8 +18,9 @@ const generateOrderNumber = () => {
 
 const AddOrder: React.FC = () => {
   const navigate = useNavigate();
-  const { dispatch } = useError(); // Use inside a React component
-  const [order, setOrder] = useState<OrderList>({
+  const reduxDispatch = useDispatch<AppDispatch>();
+  const { dispatch: errorDispatch } = useError(); // Use inside a React component
+  const [order, setOrder] = useState<any>({
     id: 0, // ID will be assigned by the backend
     orderNumber: generateOrderNumber(),
     customer: null,
@@ -25,7 +28,6 @@ const AddOrder: React.FC = () => {
     cost: 0,
     status: 'New',
     distributor: null, // Ensure this field is initialized
-
   });
 
 
@@ -38,10 +40,10 @@ const AddOrder: React.FC = () => {
         newCustomer = await customersStore.updateCustomer(customer);
       if(newCustomer){
         const selectedLocation = newCustomer?.locations?.find(l => l.coordinates === customer.locations[0].coordinates) ;
-        await ordersStore.addOrder({ ...order, customerId:newCustomer?.id,
-           LocationId:selectedLocation?.id,
+        await reduxDispatch(addOrder({ ...order, customerId:newCustomer?.id,
+           locationId:selectedLocation?.id,
             statusString: 'Draft',
-          distributorId:order?.distributor?.id});
+          distributorId:order?.distributor?.id})).unwrap();
     }
       // Save the order as a draft before navigating back
 
@@ -64,7 +66,7 @@ const AddOrder: React.FC = () => {
     try {
       // Validate the order before submission
       if (!order.customer || !order.location || !order.cost || !order.distributor) {
-        dispatch({
+        errorDispatch({
           type: 'SET_ERROR',
           payload: errorMessage || 'يرجى تعبئة جميع الحقول المطلوبة.',
         });

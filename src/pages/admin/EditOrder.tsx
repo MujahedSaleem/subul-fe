@@ -1,15 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import Layout from '../../components/Layout';
 import OrderForm from '../../components/OrderForm';
 import type { OrderList, OrderRequest } from '../../types/order';
 import { customersStore } from '../../store/customersStore';
 import { useError } from '../../context/ErrorContext';
 import { Customer, Location, UpdateCustomerRequest, UpdateLocationRequest } from '../../types/customer';
-import { updateOrder, confirmOrder } from '../../store/slices/orderSlice';
-import { ordersStore } from '../../store/ordersStore';
-import type { AppDispatch } from '../../store/store';
+import { updateOrder, confirmOrder, getOrderById, clearCurrentOrder } from '../../store/slices/orderSlice';
+import type { AppDispatch, RootState } from '../../store/store';
 
 const EditOrder: React.FC = () => {
   const { id } = useParams();
@@ -17,7 +16,9 @@ const EditOrder: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { dispatch: errorDispatch } = useError();
   const shouldSaveOnUnmount = useRef(true);
-  const [isLoading, setIsLoading] = useState(true);
+  
+  const { isLoading: reduxLoading } = useSelector((state: RootState) => state.orders);
+  
   const [isBackLoading, setIsBackLoading] = useState(false);
   const [isSubmitLoading, setIsSubmitLoading] = useState(false);
   const [order, setOrder] = useState<OrderList | null>(null);
@@ -46,33 +47,38 @@ const EditOrder: React.FC = () => {
         return;
       }
 
+      const orderId = parseInt(id);
+      if (isNaN(orderId)) {
+        navigate('/admin/orders');
+        return;
+      }
+
       try {
-        setIsLoading(true);
-        const orderId = parseInt(id);
-        if (isNaN(orderId)) {
-          navigate('/admin/orders');
-          return;
-        }
-        const orderData = await ordersStore.getOrderById(orderId);
-        if (orderData) {
+        // Clear previous order data
+        dispatch(clearCurrentOrder());
+        
+        // Fetch order via Redux
+        const result = await dispatch(getOrderById(orderId)).unwrap();
+        
+        if (result) {
           // Fetch customer data including locations
-          if (orderData.customer?.id) {
-            const customerData = await customersStore.getCustomerById(orderData.customer.id.toString());
+          if (result.customer?.id) {
+            const customerData = await customersStore.getCustomerById(result.customer.id.toString());
             if (customerData) {
               const fullOrderData = {
-                ...orderData,
+                ...result,
                 customer: customerData
               };
               setOrder(fullOrderData);
               setOriginalOrder(fullOrderData);
               setOriginalCustomer(customerData);
             } else {
-              setOrder(orderData);
-              setOriginalOrder(orderData);
+              setOrder(result);
+              setOriginalOrder(result);
             }
           } else {
-            setOrder(orderData);
-            setOriginalOrder(orderData);
+            setOrder(result);
+            setOriginalOrder(result);
           }
         } else {
           navigate('/admin/orders');
@@ -80,13 +86,18 @@ const EditOrder: React.FC = () => {
       } catch (error) {
         console.error('Error loading order:', error);
         navigate('/admin/orders');
-      } finally {
-        setIsLoading(false);
       }
     };
 
     loadOrder();
-  }, [id, navigate]);
+  }, [id, navigate, dispatch]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      dispatch(clearCurrentOrder());
+    };
+  }, [dispatch]);
 
   const handleBack = async () => {
     if (!order || !originalOrder || !originalCustomer) return;
@@ -217,7 +228,7 @@ const EditOrder: React.FC = () => {
     }
   };
 
-  if (isLoading) {
+  if (reduxLoading || !order) {
     return (
       <Layout title="تعديل الطلبية">
         <div className="flex justify-center items-center min-h-[60vh]">

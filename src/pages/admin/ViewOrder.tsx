@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import Layout from '../../components/Layout';
 import { Card, CardBody, CardHeader, Typography } from '@material-tailwind/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -18,74 +19,54 @@ import {
 import Button from '../../components/Button';
 import { OrderList } from '../../types/order';
 import { useError } from '../../context/ErrorContext';
-import { ordersStore } from '../../store/ordersStore';
+import { getOrderById, clearCurrentOrder } from '../../store/slices/orderSlice';
+import type { AppDispatch, RootState } from '../../store/store';
 
 const ViewOrder: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { dispatch } = useError();
-  const [order, setOrder] = useState<OrderList | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const reduxDispatch = useDispatch<AppDispatch>();
+  const { dispatch: errorDispatch } = useError();
+  
+  const { currentOrder, isLoading, error: reduxError } = useSelector((state: RootState) => state.orders);
+  
+  const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = ordersStore.subscribe(() => {
-      if (id) {
-        const currentOrder = ordersStore.orders.find(o => o.id === Number(id));
-        if (currentOrder) {
-          setOrder(currentOrder);
-        }
-        setIsLoading(false);
-      }
-    });
-
     const fetchData = async () => {
       try {
-        setIsLoading(true);
-        setError(null);
+        setLocalError(null);
         
         if (!id) {
           const errorMsg = 'Order ID is missing';
           console.error(errorMsg);
-          setError(errorMsg);
-          dispatch({ type: 'SET_ERROR', payload: errorMsg });
+          setLocalError(errorMsg);
+          errorDispatch({ type: 'SET_ERROR', payload: errorMsg });
           return;
         }
 
+        // Clear previous order data
+        reduxDispatch(clearCurrentOrder());
         
-        if (!ordersStore.isLoadingData) {
-          await ordersStore.fetchOrders();
-        }
-
-        // After fetching all orders, try to get the specific order
-        const orderData = await ordersStore.getOrderById(Number(id));
-        
-
-        if (!orderData) {
-          const errorMsg = `Order with ID ${id} not found`;
-          console.error(errorMsg);
-          setError(errorMsg);
-          dispatch({ type: 'SET_ERROR', payload: errorMsg });
-          return;
-        }
-
-        setOrder(orderData);
+        // Fetch the specific order
+        await reduxDispatch(getOrderById(Number(id))).unwrap();
       } catch (error: any) {
         console.error('Error in fetchData:', error);
         const errorMsg = error.message || 'Failed to fetch order details';
-        setError(errorMsg);
-        dispatch({ type: 'SET_ERROR', payload: errorMsg });
-      } finally {
-        setIsLoading(false);
+        setLocalError(errorMsg);
+        errorDispatch({ type: 'SET_ERROR', payload: errorMsg });
       }
     };
 
     fetchData();
+  }, [id, reduxDispatch, errorDispatch]);
 
+  // Cleanup on unmount
+  useEffect(() => {
     return () => {
-      unsubscribe();
+      reduxDispatch(clearCurrentOrder());
     };
-  }, [id, dispatch]);
+  }, [reduxDispatch]);
 
   // Debug render
   
@@ -127,6 +108,9 @@ const ViewOrder: React.FC = () => {
     );
   }
 
+  const error = localError || reduxError;
+  const order = currentOrder;
+
   if (error || !order) {
     return (
       <Layout title="تفاصيل الطلب">
@@ -137,8 +121,8 @@ const ViewOrder: React.FC = () => {
               color="blue-gray"
               className="mb-2"
               placeholder=""
-              
-              
+              onPointerEnterCapture={() => {}}
+              onPointerLeaveCapture={() => {}}
             >
               {error || 'لم يتم العثور على الطلب'}
             </Typography>
