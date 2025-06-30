@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { faPlus } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faCheckDouble, faRightFromBracket } from '@fortawesome/free-solid-svg-icons';
 import { Card, CardBody, CardHeader, Typography } from '@material-tailwind/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPhone, faLocationDot, faCircleCheck, faTrash, faPenToSquare, faEye, faUser, faCalendar, faMoneyBill, faCheckCircle, faHourglassHalf, faPencil } from '@fortawesome/free-solid-svg-icons';
@@ -13,6 +13,7 @@ import Button from '../../components/Button';
 import IconButton from '../../components/IconButton';
 import { OrderList } from '../../types/order';
 import { Customer, Location } from '../../types/customer';
+import axiosInstance from '../../utils/axiosInstance';
 
 const DistributorListOrder: React.FC = () => {
   const navigate = useNavigate();
@@ -20,6 +21,8 @@ const DistributorListOrder: React.FC = () => {
   const { logout } = useAuth();
   const [isCallModalOpen, setIsCallModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [isClosingShift, setIsClosingShift] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   const {
     orders,
@@ -74,6 +77,46 @@ const DistributorListOrder: React.FC = () => {
     if (location.coordinates) {
       window.open(`https://www.google.com/maps/search/?api=1&query=${location.coordinates}`, '_blank');
       }
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  const handleCloseShift = () => {
+    const pendingOrders = orders.filter(order => order.status !== 'Confirmed');
+    
+    if (pendingOrders.length > 0) {
+      dispatch({ 
+        type: 'SET_ERROR', 
+        payload: `لا يمكن إنهاء الوردية. يوجد ${pendingOrders.length} طلب غير مؤكد. يرجى تأكيد جميع الطلبات أولاً.` 
+      });
+      return;
+    }
+
+    setShowConfirmDialog(true);
+  };
+
+  const confirmCloseShift = async () => {
+    setIsClosingShift(true);
+    setShowConfirmDialog(false);
+    
+    try {
+      await axiosInstance.post('/distributors/deactivate');
+      
+      // Clear any existing errors and logout
+      dispatch({ type: 'CLEAR_ERROR' });
+      logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Error deactivating account:', error);
+      dispatch({ 
+        type: 'SET_ERROR', 
+        payload: 'حدث خطأ أثناء إنهاء الوردية. يرجى المحاولة مرة أخرى أو الاتصال بالدعم الفني.' 
+      });
+      setIsClosingShift(false);
+    }
   };
 
   const getStatusConfig = (status: string) => {
@@ -148,14 +191,54 @@ const DistributorListOrder: React.FC = () => {
                 الطلبات
               </Typography>
             </div>
-            <div className="flex w-full shrink-0 gap-2 md:w-max">
+            <div className="flex flex-col sm:flex-row w-full sm:w-max gap-2">
+              {/* Primary Action */}
               <Button
-                className="flex items-center gap-3"
+                className="flex items-center justify-center gap-2 font-medium"
                 size="sm"
                 onClick={() => navigate('/distributor/orders/add')}
               >
-                <FontAwesomeIcon icon={faPlus} className="h-4 w-4" /> إضافة طلب
+                <FontAwesomeIcon icon={faPlus} className="h-4 w-4" />
+                <span className="hidden sm:inline">إضافة طلب</span>
+                <span className="sm:hidden">طلب جديد</span>
               </Button>
+              
+              {/* Secondary Actions */}
+              <div className="flex gap-2">
+                <Button
+                  className="flex items-center justify-center gap-2 font-medium"
+                  size="sm"
+                  color="green"
+                  onClick={handleCloseShift}
+                  disabled={isClosingShift || isLoading}
+                >
+                  {isClosingShift ? (
+                    <>
+                      <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                      <span className="hidden sm:inline">جاري الإنهاء...</span>
+                      <span className="sm:hidden">إنهاء...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FontAwesomeIcon icon={faCheckDouble} className="h-4 w-4" />
+                      <span className="hidden sm:inline">إنهاء الوردية</span>
+                      <span className="sm:hidden">إنهاء</span>
+                    </>
+                  )}
+                </Button>
+                
+                <Button
+                  className="flex items-center justify-center gap-2 font-medium"
+                  size="sm"
+                  color="red"
+                  onClick={handleLogout}
+                  disabled={isClosingShift}
+                >
+                  <FontAwesomeIcon icon={faRightFromBracket} className="h-4 w-4" />
+                  <span className="hidden sm:inline">خروج</span>
+                  <span className="sm:hidden">خروج</span>
+                </Button>
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -375,6 +458,70 @@ const DistributorListOrder: React.FC = () => {
         onClose={() => setIsCallModalOpen(false)}
         phone={selectedCustomer?.phone || ''}
       />
+
+      {/* Professional Close Shift Confirmation Dialog */}
+      {showConfirmDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" dir="rtl">
+          <div className="bg-white rounded-lg shadow-xl p-6 m-4 max-w-md w-full">
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-orange-100 mb-4">
+                <FontAwesomeIcon icon={faCheckDouble} className="w-6 h-6 text-orange-600" />
+              </div>
+              
+              <Typography 
+                variant="h5" 
+                color="blue-gray" 
+                className="mb-2 font-bold"
+                placeholder=""
+                onPointerEnterCapture={() => {}}
+                onPointerLeaveCapture={() => {}}
+              >
+                إنهاء الوردية
+              </Typography>
+              
+              <Typography 
+                variant="paragraph" 
+                color="blue-gray" 
+                className="mb-6 text-gray-600"
+                placeholder=""
+                onPointerEnterCapture={() => {}}
+                onPointerLeaveCapture={() => {}}
+              >
+                هل أنت متأكد من إنهاء الوردية؟ سيتم تسجيل خروجك من النظام تلقائياً وإنهاء جميع العمليات النشطة.
+              </Typography>
+              
+              <div className="flex gap-3 justify-center">
+                <Button
+                  color="red"
+                  onClick={confirmCloseShift}
+                  disabled={isClosingShift}
+                  className="flex items-center gap-2"
+                >
+                  {isClosingShift ? (
+                    <>
+                      <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                      جاري الإنهاء...
+                    </>
+                  ) : (
+                    <>
+                      <FontAwesomeIcon icon={faCheckDouble} className="w-4 h-4" />
+                      تأكيد الإنهاء
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="gray"
+                  onClick={() => setShowConfirmDialog(false)}
+                  disabled={isClosingShift}
+                >
+                  إلغاء
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       </Layout>
   );
 };
