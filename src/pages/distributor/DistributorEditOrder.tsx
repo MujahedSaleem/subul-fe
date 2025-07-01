@@ -128,7 +128,18 @@ const DistributorEditOrder: React.FC = () => {
 
     setIsBackLoading(true);
     try {
-            // Check if there are any changes to the order
+      // Check if there are any changes to the customer (including new locations)
+      const hasCustomerChanges = JSON.stringify({
+        name: order.customer.name,
+        phone: order.customer.phone,
+        locations: order.customer.locations
+      }) !== JSON.stringify({
+        name: originalOrder.customer.name,
+        phone: originalOrder.customer.phone,
+        locations: originalOrder.customer.locations
+      });
+
+      // Check if there are any changes to the order
       const hasOrderChanges = JSON.stringify({
         cost: order.cost,
         status: order.status,
@@ -141,12 +152,50 @@ const DistributorEditOrder: React.FC = () => {
         locationId: originalOrder.location?.id
       });
 
-      // Update order if there are changes
-      if (hasOrderChanges) {
+      let finalLocationId = order.location?.id;
+      
+      // Update customer first if there are changes (especially new locations)
+      if (hasCustomerChanges) {
+        try {
+          const result = await updateCustomer({
+            id: order.customer.id,
+            name: order.customer.name,
+            phone: order.customer.phone,
+            locations: order.customer.locations
+          });
+          const updatedCustomer = result.payload as Customer;
+          
+          if (updatedCustomer) {
+            // Find the correct location from the updated customer
+            // This handles the case where new locations get assigned real IDs by the backend
+            const selectedLocation = updatedCustomer.locations.find(
+              (l) => {
+                // For new locations (originally ID 0), match by name and coordinates
+                if (order.location?.id === 0) {
+                  return l.name === order.location.name && 
+                         (!order.location.coordinates || l.coordinates === order.location.coordinates);
+                }
+                // For existing locations, match by ID
+                return l.id === order.location?.id;
+              }
+            );
+            
+            if (selectedLocation) {
+              finalLocationId = selectedLocation.id;
+            }
+          }
+        } catch (error) {
+          console.error('Error updating customer:', error);
+          // Don't fail the whole operation if customer update fails
+        }
+      }
+
+      // Update order if there are changes OR if the location ID was updated from customer changes
+      if (hasOrderChanges || finalLocationId !== order.location?.id) {
         const orderRequest: OrderRequest = {
           id: order.id, // Include ID for the update URL
           customerId: parseInt(order.customer.id),
-          locationId: order.location?.id,
+          locationId: finalLocationId,
           cost: order.cost,
           statusString: order.status as 'New' | 'Pending' | 'Confirmed' | 'Draft'
         };
