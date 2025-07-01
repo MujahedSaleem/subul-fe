@@ -163,7 +163,7 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
           customer={order?.customer}
           setOrder={setOrder}
           isNewCustomer={isNewCustomer}
-          disabled={(isEdit && order.status === 'Confirmed') || !isNewCustomer}
+          disabled={(isEdit && order.status === 'Confirmed') || !!(order?.customer?.name?.trim())}
         />
       )}
 
