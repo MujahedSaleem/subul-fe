@@ -4,6 +4,7 @@ import { faPlus, faCheckDouble, faRightFromBracket } from '@fortawesome/free-sol
 import { Card, CardBody, CardHeader, Typography } from '@material-tailwind/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPhone, faLocationDot, faCircleCheck, faTrash, faPenToSquare, faEye, faUser, faCalendar, faMoneyBill, faCheckCircle, faHourglassHalf, faPencil } from '@fortawesome/free-solid-svg-icons';
+import { faWhatsapp } from '@fortawesome/free-brands-svg-icons';
 import CallModal from '../../components/admin/shared/CallModal';
 import { useError } from '../../context/ErrorContext';
 import Layout from '../../components/Layout';
@@ -70,7 +71,13 @@ const DistributorListOrder: React.FC = () => {
 
   const handleCallCustomer = (customer: Customer) => {
     setSelectedCustomer(customer);
-      setIsCallModalOpen(true);
+    setIsCallModalOpen(true);
+  };
+
+  const handleDirectCall = (phone: string) => {
+    const cleaned = phone?.replace(/\D/g, '');
+    const withoutLeadingZeros = cleaned?.replace(/^0+/, '');
+    window.location.href = `tel:${withoutLeadingZeros}`;
   };
 
   const handleOpenLocation = (location: Location) => {
@@ -421,7 +428,7 @@ const DistributorListOrder: React.FC = () => {
                                 className="flex-1 flex items-center justify-center gap-2"
                                 color="blue"
                                 size="sm"
-                                onClick={() => handleCallCustomer(order.customer)}
+                                onClick={() => handleDirectCall(order.customer?.phone || '')}
                               >
                                 <FontAwesomeIcon icon={faPhone} className="w-4 h-4" />
                                 اتصال
@@ -430,11 +437,24 @@ const DistributorListOrder: React.FC = () => {
                                 className="flex-1 flex items-center justify-center gap-2"
                                 color="green"
                                 size="sm"
+                                onClick={() => handleCallCustomer(order.customer)}
+                              >
+                                <FontAwesomeIcon icon={faWhatsapp} className="w-4 h-4" />
+                                واتساب
+                              </Button>
+                            </div>
+
+                            {/* Confirm Button */}
+                            <div className="mt-2">
+                              <Button
+                                className="w-full flex items-center justify-center gap-2"
+                                color="amber"
+                                size="sm"
                                 onClick={() => handleConfirmOrder(order)}
                                 disabled={order.status === 'Confirmed'}
                               >
                                 <FontAwesomeIcon icon={faCheckCircle} className="w-4 h-4" />
-                                تأكيد
+                                {order.status === 'Confirmed' ? 'تم التأكيد' : 'تأكيد الطلب'}
                               </Button>
                             </div>
                           </div>
