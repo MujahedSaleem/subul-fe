@@ -23,15 +23,17 @@ RUN pnpm store prune && pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm run build
 
-# Stage 3: Final image with Nginx for serving static files
-FROM nginx:alpine
+# Stage 3: Final image with a simple static server
+FROM node:20-slim
 
-# Copy custom Nginx configuration if needed
-COPY nginx.conf /etc/nginx/nginx.conf
+# Install serve globally to serve static files
+RUN npm install -g serve
 
-# Copy production dependencies and build artifacts
-COPY --from=build /app/dist /usr/share/nginx/html
+# Copy built artifacts
+COPY --from=build /app/dist /app
 
+# Expose port 3000
+EXPOSE 3000
 
-# Start Nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Start serve
+CMD ["serve", "-s", "/app", "-l", "3000"]
