@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import DistributorOrderForm from '../../components/distributor/DistributorOrderForm';
@@ -110,7 +110,7 @@ const DistributorAddOrder: React.FC = () => {
     let errorMessage = null;
 
     try {
-      // Validate the order before submission
+      // Basic validation
       if (!order.customer || !order.location || !order.cost) {
         dispatch({
           type: 'SET_ERROR',
@@ -118,6 +118,14 @@ const DistributorAddOrder: React.FC = () => {
         });
         return;
       }
+
+      // Check if all required fields are filled for smart logic
+      const hasCustomerName = order.customer?.name?.trim();
+      const hasCustomerPhone = order.customer?.phone?.trim();
+      const hasLocation = order.location?.name?.trim();
+      const hasPrice = order.cost > 0;
+
+      const allRequiredFieldsFilled = hasCustomerName && hasCustomerPhone && hasLocation && hasPrice;
 
       let newCustomer = null;
       if (!order.customer?.id) {
@@ -152,17 +160,23 @@ const DistributorAddOrder: React.FC = () => {
         if (!selectedLocation && newCustomer.locations.length > 0) {
           selectedLocation = newCustomer.locations[newCustomer.locations.length - 1]; // Use the last (likely newest) location
         }
+
+        // Determine the appropriate status based on field completion
+        const targetStatus: 'New' | 'Draft' = allRequiredFieldsFilled ? 'New' : 'Draft';
+        const shouldConfirm = allRequiredFieldsFilled;
         
-        const confirmedOrder: OrderRequest = {
+        const orderRequest: OrderRequest = {
           customerId: parseInt(newCustomer.id),
           locationId: selectedLocation?.id,
           cost: order.cost,
-          statusString: 'New'
+          statusString: targetStatus
         };
 
-        const orderResult = await addOrder(confirmedOrder);
+        const orderResult = await addOrder(orderRequest);
         const newOrder = orderResult.payload as OrderList;
-        if (newOrder) {
+        
+        // Only confirm if all required fields are filled
+        if (newOrder && shouldConfirm) {
           await confirmOrder(newOrder.id);
         }
       }
@@ -187,6 +201,20 @@ const DistributorAddOrder: React.FC = () => {
       setIsSubmitting(false);
     }
   };
+
+  // Calculate dynamic button title based on required fields
+  const getButtonTitle = useMemo(() => {
+    if (!order) return 'تأكيد الطلبية';
+    
+    const hasCustomerName = order.customer?.name?.trim();
+    const hasCustomerPhone = order.customer?.phone?.trim();
+    const hasLocation = order.location?.name?.trim();
+    const hasPrice = order.cost > 0;
+
+    const allRequiredFieldsFilled = hasCustomerName && hasCustomerPhone && hasLocation && hasPrice;
+    
+    return allRequiredFieldsFilled ? 'تأكيد الطلب' : 'حفظ كمسودة';
+  }, [order]);
 
   return (
     <Layout title="إضافة طلبية">
@@ -230,7 +258,7 @@ const DistributorAddOrder: React.FC = () => {
               setOrder={setOrder}
               onSubmit={handleSubmit}
               onBack={handleBack}
-              title="تأكيد الطلبية"
+              title={getButtonTitle}
               isEdit={false}
               isSubmitting={isSubmitting}
               isBackLoading={isBackLoading}
