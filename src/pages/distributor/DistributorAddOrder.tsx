@@ -110,11 +110,11 @@ const DistributorAddOrder: React.FC = () => {
     let errorMessage = null;
 
     try {
-      // Basic validation
-      if (!order.customer || !order.location || !order.cost) {
+      // Basic validation - only require customer with phone number
+      if (!order.customer || !order.customer.phone?.trim()) {
         dispatch({
           type: 'SET_ERROR',
-          payload: errorMessage || 'يرجى تعبئة جميع الحقول المطلوبة.',
+          payload: errorMessage || 'يرجى إدخال رقم الهاتف على الأقل.',
         });
         return;
       }
