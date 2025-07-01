@@ -5,48 +5,24 @@ import { faPlus, faPenToSquare, faTrash, faSearch, faSpinner, faLocationDot, faP
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Button from '../../components/Button';
 import IconButton from '../../components/IconButton';
-import { customersStore } from '../../store/customersStore';
+import { useCustomers } from '../../hooks/useCustomers';
 import { Card, CardHeader, CardBody, Typography, Input } from '@material-tailwind/react';
-import { Customer } from '../../types/customer';
 
 const Customers: React.FC = () => {
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const { customers, loading, fetchCustomers, deleteCustomer } = useCustomers();
   const [searchQuery, setSearchQuery] = useState<string>('');
   
   useEffect(() => {
-    const fetchCustomers = async () => {
-      try {
-        setIsLoading(true);
-          await customersStore.fetchCustomers();
-      } catch (error) {
-        console.error("Error fetching customers:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-  
     fetchCustomers();
+  }, [fetchCustomers]);
 
-    const unsubscribe = customersStore.subscribe(() => {
-      setCustomers(customersStore.customers);
-    });
-  
-    setCustomers(customersStore.customers);
-  
-    return () => unsubscribe();
-  }, []);
-
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('هل أنت متأكد من حذف هذا العميل؟')) {
-      setIsLoading(true);
       try {
-      await customersStore.deleteCustomer(id);
+        await deleteCustomer(id);
       } catch (error) {
         console.error("Error deleting customer:", error);
-      } finally {
-        setIsLoading(false);
       }
     }
   };
@@ -120,7 +96,7 @@ const Customers: React.FC = () => {
           </div>
         </CardHeader>
         
-        {isLoading ? (
+        {loading ? (
           <CardBody 
             className="text-center py-12"
             placeholder=""
@@ -275,7 +251,7 @@ const Customers: React.FC = () => {
                             className="hover:bg-blue-50 text-blue-600"
                           />
                           <IconButton 
-                            onClick={() => handleDelete(Number(customer.id))} 
+                            onClick={() => handleDelete(customer.id)} 
                             icon={faTrash} 
                             variant="danger" 
                             title="حذف"

@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import Layout from '../../components/Layout';
 import OrderForm from '../../components/OrderForm';
 import type { OrderList, OrderRequest } from '../../types/order';
-import { customersStore } from '../../store/customersStore';
+import { useCustomers } from '../../hooks/useCustomers';
 import { useError } from '../../context/ErrorContext';
 import { Customer, Location, UpdateCustomerRequest, UpdateLocationRequest } from '../../types/customer';
 import { updateOrder, confirmOrder, getOrderById, clearCurrentOrder } from '../../store/slices/orderSlice';
@@ -15,6 +15,7 @@ const EditOrder: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
   const { dispatch: errorDispatch } = useError();
+  const { getCustomerById, updateCustomerWithFormat } = useCustomers();
   const shouldSaveOnUnmount = useRef(true);
   
   const { isLoading: reduxLoading } = useSelector((state: RootState) => state.orders);
@@ -63,7 +64,8 @@ const EditOrder: React.FC = () => {
         if (result) {
           // Fetch customer data including locations
           if (result.customer?.id) {
-            const customerData = await customersStore.getCustomerById(result.customer.id.toString());
+            const customerResult = await getCustomerById(result.customer.id.toString());
+            const customerData = customerResult.payload;
             if (customerData) {
               const fullOrderData = {
                 ...result,

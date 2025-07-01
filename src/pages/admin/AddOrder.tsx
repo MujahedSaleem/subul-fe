@@ -7,7 +7,7 @@ import { addOrder, confirmOrder } from '../../store/slices/orderSlice';
 import type { OrderList, OrderRequest } from '../../types/order';
 import { useError } from '../../context/ErrorContext';
 import { Customer } from '../../types/customer';
-import { customersStore } from '../../store/customersStore';
+import { useCustomers } from '../../hooks/useCustomers';
 import type { AppDispatch } from '../../store/store';
 
 const generateOrderNumber = () => {
@@ -20,6 +20,7 @@ const AddOrder: React.FC = () => {
   const navigate = useNavigate();
   const reduxDispatch = useDispatch<AppDispatch>();
   const { dispatch: errorDispatch } = useError(); // Use inside a React component
+  const { addCustomer, updateCustomer } = useCustomers();
   const [order, setOrder] = useState<any>({
     id: 0, // ID will be assigned by the backend
     orderNumber: generateOrderNumber(),
