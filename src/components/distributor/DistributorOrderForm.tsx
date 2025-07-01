@@ -111,15 +111,38 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
       const gpsLocation = await getCurrentLocation();
       const updatedLocation = {...order?.location, coordinates: gpsLocation?.coordinates};
       
-      if (order?.customer?.id && order?.location?.id) {
-        await updateCustomerLocation(order.customer.id, updatedLocation);
-        setOrder((prev) => ({
+      // Always update the order state with new coordinates
+      setOrder((prev) => {
+        if (!prev) return prev;
+        
+        // Update the customer's location array as well
+        const updatedCustomer = prev.customer ? {
+          ...prev.customer,
+          locations: prev.customer.locations.map(loc => 
+            loc.id === prev.location?.id || (loc.id === 0 && loc.name === prev.location?.name)
+              ? updatedLocation
+              : loc
+          )
+        } : prev.customer;
+
+        return {
           ...prev,
-          location: updatedLocation
-        }));
+          location: updatedLocation,
+          customer: updatedCustomer
+        };
+      });
+      
+      // If it's an existing customer and location, update via API
+      if (order?.customer?.id && order?.location?.id && order?.location?.id !== 0) {
+        try {
+          await updateCustomerLocation(order.customer.id, updatedLocation);
+        } catch (error) {
+          console.error('Error updating location via API:', error);
+          // Don't fail the whole operation if API update fails
+        }
       }
     } catch (error) {
-      console.error('Error updating location:', error);
+      console.error('Error getting GPS location:', error);
     } finally {
       setGetttingGpsLocation(false);
     }
@@ -148,7 +171,7 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
         <>
         <LocationSelector
           order={order}
-          setOrder={setOrder}
+          setOrder={setOrder as React.Dispatch<React.SetStateAction<OrderList | undefined>>}
           isNewCustomer={isNewCustomer}
           disabled={isEdit && order.status === 'Confirmed'}
           customer={order?.customer}
