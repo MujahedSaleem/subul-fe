@@ -21,7 +21,7 @@ const CostInput: React.FC<CostInputProps> = ({ cost, setOrder, disabled }) => {
         onChange={(e) => setOrder(prev => ({ ...prev, cost: parseFloat(e.target.value) || 0 }))}
         className="block w-full pr-10 pl-3 py-2.5 border border-slate-200 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
         placeholder="0.00"
-        required={!disabled}
+        required={false}
         disabled={disabled}
       />
     </div>
