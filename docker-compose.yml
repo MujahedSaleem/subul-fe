@@ -13,4 +13,5 @@ services:
 
 networks:
   subul-network:
+    name: subul-network
     driver: bridge
