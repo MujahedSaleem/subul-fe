@@ -64,14 +64,20 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
 
       if (existingCustomer) {
         setIsNewCustomer(false);
-        setOriginalCustomerName(existingCustomer.name || '');
+        // Only set original name if not in edit mode (to preserve the original state)
+        if (!isEdit) {
+          setOriginalCustomerName(existingCustomer.name || '');
+        }
         setOrder((prev) => ({
           ...prev,
           customer: existingCustomer
         }));
       } else {
         setIsNewCustomer(true);
-        setOriginalCustomerName('');
+        // Only set empty original name if not in edit mode
+        if (!isEdit) {
+          setOriginalCustomerName('');
+        }
       }
     } catch (error) {
       console.error('Error finding customer:', error);
