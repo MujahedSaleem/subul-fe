@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import DistributorOrderForm from '../../components/distributor/DistributorOrderForm';
@@ -128,7 +128,7 @@ const DistributorEditOrder: React.FC = () => {
 
     setIsBackLoading(true);
     try {
-      // Check if there are any changes to the order
+            // Check if there are any changes to the order
       const hasOrderChanges = JSON.stringify({
         cost: order.cost,
         status: order.status,
@@ -141,54 +141,12 @@ const DistributorEditOrder: React.FC = () => {
         locationId: originalOrder.location?.id
       });
 
-      // Check if there are any changes to the customer
-      const hasCustomerChanges = JSON.stringify({
-        name: order.customer.name,
-        phone: order.customer.phone,
-        locations: order.customer.locations
-      }) !== JSON.stringify({
-        name: originalOrder.customer.name,
-        phone: originalOrder.customer.phone,
-        locations: originalOrder.customer.locations
-      });
-
-      let finalLocationId = order.location?.id;
-      
-      // Update customer first if there are changes
-      if (hasCustomerChanges) {
-        const result = await updateCustomer({
-          id: order.customer.id,
-          name: order.customer.name,
-          phone: order.customer.phone,
-          locations: order.customer.locations
-        });
-        const updatedCustomer = result.payload as Customer;
-        
-        if (updatedCustomer) {
-          // Find the correct location from the updated customer
-          // This handles the case where new locations get assigned real IDs by the backend
-          const selectedLocation = updatedCustomer.locations.find(
-            (l) => {
-              // For new locations (originally ID 0), match by coordinates and name
-              if (order.location?.id === 0) {
-                return l.coordinates === order.location.coordinates && l.name === order.location.name;
-              }
-              // For existing locations, match by ID or coordinates
-              return l.id === order.location?.id || l.coordinates === order.location?.coordinates;
-            }
-          );
-          
-          if (selectedLocation) {
-            finalLocationId = selectedLocation.id;
-          }
-        }
-      }
-
-      // Update order if there are changes OR if the location ID was updated from customer changes
-      if (hasOrderChanges || finalLocationId !== order.location?.id) {
+      // Update order if there are changes
+      if (hasOrderChanges) {
         const orderRequest: OrderRequest = {
+          id: order.id, // Include ID for the update URL
           customerId: parseInt(order.customer.id),
-          locationId: finalLocationId,
+          locationId: order.location?.id,
           cost: order.cost,
           statusString: order.status as 'New' | 'Pending' | 'Confirmed' | 'Draft'
         };
@@ -213,52 +171,65 @@ const DistributorEditOrder: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      // Update customer if needed using distributor store
-      if (order.customer) {
-        const customerUpdate = {
-          id: order.customer.id,
-          name: order.customer.name,
-          phone: order.customer.phone,
-          locations: order.customer.locations
-        };
-        await updateCustomer(customerUpdate);
-      }
+      // Check if all required fields are filled
+      const hasCustomerName = order.customer?.name?.trim();
+      const hasCustomerPhone = order.customer?.phone?.trim();
+      const hasLocation = order.location?.name?.trim();
+      const hasPrice = order.cost > 0;
 
-      // Update location if needed using distributor store
-      if (order.location) {
-        const locationUpdate = {
-          id: order.location.id,
-          name: order.location.name,
-          coordinates: order.location.coordinates || '',
-          address: order.location.address,
-          isActive: true,
-          customerId: order.customer.id
-        };
-        await updateCustomerLocation(order.customer.id, locationUpdate);
-      }
+      const allRequiredFieldsFilled = hasCustomerName && hasCustomerPhone && hasLocation && hasPrice;
 
-      const confirmedOrder: OrderRequest = {
+      // Determine the appropriate status and action
+      let targetStatus: 'New' | 'Draft' = allRequiredFieldsFilled ? 'New' : 'Draft';
+      let shouldConfirm = allRequiredFieldsFilled && order.status !== 'Confirmed';
+
+      const orderRequest: OrderRequest = {
+        id: order.id, // Include ID for the update URL
         customerId: parseInt(order.customer.id),
         locationId: order.location?.id,
         cost: order.cost,
-        statusString: 'New'
+        statusString: targetStatus
       };
 
-      await updateOrder(confirmedOrder);
-      await confirmOrder(order.id);
+      // Update the order first
+      await updateOrder(orderRequest);
+
+      // If all fields are filled, confirm the order
+      if (shouldConfirm) {
+        await confirmOrder(order.id);
+      }
+
       shouldSaveOnUnmount.current = false;
       navigate('/distributor/orders');
     } catch (error) {
-      console.error('Error confirming order:', error);
-      errorDispatch({ type: 'SET_ERROR', payload: 'حدث خطأ أثناء تأكيد الطلب' });
+      console.error('Error saving order:', error);
+      errorDispatch({ type: 'SET_ERROR', payload: 'حدث خطأ أثناء حفظ الطلب' });
     } finally {
       setIsSubmitting(false);
     }
-  }, [order, updateCustomer, updateCustomerLocation, updateOrder, confirmOrder, navigate, errorDispatch]);
+  }, [order, updateOrder, confirmOrder, navigate, errorDispatch]);
 
   const handleSetOrder = useCallback((newOrder: React.SetStateAction<OrderList>) => {
     setOrder(newOrder);
   }, []);
+
+  // Calculate dynamic button title based on required fields
+  const getButtonTitle = useMemo(() => {
+    if (!order) return 'حفظ التغييرات';
+    
+    const hasCustomerName = order.customer?.name?.trim();
+    const hasCustomerPhone = order.customer?.phone?.trim();
+    const hasLocation = order.location?.name?.trim();
+    const hasPrice = order.cost > 0;
+
+    const allRequiredFieldsFilled = hasCustomerName && hasCustomerPhone && hasLocation && hasPrice;
+    
+    if (order.status === 'Confirmed') {
+      return 'حفظ التغييرات';
+    }
+    
+    return allRequiredFieldsFilled ? 'تأكيد الطلب' : 'حفظ كمسودة';
+  }, [order]);
 
   if (isLoading) {
     return (
@@ -316,7 +287,7 @@ const DistributorEditOrder: React.FC = () => {
               setOrder={handleSetOrder}
               onSubmit={handleSubmit}
               onBack={handleBack}
-              title="حفظ التغييرات"
+              title={getButtonTitle}
               isEdit={true}
               isSubmitting={isSubmitting}
               isBackLoading={isBackLoading}
