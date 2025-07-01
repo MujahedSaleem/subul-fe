@@ -37,6 +37,7 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
   const [isNewCustomer, setIsNewCustomer] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
   const [getttingGpsLocation, setGetttingGpsLocation] = useState(false);
+  const [originalCustomerName, setOriginalCustomerName] = useState<string>('');
   const navigate = useNavigate();
   
   const {
@@ -63,12 +64,14 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
 
       if (existingCustomer) {
         setIsNewCustomer(false);
+        setOriginalCustomerName(existingCustomer.name || '');
         setOrder((prev) => ({
           ...prev,
           customer: existingCustomer
         }));
       } else {
         setIsNewCustomer(true);
+        setOriginalCustomerName('');
       }
     } catch (error) {
       console.error('Error finding customer:', error);
@@ -80,6 +83,14 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
 
   // Track phone to prevent unnecessary searches
   const [lastSearchedPhone, setLastSearchedPhone] = useState<string>('');
+  
+  // Set original customer name when in edit mode
+  useEffect(() => {
+    if (isEdit && order?.customer) {
+      setOriginalCustomerName(order.customer.name || '');
+      setIsNewCustomer(!order.customer.id);
+    }
+  }, [isEdit, order?.customer?.id, order?.customer?.name]);
   
   useEffect(() => {
     const currentPhone = order?.customer?.phone || '';
@@ -163,7 +174,7 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
           customer={order?.customer}
           setOrder={setOrder}
           isNewCustomer={isNewCustomer}
-          disabled={(isEdit && order.status === 'Confirmed') || !!(order?.customer?.name?.trim())}
+          disabled={(isEdit && order.status === 'Confirmed') || !!originalCustomerName.trim()}
         />
       )}
 
