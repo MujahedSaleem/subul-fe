@@ -2,6 +2,8 @@ services:
   react-vite-app:
     image: subul-fe:v1
     container_name: subul-fe
+    ports:
+      - 80:80
     build:
       context: .
       dockerfile: Dockerfile
