@@ -2,10 +2,10 @@ import { Customer, Location } from "./customer";
 import { Distributor } from "./distributor";
 
 export interface OrderRequest {
-  id: number;
-  orderNumber: string;
-  customerId?: string;
-  locationId: number|undefined;
+  id?: number;
+  orderNumber?: string;
+  customerId?: number;
+  locationId?: number;
   cost: number;
   statusString: 'New' | 'Pending' | 'Confirmed' | 'Draft';
   distributorId?: string;

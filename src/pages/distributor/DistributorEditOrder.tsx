@@ -187,12 +187,9 @@ const DistributorEditOrder: React.FC = () => {
       // Update order if there are changes OR if the location ID was updated from customer changes
       if (hasOrderChanges || finalLocationId !== order.location?.id) {
         const orderRequest: OrderRequest = {
-          id: order.id,
-          orderNumber: order.orderNumber,
-          customerId: order.customer.id,
+          customerId: parseInt(order.customer.id),
           locationId: finalLocationId,
           cost: order.cost,
-          distributorId: order.distributor?.id,
           statusString: order.status as 'New' | 'Pending' | 'Confirmed' | 'Draft'
         };
         await updateOrder(orderRequest);
@@ -240,18 +237,15 @@ const DistributorEditOrder: React.FC = () => {
         await updateCustomerLocation(order.customer.id, locationUpdate);
       }
 
-      const confirmedOrder = {
-        id: order.id,
-        orderNumber: order.orderNumber,
-        customerId: order.customer.id,
+      const confirmedOrder: OrderRequest = {
+        customerId: parseInt(order.customer.id),
         locationId: order.location?.id,
         cost: order.cost,
-        distributorId: order.distributor.id,
         statusString: 'New'
-      } as OrderRequest;
+      };
 
       await updateOrder(confirmedOrder);
-      await confirmOrder(confirmedOrder.id);
+      await confirmOrder(order.id);
       shouldSaveOnUnmount.current = false;
       navigate('/distributor/orders');
     } catch (error) {

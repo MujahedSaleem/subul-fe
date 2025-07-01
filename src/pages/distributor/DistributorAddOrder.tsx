@@ -60,11 +60,34 @@ const DistributorAddOrder: React.FC = () => {
       }
       
       if (newCustomer) {
-        const selectedLocation = newCustomer?.locations?.find(l => l.coordinates === customer.locations[0].coordinates);
+        // Find the correct location from the updated customer
+        let selectedLocation = null;
+        const orderLocation = order.location;
+        
+        if (orderLocation) {
+          // For new locations (originally ID 0), match by name and coordinates
+          // For existing locations, match by ID
+          selectedLocation = newCustomer.locations.find(l => {
+            if (orderLocation.id === 0) {
+              // New location - match by name (and coordinates if available)
+              return l.name === orderLocation.name && 
+                     (!orderLocation.coordinates || l.coordinates === orderLocation.coordinates);
+            } else {
+              // Existing location - match by ID
+              return l.id === orderLocation.id;
+            }
+          });
+        }
+        
+        // Fallback to first location if no match found
+        if (!selectedLocation && newCustomer.locations.length > 0) {
+          selectedLocation = newCustomer.locations[newCustomer.locations.length - 1]; // Use the last (likely newest) location
+        }
+
         await addOrder({ 
-          ...order, 
-          customerId: newCustomer?.id,
+          customerId: parseInt(newCustomer.id),
           locationId: selectedLocation?.id,
+          cost: order.cost,
           statusString: 'Draft' as const
         });
       }
@@ -106,15 +129,34 @@ const DistributorAddOrder: React.FC = () => {
       }
 
       if (newCustomer) {
-        const selectedLocation = newCustomer?.locations?.find(l => l.coordinates === order.customer.locations[0].coordinates);
+        // Find the correct location from the updated customer
+        let selectedLocation = null;
+        const orderLocation = order.location;
+        
+        if (orderLocation) {
+          // For new locations (originally ID 0), match by name and coordinates
+          // For existing locations, match by ID
+          selectedLocation = newCustomer.locations.find(l => {
+            if (orderLocation.id === 0) {
+              // New location - match by name (and coordinates if available)
+              return l.name === orderLocation.name && 
+                     (!orderLocation.coordinates || l.coordinates === orderLocation.coordinates);
+            } else {
+              // Existing location - match by ID
+              return l.id === orderLocation.id;
+            }
+          });
+        }
+        
+        // Fallback to last location if no match found
+        if (!selectedLocation && newCustomer.locations.length > 0) {
+          selectedLocation = newCustomer.locations[newCustomer.locations.length - 1]; // Use the last (likely newest) location
+        }
         
         const confirmedOrder: OrderRequest = {
-          id: order.id,
-          orderNumber: order.orderNumber,
-          customerId: newCustomer.id,
+          customerId: parseInt(newCustomer.id),
           locationId: selectedLocation?.id,
           cost: order.cost,
-          distributorId: undefined,
           statusString: 'New'
         };
 
