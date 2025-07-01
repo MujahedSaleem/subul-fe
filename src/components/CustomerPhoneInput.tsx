@@ -49,6 +49,7 @@ const CustomerPhoneInput: React.FC<CustomerPhoneInputProps> = ({
             phone={customer?.phone}
             isOpen={isCallModalOpen}
             onClose={() => setIsCallModalOpen(false)}
+            showDialOption={true}
           />
     </div>
   );

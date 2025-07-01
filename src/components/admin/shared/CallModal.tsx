@@ -1,5 +1,5 @@
 import React from 'react';
-import { faXmark } from '@fortawesome/free-solid-svg-icons';
+import { faXmark, faPhone } from '@fortawesome/free-solid-svg-icons';
 import { faWhatsapp } from '@fortawesome/free-brands-svg-icons';
 import Button from '../../Button';
 import IconButton from '../../IconButton';
@@ -8,9 +8,10 @@ interface CallModalProps {
   phone: string;
   isOpen: boolean;
   onClose: () => void;
+  showDialOption?: boolean; // New prop to control whether to show dial option
 }
 
-const CallModal: React.FC<CallModalProps> = ({ phone, isOpen, onClose }) => {
+const CallModal: React.FC<CallModalProps> = ({ phone, isOpen, onClose, showDialOption = false }) => {
   if (!isOpen) return null;
 
   const formatPhoneNumber = (phone: string, countryCode: string) => {
@@ -24,6 +25,12 @@ const CallModal: React.FC<CallModalProps> = ({ phone, isOpen, onClose }) => {
 
   const handleWhatsAppCall = (formattedPhone: string) => {
     window.open(`https://wa.me/${formattedPhone}`, '_blank');
+    onClose();
+  };
+
+  const handleDirectCall = (formattedPhone: string) => {
+    const cleanPhone = formattedPhone.replace('+', '');
+    window.location.href = `tel:${cleanPhone}`;
     onClose();
   };
 
@@ -42,7 +49,7 @@ const CallModal: React.FC<CallModalProps> = ({ phone, isOpen, onClose }) => {
             </div>
             
             <h3 className="text-lg font-semibold text-slate-900">
-              اختر رقم الواتساب
+              {showDialOption ? 'اختر طريقة الاتصال' : 'اختر رقم الواتساب'}
             </h3>
           </div>
           
@@ -53,15 +60,28 @@ const CallModal: React.FC<CallModalProps> = ({ phone, isOpen, onClose }) => {
                   <div className="text-sm font-medium text-slate-700">
                     {formattedPhone}
                   </div>
+                  <div className={`flex gap-2 ${showDialOption ? 'flex-row' : 'flex-col'}`}>
+                    {showDialOption && (
+                      <Button
+                        onClick={() => handleDirectCall(formattedPhone)}
+                        variant="primary"
+                        icon={faPhone}
+                        size="md"
+                        block={!showDialOption}
+                      >
+                        اتصال مباشر
+                      </Button>
+                    )}
                     <Button
                       onClick={() => handleWhatsAppCall(formattedPhone.replace('+', ''))}
                       variant="success"
                       icon={faWhatsapp}
                       size="md"
-                      block
+                      block={!showDialOption}
                     >
                       واتساب
                     </Button>
+                  </div>
                 </div>
               ))}
             </div>
