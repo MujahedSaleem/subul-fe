@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { faArrowRight, faMapLocation, faSave } from '@fortawesome/free-solid-svg-icons';
 import type { OrderList } from '../../types/order';
@@ -38,6 +38,7 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [getttingGpsLocation, setGetttingGpsLocation] = useState(false);
   const [originalCustomerName, setOriginalCustomerName] = useState<string>('');
+  const originalNameInitialized = useRef(false);
   const navigate = useNavigate();
   
   const {
@@ -90,13 +91,14 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
   // Track phone to prevent unnecessary searches
   const [lastSearchedPhone, setLastSearchedPhone] = useState<string>('');
   
-  // Set original customer name when in edit mode
+  // Set original customer name when in edit mode - only once on component mount
   useEffect(() => {
-    if (isEdit && order?.customer) {
+    if (isEdit && order?.customer && !originalNameInitialized.current) {
       setOriginalCustomerName(order.customer.name || '');
       setIsNewCustomer(!order.customer.id);
+      originalNameInitialized.current = true;
     }
-  }, [isEdit, order?.customer?.id, order?.customer?.name]);
+  }, [isEdit, order?.customer?.id]); // Removed order?.customer?.name from dependencies
   
   useEffect(() => {
     const currentPhone = order?.customer?.phone || '';
