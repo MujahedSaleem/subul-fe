@@ -1,4 +1,4 @@
-import React, { useState, ReactNode, useRef, useEffect, ReactElement } from "react";
+import React, { useState, ReactNode, useRef, useEffect, ReactElement, useCallback } from "react";
 
 interface OptionProps {
   value: string | number;
@@ -49,9 +49,21 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [selectedLabel, setSelectedLabel] = useState(value||""); // Keep track of the selected label separately
+  const [dropdownPosition, setDropdownPosition] = useState({ left: 0, top: 0, width: 0 });
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const options = React.Children.toArray(children) as React.ReactElement<OptionProps>[];
+
+  const updateDropdownPosition = useCallback(() => {
+    if (inputRef.current) {
+      const rect = inputRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        left: rect.left,
+        top: rect.bottom + 8,
+        width: rect.width
+      });
+    }
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -60,12 +72,22 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
       }
     };
 
+    const handleScroll = () => {
+      if (isOpen) {
+        updateDropdownPosition();
+      }
+    };
+
     document.addEventListener("click", handleClickOutside);
+    window.addEventListener("scroll", handleScroll, true);
+    window.addEventListener("resize", handleScroll);
 
     return () => {
       document.removeEventListener("click", handleClickOutside);
+      window.removeEventListener("scroll", handleScroll, true);
+      window.removeEventListener("resize", handleScroll);
     };
-  }, []);
+  }, [isOpen, updateDropdownPosition]);
 
   useEffect(() => {
     if(value !== undefined)
@@ -73,9 +95,12 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
 
   }, [value]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
     setQuery(inputValue);
+    if (!isOpen) {
+      updateDropdownPosition();
+    }
     setIsOpen(true); // Keep dropdown open while typing
     setSelectedLabel("");
     
@@ -129,15 +154,33 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
         value={query || selectedLabel}
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
-        onClick={()=>setIsOpen(true)}
+        onClick={() => {
+          if (!isOpen) {
+            updateDropdownPosition();
+          }
+          setIsOpen(true);
+        }}
         placeholder={placeholder}
         className="block w-full p-2 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
         disabled={disabled}
       />
 
       {isOpen && (
-        <div id="dropdownSearch" className="z-10 bg-white rounded-lg shadow-sm w-full dark:bg-gray-700 mt-2 absolute">
-          <ul className="max-h-48 px-3 pb-3 overflow-y-auto text-sm text-gray-700 dark:text-gray-200">
+        <div 
+          id="dropdownSearch" 
+          className="fixed bg-white rounded-lg shadow-xl border border-gray-200 w-full dark:bg-gray-700 mt-2"
+          style={{
+            maxHeight: '240px',
+            overflowY: 'scroll',
+            overflowX: 'hidden',
+            zIndex: 9999,
+            left: dropdownPosition.left,
+            top: dropdownPosition.top,
+            width: dropdownPosition.width
+          }}
+        >
+          <div className="px-3 pb-3 pt-3 text-sm text-gray-700 dark:text-gray-200">
+            <ul className="space-y-1">
             {addedOption}
             {filteredOptions.length > 0 ? (
               filteredOptions.map((option, index) => (
@@ -176,7 +219,8 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                 إضافة "{query}"
               </li>
             )}
-          </ul>
+            </ul>
+          </div>
         </div>
       )}
     </div>

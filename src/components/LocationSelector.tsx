@@ -5,6 +5,8 @@ import Modal from "./modal";
 import EditCustomer from "./EditCustomer";
 import { SearchableDropdown, Option } from "./distributor/shared/SearchableDropdown";
 import { AddLocationModal } from "./AddLocationModal";
+import IconButton from "./IconButton";
+import { faLocationDot } from "@fortawesome/free-solid-svg-icons";
 
 interface LocationSelectorProps {
   order: OrderList | undefined;
@@ -146,27 +148,63 @@ const LocationSelector = forwardRef<HTMLDivElement, LocationSelectorProps>((
       }
     };
 
+    const handleOpenLocation = (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      if (!order?.location?.coordinates) {
+        alert('لا توجد إحداثيات متوفرة لهذا الموقع');
+        return;
+      }
+
+      const [latitude, longitude] = order.location.coordinates.split(',').map(Number);
+      const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      if (isMobileDevice) {
+        // For mobile, use navigation URL that opens in driving mode
+        const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&travelmode=driving`;
+        window.open(googleMapsUrl, '_blank');
+      } else {
+        // For desktop, open in navigation/driving mode
+        const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&travelmode=driving`;
+        window.open(url, '_blank');
+      }
+    };
+
 
     return (
       <div ref={ref} className="flex flex-col">
         <label htmlFor="location" className="text-sm font-medium text-slate-700">
           الموقع
         </label>
-        <SearchableDropdown
-          value={selectedLocationName}
-          onChange={handleLocationSelect}
-          onAddOption={!disabled ? handleAddLocation : undefined}
-          onInputChange={!disabled ? handleInputChange : undefined}
-          disabled={disabled}
-          placeholder="اختر الموقع"
-          className="block w-full"
-        >
-          {customer?.locations?.map(location => (
-            <Option key={location.id} value={location.id.toString()}>
-              {location.name}
-            </Option>
-          ))}
-        </SearchableDropdown>
+        <div className="flex items-center gap-2">
+          <SearchableDropdown
+            value={selectedLocationName}
+            onChange={handleLocationSelect}
+            onAddOption={!disabled ? handleAddLocation : undefined}
+            onInputChange={!disabled ? handleInputChange : undefined}
+            disabled={disabled}
+            placeholder="اختر الموقع"
+            className="flex-1"
+          >
+            {customer?.locations?.map(location => (
+              <Option key={location.id} value={location.id.toString()}>
+                {location.name}
+              </Option>
+            ))}
+          </SearchableDropdown>
+          
+          {/* Location button - only show when coordinates exist */}
+          {order?.location?.coordinates && (
+            <IconButton 
+              onClick={handleOpenLocation}
+              icon={faLocationDot}
+              variant="primary"
+              size="md"
+              title="فتح الموقع في خريطة جوجل"
+            />
+          )}
+        </div>
 
         {/* Add Location Modal */}
         <AddLocationModal
