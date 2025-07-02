@@ -80,15 +80,6 @@ export const useAdminOrderManagement = ({ initialOrder, isEdit = false }: UseAdm
     // Handle customer creation/update
     let newCustomer: Customer;
     const customerId = orderData.customer?.id;
-    
-    // Debug logging
-    console.log('processCustomerAndLocation - Customer data:', {
-      customerId,
-      customerIdType: typeof customerId,
-      customerIdStringified: JSON.stringify(customerId),
-      customer: orderData.customer
-    });
-    
     const shouldCreateNewCustomer = !customerId || 
                                    customerId === '' || 
                                    customerId === 'undefined' || 
@@ -97,19 +88,15 @@ export const useAdminOrderManagement = ({ initialOrder, isEdit = false }: UseAdm
                                    customerId === undefined ||
                                    String(customerId) === '0';
     
-    console.log('Should create new customer:', shouldCreateNewCustomer);
-    
     if (shouldCreateNewCustomer) {
       // Remove any invalid ID before creating
       const customerDataForCreation = {
         ...cleanCustomerData,
         id: undefined
       };
-      console.log('Creating new customer with data:', customerDataForCreation);
       const result = await addCustomer(customerDataForCreation);
       newCustomer = result.payload as Customer;
     } else {
-      console.log('Updating existing customer with data:', cleanCustomerData);
       const result = await updateCustomer(cleanCustomerData);
       newCustomer = result.payload as Customer;
     }
