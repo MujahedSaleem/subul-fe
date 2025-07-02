@@ -1,41 +1,27 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import DistributorOrderForm from '../../components/distributor/DistributorOrderForm';
-import type { OrderList, OrderRequest } from '../../types/order';
-import { useError } from '../../context/ErrorContext';
+import type { OrderList } from '../../types/order';
 import { Customer, Location } from '../../types/customer';
-import { Card, CardBody, CardHeader, Typography } from '@material-tailwind/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheckCircle, faClock, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
-import { Button } from '@material-tailwind/react';
+import { faCheckCircle, faClock } from '@fortawesome/free-solid-svg-icons';
 import { useDistributorOrders } from '../../hooks/useDistributorOrders';
-import { useDistributorCustomers } from '../../hooks/useDistributorCustomers';
+import { useOrderManagement } from '../../hooks/useOrderManagement';
 
 const DistributorEditOrder: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { dispatch: errorDispatch } = useError();
-  const shouldSaveOnUnmount = useRef(true);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isBackLoading, setIsBackLoading] = useState(false);
   const [orderLoaded, setOrderLoaded] = useState(false);
   
   const {
-    orders,
     currentOrder,
-    getOrderById,
-    updateOrder,
-    confirmOrder
+    getOrderById
   } = useDistributorOrders();
 
-  const {
-    updateCustomer,
-    updateCustomerLocation
-  } = useDistributorCustomers();
-
-  const [order, setOrder] = useState<OrderList>({
+  // Default order state for initialization
+  const [defaultOrder] = useState<OrderList>({
     id: 0,
     orderNumber: '',
     customer: {
@@ -62,7 +48,21 @@ const DistributorEditOrder: React.FC = () => {
     createdAt: new Date().toISOString(),
     confirmedAt: new Date().toISOString()
   });
-  const [originalOrder, setOriginalOrder] = useState<OrderList | null>(null);
+
+  // Use the order management hook with loaded order or default
+  const {
+    order,
+    setOrder,
+    setOriginalOrder,
+    isSubmitting,
+    isBackLoading,
+    handleSubmit,
+    handleBack,
+    buttonTitle
+  } = useOrderManagement({ 
+    initialOrder: currentOrder || defaultOrder, 
+    isEdit: true 
+  });
 
   // Memoize the order loading function to prevent infinite loops
   const loadOrder = useCallback(async (orderId: number) => {
@@ -121,164 +121,7 @@ const DistributorEditOrder: React.FC = () => {
       setOriginalOrder(fullOrderData);
       setIsLoading(false);
     }
-  }, [currentOrder, orderLoaded]);
-
-  const handleBack = useCallback(async () => {
-    if (!order || !originalOrder) return;
-
-    setIsBackLoading(true);
-    try {
-      // Check if there are any changes to the customer (including new locations)
-      const hasCustomerChanges = JSON.stringify({
-        name: order.customer.name,
-        phone: order.customer.phone,
-        locations: order.customer.locations
-      }) !== JSON.stringify({
-        name: originalOrder.customer.name,
-        phone: originalOrder.customer.phone,
-        locations: originalOrder.customer.locations
-      });
-
-      // Check if there are any changes to the order
-      const hasOrderChanges = JSON.stringify({
-        cost: order.cost,
-        status: order.status,
-        distributor: order.distributor,
-        locationId: order.location?.id
-      }) !== JSON.stringify({
-        cost: originalOrder.cost,
-        status: originalOrder.status,
-        distributor: originalOrder.distributor,
-        locationId: originalOrder.location?.id
-      });
-
-      let finalLocationId = order.location?.id;
-      
-      // Update customer first if there are changes (especially new locations)
-      if (hasCustomerChanges) {
-        try {
-          const result = await updateCustomer({
-            id: order.customer.id,
-            name: order.customer.name,
-            phone: order.customer.phone,
-            locations: order.customer.locations
-          });
-          const updatedCustomer = result.payload as Customer;
-          
-          if (updatedCustomer) {
-            // Find the correct location from the updated customer
-            // This handles the case where new locations get assigned real IDs by the backend
-            const selectedLocation = updatedCustomer.locations.find(
-              (l) => {
-                // For new locations (originally ID 0), match by name and coordinates
-                if (order.location?.id === 0) {
-                  return l.name === order.location.name && 
-                         (!order.location.coordinates || l.coordinates === order.location.coordinates);
-                }
-                // For existing locations, match by ID
-                return l.id === order.location?.id;
-              }
-            );
-            
-            if (selectedLocation) {
-              finalLocationId = selectedLocation.id;
-            }
-          }
-        } catch (error) {
-          console.error('Error updating customer:', error);
-          // Don't fail the whole operation if customer update fails
-        }
-      }
-
-      // Update order if there are changes OR if the location ID was updated from customer changes
-      if (hasOrderChanges || finalLocationId !== order.location?.id) {
-        const orderRequest: OrderRequest = {
-          id: order.id, // Include ID for the update URL
-          customerId: parseInt(order.customer.id),
-          locationId: finalLocationId,
-          cost: order.cost,
-          statusString: order.status as 'New' | 'Pending' | 'Confirmed' | 'Draft'
-        };
-        await updateOrder(orderRequest);
-      }
-
-      navigate('/distributor/orders');
-    } catch (error) {
-      console.error('Error handling back navigation:', error);
-      errorDispatch({ type: 'SET_ERROR', payload: 'حدث خطأ أثناء حفظ التغييرات' });
-    } finally {
-      setIsBackLoading(false);
-    }
-  }, [order, originalOrder, updateCustomer, updateOrder, navigate, errorDispatch]);
-
-  const handleSubmit = useCallback(async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!order || order.status === 'Confirmed') {
-      navigate('/distributor/orders');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      // Check if all required fields are filled
-      const hasCustomerName = order.customer?.name?.trim();
-      const hasCustomerPhone = order.customer?.phone?.trim();
-      const hasLocation = order.location?.name?.trim();
-      const hasPrice = order.cost > 0;
-
-      const allRequiredFieldsFilled = hasCustomerName && hasCustomerPhone && hasLocation && hasPrice;
-
-      // Determine the appropriate status and action
-      let targetStatus: 'New' | 'Draft' = allRequiredFieldsFilled ? 'New' : 'Draft';
-      let shouldConfirm = allRequiredFieldsFilled && order.status !== 'Confirmed';
-
-      const orderRequest: OrderRequest = {
-        id: order.id, // Include ID for the update URL
-        customerId: parseInt(order.customer.id),
-        locationId: order.location?.id,
-        cost: order.cost,
-        statusString: targetStatus
-      };
-
-      // Update the order first
-      await updateOrder(orderRequest);
-
-      // If all fields are filled, confirm the order
-      if (shouldConfirm) {
-        await confirmOrder(order.id);
-      }
-
-      shouldSaveOnUnmount.current = false;
-      navigate('/distributor/orders');
-    } catch (error) {
-      console.error('Error saving order:', error);
-      errorDispatch({ type: 'SET_ERROR', payload: 'حدث خطأ أثناء حفظ الطلب' });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [order, updateOrder, confirmOrder, navigate, errorDispatch]);
-
-  const handleSetOrder = useCallback((newOrder: React.SetStateAction<OrderList>) => {
-    setOrder(newOrder);
-  }, []);
-
-  // Calculate dynamic button title based on required fields
-  const getButtonTitle = useMemo(() => {
-    if (!order) return 'حفظ التغييرات';
-    
-    const hasCustomerName = order.customer?.name?.trim();
-    const hasCustomerPhone = order.customer?.phone?.trim();
-    const hasLocation = order.location?.name?.trim();
-    const hasPrice = order.cost > 0;
-
-    const allRequiredFieldsFilled = hasCustomerName && hasCustomerPhone && hasLocation && hasPrice;
-    
-    if (order.status === 'Confirmed') {
-      return 'حفظ التغييرات';
-    }
-    
-    return allRequiredFieldsFilled ? 'تأكيد الطلب' : 'حفظ كمسودة';
-  }, [order]);
+  }, [currentOrder, orderLoaded, setOrder, setOriginalOrder]);
 
   if (isLoading) {
     return (
@@ -333,10 +176,10 @@ const DistributorEditOrder: React.FC = () => {
           <div className="p-6 sm:p-8">
             <DistributorOrderForm
               order={order}
-              setOrder={handleSetOrder}
+              setOrder={setOrder}
               onSubmit={handleSubmit}
               onBack={handleBack}
-              title={getButtonTitle}
+              title={buttonTitle}
               isEdit={true}
               isSubmitting={isSubmitting}
               isBackLoading={isBackLoading}

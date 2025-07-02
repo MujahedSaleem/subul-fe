@@ -1,36 +1,14 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React from 'react';
 import Layout from '../../components/Layout';
 import DistributorOrderForm from '../../components/distributor/DistributorOrderForm';
-import type { OrderList, OrderRequest, DistributorInfo } from '../../types/order';
-import { useError } from '../../context/ErrorContext';
+import type { OrderList, DistributorInfo } from '../../types/order';
 import { Customer, Location } from '../../types/customer';
-import { useDistributorCustomers } from '../../hooks/useDistributorCustomers';
-import { useDistributorOrders } from '../../hooks/useDistributorOrders';
-
-const generateOrderNumber = () => {
-  const now = new Date();
-  const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
-  return `ORD${timestamp}`;
-};
+import { useOrderManagement } from '../../hooks/useOrderManagement';
+import { generateOrderNumber } from '../../utils/distributorUtils';
 
 const DistributorAddOrder: React.FC = () => {
-  const navigate = useNavigate();
-  const { dispatch } = useError();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isBackLoading, setIsBackLoading] = useState(false);
-
-  const {
-    addCustomer,
-    updateCustomer
-  } = useDistributorCustomers();
-
-  const {
-    addOrder,
-    confirmOrder
-  } = useDistributorOrders();
-
-  const [order, setOrder] = useState<OrderList>({
+  // Create initial order state
+  const initialOrder: OrderList = {
     id: 0,
     orderNumber: generateOrderNumber(),
     customer: null as unknown as Customer,
@@ -40,181 +18,18 @@ const DistributorAddOrder: React.FC = () => {
     distributor: null as unknown as DistributorInfo,
     createdAt: new Date().toISOString(),
     confirmedAt: null as unknown as string
-  });
-
-  const handleBack = async (customer?: Customer) => {
-    if (!customer) {
-      navigate('/distributor/orders');
-      return;
-    }
-
-    setIsBackLoading(true);
-    try {
-      let newCustomer = null;
-      if (!customer.id) {
-        const result = await addCustomer(customer);
-        newCustomer = result.payload as Customer;
-      } else {
-        const result = await updateCustomer(customer);
-        newCustomer = result.payload as Customer;
-      }
-      
-      if (newCustomer) {
-        // Find the correct location from the updated customer
-        let selectedLocation = null;
-        const orderLocation = order.location;
-        
-        if (orderLocation) {
-          // For new locations (originally ID 0), match by name and coordinates
-          // For existing locations, match by ID
-          selectedLocation = newCustomer.locations.find(l => {
-            if (orderLocation.id === 0) {
-              // New location - match by name (and coordinates if available)
-              return l.name === orderLocation.name && 
-                     (!orderLocation.coordinates || l.coordinates === orderLocation.coordinates);
-            } else {
-              // Existing location - match by ID
-              return l.id === orderLocation.id;
-            }
-          });
-        }
-        
-        // Fallback to first location if no match found
-        if (!selectedLocation && newCustomer.locations.length > 0) {
-          selectedLocation = newCustomer.locations[newCustomer.locations.length - 1]; // Use the last (likely newest) location
-        }
-
-        await addOrder({ 
-          customerId: parseInt(newCustomer.id),
-          locationId: selectedLocation?.id,
-          cost: order.cost,
-          statusString: 'Draft' as const
-        });
-      }
-    } catch (error) {
-      console.error('Failed to save order as draft:', error);
-      dispatch({
-        type: 'SET_ERROR',
-        payload: 'فشل حفظ الطلب كمسودة، الرجاء المحاولة لاحقًا.',
-      });
-    } finally {
-      setIsBackLoading(false);
-      navigate('/distributor/orders');
-    }
   };
 
-  const handleSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-
-    setIsSubmitting(true);
-    let errorMessage = null;
-
-    try {
-      // Basic validation - only require customer with phone number
-      if (!order.customer || !order.customer.phone?.trim()) {
-        dispatch({
-          type: 'SET_ERROR',
-          payload: errorMessage || 'يرجى إدخال رقم الهاتف على الأقل.',
-        });
-        return;
-      }
-
-      // Check if all required fields are filled for smart logic
-      const hasCustomerName = order.customer?.name?.trim();
-      const hasCustomerPhone = order.customer?.phone?.trim();
-      const hasLocation = order.location?.name?.trim();
-      const hasPrice = order.cost > 0;
-
-      const allRequiredFieldsFilled = hasCustomerName && hasCustomerPhone && hasLocation && hasPrice;
-
-      let newCustomer = null;
-      if (!order.customer?.id) {
-        const result = await addCustomer(order.customer);
-        newCustomer = result.payload as Customer;
-      } else {
-        const result = await updateCustomer(order.customer);
-        newCustomer = result.payload as Customer;
-      }
-
-      if (newCustomer) {
-        // Find the correct location from the updated customer
-        let selectedLocation = null;
-        const orderLocation = order.location;
-        
-        if (orderLocation) {
-          // For new locations (originally ID 0), match by name and coordinates
-          // For existing locations, match by ID
-          selectedLocation = newCustomer.locations.find(l => {
-            if (orderLocation.id === 0) {
-              // New location - match by name (and coordinates if available)
-              return l.name === orderLocation.name && 
-                     (!orderLocation.coordinates || l.coordinates === orderLocation.coordinates);
-            } else {
-              // Existing location - match by ID
-              return l.id === orderLocation.id;
-            }
-          });
-        }
-        
-        // Fallback to last location if no match found
-        if (!selectedLocation && newCustomer.locations.length > 0) {
-          selectedLocation = newCustomer.locations[newCustomer.locations.length - 1]; // Use the last (likely newest) location
-        }
-
-        // Determine the appropriate status based on field completion
-        const targetStatus: 'New' | 'Draft' = allRequiredFieldsFilled ? 'New' : 'Draft';
-        const shouldConfirm = allRequiredFieldsFilled;
-        
-        const orderRequest: OrderRequest = {
-          customerId: parseInt(newCustomer.id),
-          locationId: selectedLocation?.id,
-          cost: order.cost,
-          statusString: targetStatus
-        };
-
-        const orderResult = await addOrder(orderRequest);
-        const newOrder = orderResult.payload as OrderList;
-        
-        // Only confirm if all required fields are filled
-        if (newOrder && shouldConfirm) {
-          await confirmOrder(newOrder.id);
-        }
-      }
-
-      // Navigate to the orders page after successful submission
-      navigate('/distributor/orders');
-    } catch (exception: any) {
-      // Handle errors from the backend
-      if (exception.response?.status === 400) {
-        const { error } = exception.response.data;
-        errorMessage = error || "حدث خطأ غير متوقع، الرجاء المحاولة لاحقًا.";
-      } else {
-        errorMessage = "فشل الاتصال بالخادم، الرجاء التحقق من الإنترنت.";
-      }
-
-      // Dispatch the error globally
-      dispatch({
-        type: 'SET_ERROR',
-        payload: errorMessage || 'حدث خطأ أثناء العملية.',
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Calculate dynamic button title based on required fields
-  const getButtonTitle = useMemo(() => {
-    if (!order) return 'تأكيد الطلبية';
-    
-    const hasCustomerName = order.customer?.name?.trim();
-    const hasCustomerPhone = order.customer?.phone?.trim();
-    const hasLocation = order.location?.name?.trim();
-    const hasPrice = order.cost > 0;
-
-    const allRequiredFieldsFilled = hasCustomerName && hasCustomerPhone && hasLocation && hasPrice;
-    
-    return allRequiredFieldsFilled ? 'تأكيد الطلب' : 'حفظ كمسودة';
-  }, [order]);
+  // Use the common order management hook
+  const {
+    order,
+    setOrder,
+    isSubmitting,
+    isBackLoading,
+    handleSubmit,
+    handleBack,
+    buttonTitle
+  } = useOrderManagement({ initialOrder, isEdit: false });
 
   return (
     <Layout title="إضافة طلبية">
@@ -258,7 +73,7 @@ const DistributorAddOrder: React.FC = () => {
               setOrder={setOrder}
               onSubmit={handleSubmit}
               onBack={handleBack}
-              title={getButtonTitle}
+              title={buttonTitle}
               isEdit={false}
               isSubmitting={isSubmitting}
               isBackLoading={isBackLoading}

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { faPlus, faCheckDouble, faRightFromBracket } from '@fortawesome/free-solid-svg-icons';
 import { Card, CardBody, CardHeader, Typography } from '@material-tailwind/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPhone, faLocationDot, faCircleCheck, faTrash, faPenToSquare, faEye, faUser, faCalendar, faMoneyBill, faCheckCircle, faHourglassHalf, faPencil } from '@fortawesome/free-solid-svg-icons';
+import { faPhone, faLocationDot, faTrash, faPenToSquare, faEye, faUser, faCalendar, faMoneyBill, faCheckCircle, faHourglassHalf, faCircleCheck, faPencil } from '@fortawesome/free-solid-svg-icons';
 import { faWhatsapp } from '@fortawesome/free-brands-svg-icons';
 import CallModal from '../../components/admin/shared/CallModal';
 import { useError } from '../../context/ErrorContext';
@@ -15,6 +15,7 @@ import IconButton from '../../components/IconButton';
 import { OrderList } from '../../types/order';
 import { Customer, Location } from '../../types/customer';
 import axiosInstance from '../../utils/axiosInstance';
+import { getOrderStatusConfig, formatCurrency, handleDirectCall, handleOpenLocation } from '../../utils/distributorUtils';
 
 const DistributorListOrder: React.FC = () => {
   const navigate = useNavigate();
@@ -74,18 +75,6 @@ const DistributorListOrder: React.FC = () => {
     setIsCallModalOpen(true);
   };
 
-  const handleDirectCall = (phone: string) => {
-    const cleaned = phone?.replace(/\D/g, '');
-    const withoutLeadingZeros = cleaned?.replace(/^0+/, '');
-    window.location.href = `tel:${withoutLeadingZeros}`;
-  };
-
-  const handleOpenLocation = (location: Location) => {
-    if (location.coordinates) {
-      window.open(`https://www.google.com/maps/search/?api=1&query=${location.coordinates}`, '_blank');
-      }
-  };
-
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -124,50 +113,6 @@ const DistributorListOrder: React.FC = () => {
       });
       setIsClosingShift(false);
     }
-  };
-
-  const getStatusConfig = (status: string) => {
-    switch (status) {
-      case 'Confirmed':
-        return {
-          icon: faCheckCircle,
-          color: 'text-green-600',
-          bgColor: 'bg-green-50',
-          label: 'تم التأكيد'
-        };
-      case 'Pending':
-        return {
-          icon: faHourglassHalf,
-          color: 'text-yellow-600',
-          bgColor: 'bg-yellow-50',
-          label: 'قيد الانتظار'
-        };
-      case 'New':
-        return {
-          icon: faCircleCheck,
-          color: 'text-blue-600',
-          bgColor: 'bg-blue-50',
-          label: 'جديد'
-        };
-      case 'Draft':
-        return {
-          icon: faPencil,
-          color: 'text-gray-600',
-          bgColor: 'bg-gray-50',
-          label: 'مسودة'
-        };
-      default:
-        return {
-          icon: faCircleCheck,
-          color: 'text-gray-600',
-          bgColor: 'bg-gray-50',
-          label: status
-        };
-    }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return amount.toLocaleString('en-US', { style: 'currency', currency: 'ILS' });
   };
 
   return (
@@ -265,7 +210,7 @@ const DistributorListOrder: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {orders && orders.length > 0 ? (
                   orders.map((order) => {
-                    const statusConfig = getStatusConfig(order.status);
+                    const statusConfig = getOrderStatusConfig(order.status);
                     
                     return (
                       <Card

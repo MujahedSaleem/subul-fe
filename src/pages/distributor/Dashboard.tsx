@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBox, faCircleCheck, faTriangleExclamation, faEye, faPhone, faPlus, faBell } from '@fortawesome/free-solid-svg-icons';
 import { useDistributorOrders } from '../../hooks/useDistributorOrders';
 import { useNavigate } from 'react-router-dom';
+import { handleDirectCall } from '../../utils/distributorUtils';
 
 const DistributorDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -213,13 +214,13 @@ const DistributorDashboard: React.FC = () => {
                         <FontAwesomeIcon icon={faEye} className="h-4 w-4" />
                       </button>
                       {order.phone && (
-                        <a
-                          href={`tel:${order.phone}`}
+                        <button
+                          onClick={() => handleDirectCall(order.phone)}
                           className="p-2 bg-green-100 text-green-600 rounded-lg hover:bg-green-200 transition-colors duration-150 touch-manipulation active:scale-95"
                           aria-label="اتصال"
                         >
                           <FontAwesomeIcon icon={faPhone} className="h-4 w-4" />
-                        </a>
+                        </button>
                       )}
                     </div>
                   </div>
