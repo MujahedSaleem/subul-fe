@@ -53,20 +53,27 @@ export const formatCurrency = (amount: number): string => {
 };
 
 /**
- * Clean phone number for direct calling
+ * Clean phone number for direct calling and add country code
  */
 export const cleanPhoneNumber = (phone: string): string => {
   const cleaned = phone?.replace(/\D/g, '');
-  return cleaned?.replace(/^0+/, '');
+  const withoutLeadingZeros = cleaned?.replace(/^0+/, '');
+  
+  // Add Israel country code (+972) if not already present
+  if (withoutLeadingZeros && !withoutLeadingZeros.startsWith('972')) {
+    return `972${withoutLeadingZeros}`;
+  }
+  
+  return withoutLeadingZeros;
 };
 
 /**
- * Handle direct phone call
+ * Handle direct phone call with country code
  */
 export const handleDirectCall = (phone: string): void => {
   const cleanedPhone = cleanPhoneNumber(phone);
   if (cleanedPhone) {
-    window.location.href = `tel:${cleanedPhone}`;
+    window.location.href = `tel:+${cleanedPhone}`;
   }
 };
 
