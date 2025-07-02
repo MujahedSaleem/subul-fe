@@ -134,7 +134,8 @@ const EditOrder: React.FC = () => {
       // Update customer first if there are changes
       if (hasCustomerChanges) {
         const updateRequest = transformCustomerForUpdate(order.customer);
-        const updatedCustomer = await customersStore.updateCustomerWithFormat(order.customer.id, updateRequest);
+        const result = await updateCustomerWithFormat(order.customer.id, updateRequest);
+        const updatedCustomer = result.payload as Customer;
         
         if (updatedCustomer) {
           // Find the correct location from the updated customer
@@ -161,7 +162,7 @@ const EditOrder: React.FC = () => {
         const orderRequest: OrderRequest = {
           id: order.id,
           orderNumber: order.orderNumber,
-          customerId: order.customer.id,
+          customerId: parseInt(order.customer.id),
           locationId: finalLocationId,
           cost: order.cost,
           distributorId: order.distributor?.id,
@@ -191,7 +192,8 @@ const EditOrder: React.FC = () => {
     setIsSubmitLoading(true);
     try {
       const updateRequest = transformCustomerForUpdate(order.customer);
-      const updatedCustomer = await customersStore.updateCustomerWithFormat(order.customer.id, updateRequest);
+      const result = await updateCustomerWithFormat(order.customer.id, updateRequest);
+      const updatedCustomer = result.payload as Customer;
       
       if (updatedCustomer) {
         // Find the correct location from the updated customer
@@ -210,7 +212,7 @@ const EditOrder: React.FC = () => {
         const confirmedOrder = {
           id: order.id,
           orderNumber: order.orderNumber,
-          customerId: updatedCustomer.id,
+          customerId: parseInt(updatedCustomer.id),
           locationId: selectedLocation?.id,
           cost: order.cost,
           distributorId: order.distributor.id,
@@ -218,7 +220,9 @@ const EditOrder: React.FC = () => {
         } as OrderRequest;
 
         await dispatch(updateOrder(confirmedOrder)).unwrap();
-        await dispatch(confirmOrder(confirmedOrder.id)).unwrap();
+        if (confirmedOrder.id) {
+          await dispatch(confirmOrder(confirmedOrder.id)).unwrap();
+        }
         shouldSaveOnUnmount.current = false;
         navigate('/admin/orders');
       }

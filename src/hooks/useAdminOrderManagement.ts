@@ -1,10 +1,12 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import { useError } from '../context/ErrorContext';
-import { useDistributorCustomers } from './useDistributorCustomers';
-import { useDistributorOrders } from './useDistributorOrders';
+import { useCustomers } from './useCustomers';
 import { Customer, Location } from '../types/customer';
 import { OrderList, OrderRequest } from '../types/order';
+import { addOrder, updateOrder, confirmOrder } from '../store/slices/orderSlice';
+import type { AppDispatch } from '../store/store';
 import { 
   areAllRequiredFieldsFilled, 
   getOrderButtonTitle, 
@@ -13,13 +15,14 @@ import {
   getFallbackLocation 
 } from '../utils/distributorUtils';
 
-interface UseOrderManagementProps {
+interface UseAdminOrderManagementProps {
   initialOrder: OrderList;
   isEdit?: boolean;
 }
 
-export const useOrderManagement = ({ initialOrder, isEdit = false }: UseOrderManagementProps) => {
+export const useAdminOrderManagement = ({ initialOrder, isEdit = false }: UseAdminOrderManagementProps) => {
   const navigate = useNavigate();
+  const reduxDispatch = useDispatch<AppDispatch>();
   const { dispatch } = useError();
   
   const [order, setOrder] = useState<OrderList>(initialOrder);
@@ -27,14 +30,22 @@ export const useOrderManagement = ({ initialOrder, isEdit = false }: UseOrderMan
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBackLoading, setIsBackLoading] = useState(false);
 
-  const { addCustomer, updateCustomer } = useDistributorCustomers();
-  const { addOrder, updateOrder, confirmOrder } = useDistributorOrders();
+  const { addCustomer, updateCustomer } = useCustomers();
 
   /**
-   * Process customer and location updates
+   * Check if admin order has all required fields (including distributor)
+   */
+  const areAllAdminFieldsFilled = useCallback((orderData: OrderList): boolean => {
+    const baseFieldsFilled = areAllRequiredFieldsFilled(orderData);
+    const hasDistributor = orderData.distributor?.id;
+    return baseFieldsFilled && !!hasDistributor;
+  }, []);
+
+  /**
+   * Process customer and location updates for admin
    */
   const processCustomerAndLocation = useCallback(async (orderData: OrderList): Promise<{
-    customerId: number;
+    customerId: string;
     locationId?: number;
   }> => {
     // Deduplicate locations to prevent duplicate entries
@@ -69,12 +80,24 @@ export const useOrderManagement = ({ initialOrder, isEdit = false }: UseOrderMan
     // Handle customer creation/update
     let newCustomer: Customer;
     const customerId = orderData.customer?.id;
+    
+    // Debug logging
+    console.log('processCustomerAndLocation - Customer data:', {
+      customerId,
+      customerIdType: typeof customerId,
+      customerIdStringified: JSON.stringify(customerId),
+      customer: orderData.customer
+    });
+    
     const shouldCreateNewCustomer = !customerId || 
                                    customerId === '' || 
                                    customerId === 'undefined' || 
                                    customerId === 'null' ||
                                    customerId === null ||
-                                   customerId === undefined;
+                                   customerId === undefined ||
+                                   String(customerId) === '0';
+    
+    console.log('Should create new customer:', shouldCreateNewCustomer);
     
     if (shouldCreateNewCustomer) {
       // Remove any invalid ID before creating
@@ -82,9 +105,11 @@ export const useOrderManagement = ({ initialOrder, isEdit = false }: UseOrderMan
         ...cleanCustomerData,
         id: undefined
       };
+      console.log('Creating new customer with data:', customerDataForCreation);
       const result = await addCustomer(customerDataForCreation);
       newCustomer = result.payload as Customer;
     } else {
+      console.log('Updating existing customer with data:', cleanCustomerData);
       const result = await updateCustomer(cleanCustomerData);
       newCustomer = result.payload as Customer;
     }
@@ -105,7 +130,7 @@ export const useOrderManagement = ({ initialOrder, isEdit = false }: UseOrderMan
     }
 
     return {
-      customerId: parseInt(newCustomer.id),
+      customerId: newCustomer.id,
       locationId: selectedLocation?.id
     };
   }, [addCustomer, updateCustomer]);
@@ -120,7 +145,7 @@ export const useOrderManagement = ({ initialOrder, isEdit = false }: UseOrderMan
     let errorMessage: string | null = null;
 
     try {
-      // Basic validation - only require customer with phone number
+      // Admin validation - require all fields including distributor
       if (!order.customer || !order.customer.phone?.trim()) {
         dispatch({
           type: 'SET_ERROR',
@@ -129,47 +154,56 @@ export const useOrderManagement = ({ initialOrder, isEdit = false }: UseOrderMan
         return;
       }
 
+      if (!order.distributor?.id) {
+        dispatch({
+          type: 'SET_ERROR',
+          payload: 'يرجى اختيار الموزع.',
+        });
+        return;
+      }
+
       // For edit mode, check if order is already confirmed
       if (isEdit && order.status === 'Confirmed') {
-        navigate('/distributor/orders');
+        navigate('/admin/orders');
         return;
       }
 
       const { customerId, locationId } = await processCustomerAndLocation(order);
 
       // Determine the appropriate status and action
-      const targetStatus = getTargetOrderStatus(order);
-      const shouldConfirm = areAllRequiredFieldsFilled(order) && order.status !== 'Confirmed';
+      const targetStatus = areAllAdminFieldsFilled(order) ? 'New' : 'Draft';
+      const shouldConfirm = areAllAdminFieldsFilled(order) && order.status !== 'Confirmed';
 
       const orderRequest: OrderRequest = {
-        ...(isEdit && { id: order.id }), // Include ID for updates
-        customerId,
+        ...(isEdit && order.id > 0 && { id: order.id }), // Only include ID for actual updates
+        orderNumber: order.orderNumber,
+        customerId: parseInt(customerId),
         locationId,
         cost: order.cost,
+        distributorId: order.distributor.id,
         statusString: targetStatus
       };
 
       if (isEdit) {
         // Update existing order
-        await updateOrder(orderRequest);
+        await reduxDispatch(updateOrder(orderRequest)).unwrap();
         
         // Confirm if all fields are filled
         if (shouldConfirm) {
-          await confirmOrder(order.id);
+          await reduxDispatch(confirmOrder(order.id)).unwrap();
         }
       } else {
         // Create new order
-        const orderResult = await addOrder(orderRequest);
-        const newOrder = orderResult.payload as OrderList;
+        const orderResult = await reduxDispatch(addOrder(orderRequest)).unwrap();
         
         // Only confirm if all required fields are filled
-        if (newOrder && shouldConfirm) {
-          await confirmOrder(newOrder.id);
+        if (orderResult && shouldConfirm) {
+          await reduxDispatch(confirmOrder(orderResult.id)).unwrap();
         }
       }
 
       // Navigate to the orders page after successful submission
-      navigate('/distributor/orders');
+      navigate('/admin/orders');
     } catch (exception: any) {
       // Handle errors from the backend
       if (exception.response?.status === 400) {
@@ -187,14 +221,14 @@ export const useOrderManagement = ({ initialOrder, isEdit = false }: UseOrderMan
     } finally {
       setIsSubmitting(false);
     }
-  }, [order, isEdit, processCustomerAndLocation, addOrder, updateOrder, confirmOrder, navigate, dispatch]);
+  }, [order, isEdit, processCustomerAndLocation, reduxDispatch, navigate, dispatch, areAllAdminFieldsFilled]);
 
   /**
    * Handle back navigation with draft saving
    */
   const handleBack = useCallback(async (customer?: Customer) => {
     if (!customer && !isEdit) {
-      navigate('/distributor/orders');
+      navigate('/admin/orders');
       return;
     }
 
@@ -215,47 +249,49 @@ export const useOrderManagement = ({ initialOrder, isEdit = false }: UseOrderMan
         const hasOrderChanges = JSON.stringify({
           cost: order.cost,
           status: order.status,
+          distributor: order.distributor,
           locationId: order.location?.id
         }) !== JSON.stringify({
           cost: originalOrder.cost,
           status: originalOrder.status,
+          distributor: originalOrder.distributor,
           locationId: originalOrder.location?.id
         });
 
         let finalLocationId = order.location?.id;
         
-                 // Update customer first if there are changes
-         if (hasCustomerChanges) {
-           try {
-             // Deduplicate locations before updating
-             const deduplicateLocations = (locations: Location[]): Location[] => {
-               if (!locations || locations.length === 0) return [];
-               
-               const seen = new Set<string>();
-               return locations.filter(location => {
-                 // Normalize values for comparison
-                 const name = (location.name || '').trim().toLowerCase();
-                 const coordinates = (location.coordinates || '').trim();
-                 const address = (location.address || '').trim();
-                 
-                 // Create a unique key - if name is the same and coordinates/address are both empty or same, consider it duplicate
-                 const key = `${name}-${coordinates}-${address}`;
-                 
-                 if (seen.has(key)) {
-                   console.log('Duplicate location detected and removed in handleBack:', location);
-                   return false;
-                 }
-                 seen.add(key);
-                 return true;
-               });
-             };
+        // Update customer first if there are changes
+        if (hasCustomerChanges) {
+          try {
+            // Deduplicate locations before updating
+            const deduplicateLocations = (locations: Location[]): Location[] => {
+              if (!locations || locations.length === 0) return [];
+              
+              const seen = new Set<string>();
+              return locations.filter(location => {
+                // Normalize values for comparison
+                const name = (location.name || '').trim().toLowerCase();
+                const coordinates = (location.coordinates || '').trim();
+                const address = (location.address || '').trim();
+                
+                // Create a unique key - if name is the same and coordinates/address are both empty or same, consider it duplicate
+                const key = `${name}-${coordinates}-${address}`;
+                
+                if (seen.has(key)) {
+                  console.log('Duplicate location detected and removed in handleBack:', location);
+                  return false;
+                }
+                seen.add(key);
+                return true;
+              });
+            };
 
-             const result = await updateCustomer({
-               id: order.customer.id,
-               name: order.customer.name,
-               phone: order.customer.phone,
-               locations: deduplicateLocations(order.customer.locations || [])
-             });
+            const result = await updateCustomer({
+              id: order.customer.id,
+              name: order.customer.name,
+              phone: order.customer.phone,
+              locations: deduplicateLocations(order.customer.locations || [])
+            });
             const updatedCustomer = result.payload as Customer;
             
             if (updatedCustomer && order.location) {
@@ -273,23 +309,29 @@ export const useOrderManagement = ({ initialOrder, isEdit = false }: UseOrderMan
         if (hasOrderChanges || finalLocationId !== order.location?.id) {
           const orderRequest: OrderRequest = {
             id: order.id,
+            orderNumber: order.orderNumber,
             customerId: parseInt(order.customer.id),
             locationId: finalLocationId,
             cost: order.cost,
+            distributorId: order.distributor?.id,
             statusString: order.status as 'New' | 'Pending' | 'Confirmed' | 'Draft'
           };
-          await updateOrder(orderRequest);
+          await reduxDispatch(updateOrder(orderRequest)).unwrap();
         }
       } else if (!isEdit && customer) {
         // Handle add mode back navigation (save as draft)
         const { customerId, locationId } = await processCustomerAndLocation(order);
 
-        await addOrder({ 
-          customerId,
+        const orderRequest: OrderRequest = {
+          orderNumber: order.orderNumber,
+          customerId: parseInt(customerId),
           locationId,
           cost: order.cost,
+          distributorId: order.distributor?.id,
           statusString: 'Draft' as const
-        });
+        };
+
+        await reduxDispatch(addOrder(orderRequest)).unwrap();
       }
     } catch (error) {
       console.error('Failed to save order as draft:', error);
@@ -299,16 +341,23 @@ export const useOrderManagement = ({ initialOrder, isEdit = false }: UseOrderMan
       });
     } finally {
       setIsBackLoading(false);
-      navigate('/distributor/orders');
+      navigate('/admin/orders');
     }
-  }, [order, originalOrder, isEdit, processCustomerAndLocation, addOrder, updateOrder, updateCustomer, navigate, dispatch]);
+  }, [order, originalOrder, isEdit, processCustomerAndLocation, reduxDispatch, updateCustomer, navigate, dispatch]);
 
   /**
-   * Calculate dynamic button title based on required fields
+   * Calculate dynamic button title based on required fields (including distributor)
    */
   const buttonTitle = useMemo(() => {
-    return getOrderButtonTitle(order, isEdit);
-  }, [order, isEdit]);
+    if (!order) return isEdit ? 'حفظ التغييرات' : 'تأكيد الطلبية';
+    
+    if (isEdit && order.status === 'Confirmed') {
+      return 'حفظ التغييرات';
+    }
+    
+    const allFieldsFilled = areAllAdminFieldsFilled(order);
+    return allFieldsFilled ? 'تأكيد الطلب' : 'حفظ كمسودة';
+  }, [order, isEdit, areAllAdminFieldsFilled]);
 
   return {
     order,
@@ -316,11 +365,14 @@ export const useOrderManagement = ({ initialOrder, isEdit = false }: UseOrderMan
       setOrder(newOrder);
     }, []),
     originalOrder,
-    setOriginalOrder,
+    setOriginalOrder: useCallback((newOriginalOrder: React.SetStateAction<OrderList | null>) => {
+      setOriginalOrder(newOriginalOrder);
+    }, []),
     isSubmitting,
     isBackLoading,
     handleSubmit,
     handleBack,
-    buttonTitle
+    buttonTitle,
+    areAllAdminFieldsFilled
   };
 }; 

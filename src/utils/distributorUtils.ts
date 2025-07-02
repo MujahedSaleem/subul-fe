@@ -102,7 +102,7 @@ export const areAllRequiredFieldsFilled = (order: OrderList): boolean => {
   const hasCustomerName = order.customer?.name?.trim();
   const hasCustomerPhone = order.customer?.phone?.trim();
   const hasLocation = order.location?.name?.trim();
-  const hasPrice = order.cost > 0;
+  const hasPrice = order.cost >= 0;
 
   return !!(hasCustomerName && hasCustomerPhone && hasLocation && hasPrice);
 };
