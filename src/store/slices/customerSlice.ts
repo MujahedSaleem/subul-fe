@@ -9,6 +9,9 @@ interface CustomerState {
   initialized: boolean;
 }
 
+// Request deduplication
+let pendingFetchRequest: Promise<any> | null = null;
+
 const initialState: CustomerState = {
   customers: [],
   loading: false,
@@ -16,13 +19,35 @@ const initialState: CustomerState = {
   initialized: false,
 };
 
-// Async thunks
+// Async thunks with deduplication
 export const fetchCustomers = createAsyncThunk(
   'customers/fetchCustomers',
-  async (_, { rejectWithValue }) => {
+  async (_, { getState, rejectWithValue }) => {
+    const state = getState() as { customers: CustomerState };
+    
+    // Return existing data if already initialized and not forcing refresh
+    if (state.customers.initialized && !state.customers.loading) {
+      return state.customers.customers;
+    }
+    
+    // If there's already a pending request, wait for it
+    if (pendingFetchRequest) {
+      return await pendingFetchRequest;
+    }
+    
     try {
-      const response = await axiosInstance.get<Customer[]>('/customers');
-      return response.data;
+      // Create and store the pending request
+      pendingFetchRequest = axiosInstance.get<Customer[]>('/customers')
+        .then(response => {
+          pendingFetchRequest = null; // Clear when done
+          return response.data;
+        })
+        .catch(error => {
+          pendingFetchRequest = null; // Clear on error too
+          throw error;
+        });
+      
+      return await pendingFetchRequest;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch customers');
     }
