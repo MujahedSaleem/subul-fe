@@ -3,11 +3,11 @@ import CustomerForm from "../../components/CustomerForm";
 import { useCustomers } from "../../hooks/useCustomers";
 import { Customer } from "../../types/customer";
 import Layout from '../../components/Layout';
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 const AddCustomer: React.FC = () => {
   const navigate = useNavigate();
-  const { addCustomer, fetchCustomers } = useCustomers();
+  const { addCustomer } = useCustomers();
   const [customer, setCustomer] = useState<Customer>({
     id: '', // Will be assigned by backend
     name: '',
@@ -15,9 +15,7 @@ const AddCustomer: React.FC = () => {
     locations: [],
   });
 
-  useEffect(() => {
-    fetchCustomers();
-  }, [fetchCustomers]);
+  // No need to fetch customers in add page
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

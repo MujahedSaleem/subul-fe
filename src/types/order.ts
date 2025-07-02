@@ -6,7 +6,7 @@ export interface OrderRequest {
   orderNumber?: string;
   customerId?: number;
   locationId?: number;
-  cost: number;
+  cost: number | undefined;
   statusString: 'New' | 'Pending' | 'Confirmed' | 'Draft';
   distributorId?: string;
 }
@@ -23,7 +23,7 @@ export interface OrderList {
   customer: Customer;
   location: Location;
   distributor: DistributorInfo;
-  cost: number;
+  cost: number | undefined;
   status: string;
   createdAt: string;
   confirmedAt: string;

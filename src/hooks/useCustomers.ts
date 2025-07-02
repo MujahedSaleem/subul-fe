@@ -12,6 +12,7 @@ import {
   findOrCreateCustomer,
   clearError,
   resetState,
+  invalidateCache,
 } from '../store/slices/customerSlice';
 import { Customer, UpdateCustomerRequest } from '../types/customer';
 
@@ -19,8 +20,8 @@ export const useCustomers = () => {
   const dispatch = useAppDispatch();
   const { customers, loading, error, initialized } = useAppSelector((state) => state.customers);
 
-  const fetchCustomersData = useCallback(() => {
-    if (!initialized && !loading) {
+  const fetchCustomersData = useCallback((forceRefresh: boolean = false) => {
+    if (forceRefresh || (!initialized && !loading)) {
       dispatch(fetchCustomers());
     }
   }, [dispatch, initialized, loading]);
@@ -71,6 +72,11 @@ export const useCustomers = () => {
     dispatch(resetState());
   }, [dispatch]);
 
+  const refreshCustomers = useCallback(() => {
+    dispatch(invalidateCache());
+    dispatch(fetchCustomers());
+  }, [dispatch]);
+
   return {
     customers,
     loading,
@@ -87,5 +93,6 @@ export const useCustomers = () => {
     findOrCreateCustomer: findOrCreateCustomerData,
     clearError: clearErrorData,
     resetState: resetStateData,
+    refreshCustomers,
   };
 }; 

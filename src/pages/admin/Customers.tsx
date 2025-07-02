@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import { faPlus, faPenToSquare, faTrash, faSearch, faSpinner, faLocationDot, faPhone } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -10,12 +10,24 @@ import { Card, CardHeader, CardBody, Typography, Input } from '@material-tailwin
 
 const Customers: React.FC = () => {
   const navigate = useNavigate();
-  const { customers, loading, fetchCustomers, deleteCustomer } = useCustomers();
+  const location = useLocation();
+  const { customers, loading, fetchCustomers, deleteCustomer, refreshCustomers } = useCustomers();
   const [searchQuery, setSearchQuery] = useState<string>('');
   
   useEffect(() => {
     fetchCustomers();
-  }, [fetchCustomers]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
+
+  // Refresh data when returning to this page from edit
+  useEffect(() => {
+    // If we're on the customers page and there's state indicating we should refresh
+    if (location.pathname === '/admin/customers' && location.state?.shouldRefresh) {
+      refreshCustomers();
+      // Clear the state to prevent unnecessary refreshes
+      window.history.replaceState({}, document.title);
+    }
+  }, [location, refreshCustomers]);
 
   const handleDelete = async (id: string) => {
     if (window.confirm('هل أنت متأكد من حذف هذا العميل؟')) {
@@ -37,8 +49,8 @@ const Customers: React.FC = () => {
       <Card 
         className="h-full w-full shadow-lg"
         placeholder=""
-        
-        
+        onPointerEnterCapture={undefined}
+        onPointerLeaveCapture={undefined}
       >
         <CardHeader 
           floated={false} 
@@ -48,50 +60,42 @@ const Customers: React.FC = () => {
           
           
         >
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="flex flex-col gap-4">
+            {/* Title Section */}
             <div className="flex flex-col gap-1">
-              <Typography 
-                variant="h4" 
-                color="blue-gray"
-                className="font-bold"
-                placeholder=""
-                
-                
-              >
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
                 العملاء
-              </Typography>
-              <Typography
-                variant="small"
-                color="blue-gray"
-                className="font-normal"
-                placeholder=""
-                
-                
-              >
+              </h1>
+              <p className="text-sm text-gray-600">
                 إدارة العملاء وإضافة عملاء جدد
-              </Typography>
+              </p>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="w-72">
-                <Input
-                  label="بحث عن عميل"
-                  icon={<FontAwesomeIcon icon={faSearch} className="text-slate-400" />}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  crossOrigin={undefined}
-                  placeholder=""
-                  
-                  
-                />
+            
+            {/* Search and Add Button Section */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex-1">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="بحث عن عميل..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-right"
+                  />
+                  <FontAwesomeIcon 
+                    icon={faSearch} 
+                    className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" 
+                  />
+                </div>
               </div>
-              <Button 
-                variant="gradient" 
+              <button 
                 onClick={() => navigate('/admin/customers/add')} 
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+                className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg transition-colors font-medium whitespace-nowrap"
               >
                 <FontAwesomeIcon icon={faPlus} />
-            إضافة عميل
-          </Button>
+                <span className="hidden sm:inline">إضافة عميل</span>
+                <span className="sm:hidden">إضافة</span>
+              </button>
             </div>
           </div>
         </CardHeader>

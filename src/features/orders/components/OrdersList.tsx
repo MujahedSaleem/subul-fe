@@ -49,7 +49,7 @@ const OrdersList: React.FC = () => {
 
   const handleConfirmOrder = (order: OrderList) => {
     if (order.status === 'Confirmed') return;
-    if (!order?.customer?.id || !order.cost) {
+    if (!order?.customer?.id || order.cost === undefined || order.cost === null) {
       alert('لا يمكن تأكيد الطلب. بيانات العميل أو التكلفة غير مكتملة.');
       return;
     }

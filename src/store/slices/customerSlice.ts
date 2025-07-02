@@ -187,6 +187,9 @@ const customerSlice = createSlice({
       state.error = null;
       state.initialized = false;
     },
+    invalidateCache: (state) => {
+      state.initialized = false;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -286,5 +289,5 @@ const customerSlice = createSlice({
   },
 });
 
-export const { clearError, resetState } = customerSlice.actions;
+export const { clearError, resetState, invalidateCache } = customerSlice.actions;
 export default customerSlice.reducer; 

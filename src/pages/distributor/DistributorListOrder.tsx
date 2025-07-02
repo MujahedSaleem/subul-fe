@@ -50,7 +50,7 @@ const DistributorListOrder: React.FC = () => {
       if (order.status === 'Confirmed') {
         return;
       }
-      if (!order?.customer?.id || !order.cost) {
+      if (!order?.customer?.id || order.cost === undefined || order.cost === null) {
         alert('Cannot confirm order. Customer data or cost is incomplete.');
       return;
     }

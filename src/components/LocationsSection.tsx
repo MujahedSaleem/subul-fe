@@ -81,7 +81,6 @@ const LocationsSection: React.FC<LocationsSectionProps> = ({
                     }
                     className="block w-full border border-slate-200 rounded-lg py-2 px-3 focus:ring-primary-500/20 focus:border-primary-500"
                     placeholder="مثال: 31.2357, 30.0444"
-                    required
                   />
                 </div>
 
