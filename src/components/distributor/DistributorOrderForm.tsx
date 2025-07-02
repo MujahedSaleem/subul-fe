@@ -196,7 +196,7 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
           customer={order?.customer}
           isDistributor={true}
         />
-              {!(order?.location?.coordinates)&&(
+              {order?.location?.name && !(order?.location?.coordinates) && (
         <div className="flex items-center gap-1">
                 <p className="text-red-500 text-xs">لا توجد إحداثيات متوفرة لهذا الموقع</p>
                 <IconButton 

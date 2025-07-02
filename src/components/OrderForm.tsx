@@ -183,7 +183,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
         />
       )}
 
-      {order?.location && !order.location.coordinates && (
+      {order?.location && order.location.name && !order.location.coordinates && (
         <div className="flex items-center gap-2 bg-yellow-50 p-3 rounded-lg border border-yellow-100">
           <div className="flex-1">
             <p className="text-yellow-800 text-sm">لا توجد إحداثيات متوفرة لهذا الموقع</p>

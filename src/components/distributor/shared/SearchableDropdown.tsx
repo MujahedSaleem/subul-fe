@@ -25,6 +25,7 @@ interface SearchableDropdownProps {
   value?: string | number;
   onChange: (value: string | number) => void;
   onAddOption?: (newValue: string) => void;
+  onInputChange?: (inputValue: string) => void;
   disabled?: boolean;
   className?: string;
   placeholder?: string;
@@ -36,6 +37,7 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
   value,
   onChange,
   onAddOption,
+  onInputChange,
   disabled = false,
   className = "",
   placeholder = "اختر خيارًا",
@@ -72,9 +74,15 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
   }, [value]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setQuery(e.target.value);
+    const inputValue = e.target.value;
+    setQuery(inputValue);
     setIsOpen(true); // Keep dropdown open while typing
-    setSelectedLabel("")
+    setSelectedLabel("");
+    
+    // Call the external input change handler if provided
+    if (onInputChange) {
+      onInputChange(inputValue);
+    }
   };
 
   const handleSelect = (option: React.ReactElement<OptionProps>) => {

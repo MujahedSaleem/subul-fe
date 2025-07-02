@@ -97,6 +97,55 @@ const LocationSelector = forwardRef<HTMLDivElement, LocationSelectorProps>((
       setNewLocationName(newLocationName);
     };
 
+    const handleInputChange = (inputValue: string) => {
+      // If input is being cleared and we have a current location
+      if (inputValue.trim() === '' && order?.location) {
+        const currentLocation = order.location;
+        
+        // Create empty location object to clear selection
+        const emptyLocation: Location = {
+          id: 0,
+          name: '',
+          coordinates: '',
+          address: '',
+          isActive: true,
+          customerId: customer?.id || ''
+        };
+        
+        // If it's a new location (id = 0), remove it from customer's locations
+        if (currentLocation.id === 0) {
+          setOrder((prev: OrderList | undefined) => {
+            if (!prev || !prev.customer) return prev;
+            
+            const updatedCustomer = {
+              ...prev.customer,
+              locations: prev.customer.locations.filter(loc => 
+                !(loc.id === 0 && loc.name === currentLocation.name)
+              )
+            };
+            
+            return {
+              ...prev,
+              customer: updatedCustomer,
+              location: emptyLocation,
+              locationId: 0
+            };
+          });
+        } else {
+          // If it's an existing location, just clear the selection
+          setOrder((prev: OrderList | undefined) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              location: emptyLocation,
+              locationId: 0
+            };
+          });
+        }
+        setSelectedLocationName('');
+      }
+    };
+
 
     return (
       <div ref={ref} className="flex flex-col">
@@ -107,6 +156,7 @@ const LocationSelector = forwardRef<HTMLDivElement, LocationSelectorProps>((
           value={selectedLocationName}
           onChange={handleLocationSelect}
           onAddOption={!disabled ? handleAddLocation : undefined}
+          onInputChange={!disabled ? handleInputChange : undefined}
           disabled={disabled}
           placeholder="اختر الموقع"
           className="block w-full"
