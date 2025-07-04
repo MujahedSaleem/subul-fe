@@ -26,24 +26,29 @@ export const useDistributorCustomers = () => {
     return dispatch(findCustomerByPhone(phone));
   }, [dispatch]);
 
-  const fetchCustomers = useCallback(() => {
-    return dispatch(fetchDistributorCustomers());
+  const fetchCustomers = useCallback((distributorId: string) => {
+    return dispatch(fetchDistributorCustomers(distributorId));
   }, [dispatch]);
 
-  const addCustomer = useCallback((customer: Partial<DistributorCreateCustomerRequest>) => {
-    return dispatch(addDistributorCustomer(customer));
+  const addCustomer = useCallback((customer: Omit<Customer, 'id'>) => {
+    return dispatch(addDistributorCustomer({ customer }));
   }, [dispatch]);
 
   const updateCustomer = useCallback((customer: Customer) => {
-    return dispatch(updateDistributorCustomer(customer));
+    return dispatch(updateDistributorCustomer({ customer }));
   }, [dispatch]);
 
   const updateCustomerLocation = useCallback((customerId: string, location: Location) => {
-    return dispatch(updateDistributorCustomerLocation({ customerId, location }));
+    const locationData = {
+      name: location.name || '',
+      coordinates: location.coordinates || '',
+      address: location.address || ''
+    };
+    return dispatch(updateDistributorCustomerLocation({ customerId, locationId: location.id, location: locationData }));
   }, [dispatch]);
 
   const getCustomerById = useCallback((customerId: string) => {
-    return dispatch(getDistributorCustomerById(customerId));
+    return dispatch(getDistributorCustomerById({ customerId }));
   }, [dispatch]);
 
   const setSelected = useCallback((customerId: string) => {

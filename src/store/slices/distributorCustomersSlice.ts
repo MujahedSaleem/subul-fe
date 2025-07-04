@@ -101,9 +101,9 @@ export const fetchDistributorCustomers = createAsyncThunk<Customer[], string>(
 );
 
 // Add customer
-export const addDistributorCustomer = createAsyncThunk<Customer, { distributorId: string; customer: Omit<Customer, 'id'> }>(
+export const addDistributorCustomer = createAsyncThunk<Customer, {  customer: Omit<Customer, 'id'> }>(
   'distributorCustomers/addDistributorCustomer',
-  async ({ distributorId, customer }, { rejectWithValue }) => {
+  async ({  customer }, { rejectWithValue }) => {
     try {
       const response = await axiosInstance.post(`/distributors/customers`, customer);
       return extractApiData<Customer>(response.data);
@@ -114,9 +114,9 @@ export const addDistributorCustomer = createAsyncThunk<Customer, { distributorId
 );
 
 // Update customer
-export const updateDistributorCustomer = createAsyncThunk<Customer, { distributorId: string; customer: Customer }>(
+export const updateDistributorCustomer = createAsyncThunk<Customer, {customer: Customer }>(
   'distributorCustomers/updateDistributorCustomer',
-  async ({ distributorId, customer }, { rejectWithValue }) => {
+  async ({  customer }, { rejectWithValue }) => {
     try {
       const response = await axiosInstance.put(`/distributors/customers/${customer.id}`, customer);
       return extractApiData<Customer>(response.data);
@@ -127,9 +127,9 @@ export const updateDistributorCustomer = createAsyncThunk<Customer, { distributo
 );
 
 // Update customer location (disabled due to backend 405 error)
-export const updateDistributorCustomerLocation = createAsyncThunk<Customer, { distributorId: string; customerId: string; locationId: number; location: { name: string; coordinates: string; address: string } }>(
+export const updateDistributorCustomerLocation = createAsyncThunk<Customer, {  customerId: string; locationId: number; location: { name: string; coordinates: string; address: string } }>(
   'distributorCustomers/updateDistributorCustomerLocation',
-  async ({ distributorId, customerId, locationId, location }, { rejectWithValue }) => {
+  async ({  customerId, locationId, location }, { rejectWithValue }) => {
     try {
       const response = await axiosInstance.put(`/distributors/customers/${customerId}/locations/${locationId}`, location);
       return extractApiData<Customer>(response.data);
@@ -140,9 +140,9 @@ export const updateDistributorCustomerLocation = createAsyncThunk<Customer, { di
 );
 
 // Get customer by ID
-export const getDistributorCustomerById = createAsyncThunk<Customer, { distributorId: string; customerId: string }>(
+export const getDistributorCustomerById = createAsyncThunk<Customer, {  customerId: string }>(
   'distributorCustomers/getDistributorCustomerById',
-  async ({ distributorId, customerId }, { getState, rejectWithValue }) => {
+  async ({  customerId }, { getState, rejectWithValue }) => {
     try {
       const state = getState() as { distributorCustomers: DistributorCustomersState };
       

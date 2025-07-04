@@ -192,8 +192,8 @@ const LocationSelector = forwardRef<HTMLDivElement, LocationSelectorProps>((
             className="flex-1"
             autoOpen={autoOpenDropdown && customer?.locations && customer.locations.length > 0}
           >
-            {customer?.locations?.map(location => (
-              <Option key={location.id} value={location.id.toString()}>
+            {customer?.locations?.map((location, index) => (
+              <Option key={location.id === 0 ? `new-location-${index}-${location.name}` : location.id} value={location.id.toString()}>
                 {location.name}
               </Option>
             ))}
