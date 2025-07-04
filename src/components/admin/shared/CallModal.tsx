@@ -3,6 +3,7 @@ import { faXmark, faPhone } from '@fortawesome/free-solid-svg-icons';
 import { faWhatsapp } from '@fortawesome/free-brands-svg-icons';
 import Button from '../../Button';
 import IconButton from '../../IconButton';
+import { handleDirectCall } from '../../../utils/distributorUtils';
 
 interface CallModalProps {
   phone: string;
@@ -28,11 +29,7 @@ const CallModal: React.FC<CallModalProps> = ({ phone, isOpen, onClose, showDialO
     onClose();
   };
 
-  const handleDirectCall = (formattedPhone: string) => {
-    const cleanPhone = formattedPhone.replace('+', '');
-    window.location.href = `tel:${cleanPhone}`;
-    onClose();
-  };
+
 
   return (
     <div className="modal-overlay">
@@ -63,7 +60,7 @@ const CallModal: React.FC<CallModalProps> = ({ phone, isOpen, onClose, showDialO
                   <div className={`flex gap-2 ${showDialOption ? 'flex-row' : 'flex-col'}`}>
                     {showDialOption && (
                       <Button
-                        onClick={() => handleDirectCall(formattedPhone)}
+                        onClick={() => {handleDirectCall(formattedPhone);onClose()}}
                         variant="primary"
                         icon={faPhone}
                         size="md"

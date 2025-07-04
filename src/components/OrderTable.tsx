@@ -9,6 +9,7 @@ import { Customer, Location } from '../types/customer';
 import IconButton from './IconButton';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import CallModal from './admin/shared/CallModal';
+import { handleDirectCall } from '../utils/distributorUtils';
 
 interface OrderTableProps {
   orders: OrderList[];
@@ -73,11 +74,7 @@ const OrderTable: React.FC<OrderTableProps> = ({
     }
   };
 
-  const handleDirectCall = (phone: string) => {
-    const cleaned = phone?.replace(/\D/g, '');
-    const withoutLeadingZeros = cleaned?.replace(/^0+/, '');
-    window.location.href = `tel:${withoutLeadingZeros}`;
-  };
+
 
   const handleWhatsAppCall = (customer: Customer) => {
     if (customer?.phone) {
