@@ -14,6 +14,7 @@ interface EditCustomerProps {
 // Using forwardRef to allow parent components to access methods
 const EditCustomer = forwardRef(({ customerId, onCustomerUpdated, onCloseModal }: EditCustomerProps, ref) => {
   const [customer, setCustomer] = useState<Customer | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const navigate = useNavigate();
   const { dispatch } = useError(); // ✅ Use inside a React component
   const { customers, getCustomerById, updateCustomer, refreshCustomers } = useCustomers();
@@ -28,19 +29,27 @@ const EditCustomer = forwardRef(({ customerId, onCustomerUpdated, onCloseModal }
     fetchCustomer();
   }, [customerId, getCustomerById]);
 
+  // Auto-hide error after 6 seconds
+  useEffect(() => {
+    if (errorMsg) {
+      const timer = setTimeout(() => setErrorMsg(null), 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [errorMsg]);
+
   // Expose methods to parent using ref
   useImperativeHandle(ref, () => ({
     getCustomerData: () => customer,
     saveChanges: async () => {
       if (!customer) return;
-      
-      try {
-        await updateCustomer(customer);
+      setErrorMsg(null);
+      const result = await updateCustomer(customer);
+      if (result.meta.requestStatus === 'fulfilled') {
         onCustomerUpdated(customer); // Notify parent component of the update
         onCloseModal(); // Close modal
         refreshCustomers(); // Refresh the customer list
-      } catch (error) {
-        alert("⚠️ خطأ في تعديل العميل، حاول مجددًا.");
+      } else {
+        setErrorMsg(result.payload as string || '⚠️ خطأ في تعديل العميل، حاول مجددًا.');
       }
     }
   }));
@@ -52,19 +61,32 @@ const EditCustomer = forwardRef(({ customerId, onCustomerUpdated, onCloseModal }
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customer) return;
-    
-    try {
-      await updateCustomer(customer);
+    setErrorMsg(null);
+    const result = await updateCustomer(customer);
+    if (result.meta.requestStatus === 'fulfilled') {
       refreshCustomers(); // Refresh the customer list
       navigate("/admin/customers", { state: { shouldRefresh: true } });
-    } catch (error) {
-      dispatch({ type: "SET_ERROR", payload: "خطأ في تعديل العميل، حاول مجددًا" });
+    } else {
+      setErrorMsg(result.payload as string || '⚠️ خطأ في تعديل العميل، حاول مجددًا.');
     }
   };
 
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-semibold">تعديل بيانات العميل</h2>
+      {errorMsg && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded relative">
+          <button
+            type="button"
+            className="absolute top-1 left-2 text-red-700 hover:text-red-900 text-lg font-bold focus:outline-none"
+            onClick={() => setErrorMsg(null)}
+            aria-label="إغلاق رسالة الخطأ"
+          >
+            ×
+          </button>
+          <div dangerouslySetInnerHTML={{ __html: errorMsg.replace(/\n/g, '<br />') }} />
+        </div>
+      )}
       <CustomerForm
         customer={customer}
         setCustomer={(newCustomer) => {

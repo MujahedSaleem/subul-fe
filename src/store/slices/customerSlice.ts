@@ -11,6 +11,7 @@ interface CustomerState {
 
 // Request deduplication
 let pendingFetchRequest: Promise<any> | null = null;
+const pendingGetByIdRequests = new Map<string, Promise<any>>();
 
 const initialState: CustomerState = {
   customers: [],
@@ -73,7 +74,9 @@ export const updateCustomer = createAsyncThunk(
       const response = await axiosInstance.put<Customer>(`/customers/${customer.id}`, customer);
       return response.data;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to update customer');
+      // Try to extract the most meaningful error message from the backend
+      const backendError = error.response?.data?.error || error.response?.data?.message;
+      return rejectWithValue(backendError || 'Failed to update customer');
     }
   }
 );
@@ -133,8 +136,25 @@ export const getCustomerById = createAsyncThunk(
         return existingCustomer;
       }
 
-      const response = await axiosInstance.get<Customer>(`/customers/${id}`);
-      return response.data;
+      // Check if there's already a pending request for this customer
+      const requestKey = `getCustomerById-${id}`;
+      if (pendingGetByIdRequests.has(requestKey)) {
+        return await pendingGetByIdRequests.get(requestKey);
+      }
+
+      // Create and store the pending request
+      const requestPromise = axiosInstance.get<Customer>(`/customers/${id}`)
+        .then(response => {
+          pendingGetByIdRequests.delete(requestKey); // Clear when done
+          return response.data;
+        })
+        .catch(error => {
+          pendingGetByIdRequests.delete(requestKey); // Clear on error too
+          throw error;
+        });
+
+      pendingGetByIdRequests.set(requestKey, requestPromise);
+      return await requestPromise;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch customer');
     }
