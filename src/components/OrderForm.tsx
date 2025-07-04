@@ -12,8 +12,8 @@ import { useNavigate } from 'react-router-dom';
 import { isValidPhoneNumber } from '../utils/formatters';
 import IconButton from './IconButton';
 import { getCurrentLocation } from '../services/locationService';
-import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { findCustomerByPhone, updateCustomer } from '../store/slices/customerSlice';
+import { useAppDispatch,  } from '../store/hooks';
+import { findCustomerByPhone } from '../store/slices/customerSlice';
 
 interface OrderFormProps {
   order: OrderList;

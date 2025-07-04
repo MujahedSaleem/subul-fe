@@ -99,7 +99,7 @@ const EditOrder: React.FC = () => {
         dispatch(clearCurrentOrder());
         
         // Fetch order via Redux
-        const result = await dispatch(getOrderById(orderId)).unwrap();
+        const result = await dispatch(getOrderById(orderId.toString())).unwrap();
         
         if (result) {
           // Fetch customer data including locations

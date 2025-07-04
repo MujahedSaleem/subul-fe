@@ -32,7 +32,6 @@ const DistributorListOrder: React.FC = () => {
     error,
     fetchOrders,
     confirmOrder,
-    deleteOrder
   } = useDistributorOrders();
 
   useEffect(() => {
@@ -62,13 +61,7 @@ const DistributorListOrder: React.FC = () => {
     }
   };
 
-  const handleDeleteOrder = async (orderId: number) => {
-    try {
-      await deleteOrder(orderId);
-    } catch (error) {
-      console.error('Failed to delete order:', error);
-    }
-  };
+
 
   const handleCallCustomer = (customer: Customer) => {
     setSelectedCustomer(customer);
@@ -246,14 +239,7 @@ const DistributorListOrder: React.FC = () => {
                                     size="md"
                                     title="تعديل الطلب"
                                   />
-                                  <IconButton
-                                    icon={faTrash}
-                                    onClick={() => handleDeleteOrder(order.id)}
-                                    color="red"
-                                    className="hover:bg-red-100"
-                                    size="md"
-                                    title="حذف الطلب"
-                                  />
+                                  
                                 </>
                               )}
                             </div>
