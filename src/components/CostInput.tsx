@@ -17,7 +17,7 @@ const CostInput: React.FC<CostInputProps> = ({ cost, setOrder, disabled }) => {
         type="number"
         id="cost"
         step="0.01"
-        value={cost === 0 ? '0' : cost || ''}
+        value={cost !== undefined ? cost.toString() : ''}
         onChange={(e) => {
           const value = e.target.value;
           if (value === '') {

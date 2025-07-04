@@ -13,7 +13,7 @@ const DistributorAddOrder: React.FC = () => {
     orderNumber: generateOrderNumber(),
     customer: null as unknown as Customer,
     location: null as unknown as Location,
-    cost: 0,
+    cost: undefined,
     status: 'New',
     distributor: null as unknown as DistributorInfo,
     createdAt: new Date().toISOString(),
