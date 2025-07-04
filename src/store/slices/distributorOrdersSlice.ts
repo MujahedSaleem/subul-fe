@@ -222,18 +222,7 @@ const distributorOrdersSlice = createSlice({
         state.isLoading = false;
         state.error = action.payload as string;
       })
-      // Delete order
-      .addCase(deleteDistributorOrder.pending, (state) => {
-        state.isLoading = true;
-        state.error = null;
-      })
-      .addCase(deleteDistributorOrder.fulfilled, (state) => {
-        state.isLoading = false;
-      })
-      .addCase(deleteDistributorOrder.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload as string;
-      });
+
   }
 });
 

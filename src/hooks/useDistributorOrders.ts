@@ -7,7 +7,6 @@ import {
   addDistributorOrder,
   updateDistributorOrder,
   confirmDistributorOrder,
-  deleteDistributorOrder,
   clearCurrentOrder,
   clearErrors
 } from '../store/slices/distributorOrdersSlice';
@@ -41,9 +40,7 @@ export const useDistributorOrders = () => {
     return dispatch(confirmDistributorOrder(id));
   }, [dispatch]);
 
-  const deleteOrder = useCallback((id: number) => {
-    return dispatch(deleteDistributorOrder(id));
-  }, [dispatch]);
+
 
   const resetCurrentOrder = useCallback(() => {
     dispatch(clearCurrentOrder());
