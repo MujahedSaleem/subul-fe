@@ -47,7 +47,7 @@ export const fetchDistributorOrders = createAsyncThunk<OrderList[], string>(
     
     try {
       // Create and store the pending request
-      const promise = axiosInstance.get(`/distributors/${distributorId}/orders`)
+      const promise = axiosInstance.get(`/distributors/orders`)
         .then(response => {
           pendingRequests.delete(requestKey); // Clear when done
           return extractApiData<OrderList[]>(response.data);
@@ -85,7 +85,7 @@ export const getDistributorOrderById = createAsyncThunk<OrderList, { distributor
       }
 
       // Create and store the pending request
-      const requestPromise = axiosInstance.get(`/distributors/${distributorId}/orders/${orderId}`)
+      const requestPromise = axiosInstance.get(`/distributors/orders/${orderId}`)
         .then(response => {
           pendingRequests.delete(requestKey); // Clear when done
           return extractApiData<OrderList>(response.data);
@@ -108,7 +108,7 @@ export const addDistributorOrder = createAsyncThunk<OrderList, { distributorId: 
   'distributorOrders/addDistributorOrder',
   async ({ distributorId, order }, { rejectWithValue }) => {
     try {
-      const response = await axiosInstance.post(`/distributors/${distributorId}/orders`, order);
+      const response = await axiosInstance.post(`/distributors/orders`, order);
       return extractApiData<OrderList>(response.data);
     } catch (error: any) {
       return rejectWithValue(handleApiError(error));
@@ -121,7 +121,7 @@ export const updateDistributorOrder = createAsyncThunk<OrderList, { distributorI
   'distributorOrders/updateDistributorOrder',
   async ({ distributorId, order }, { rejectWithValue }) => {
     try {
-      const response = await axiosInstance.put(`/distributors/${distributorId}/orders/${order.id}`, order);
+      const response = await axiosInstance.put(`/distributors/orders/${order.id}`, order);
       return extractApiData<OrderList>(response.data);
     } catch (error: any) {
       return rejectWithValue(handleApiError(error));
@@ -134,7 +134,7 @@ export const confirmDistributorOrder = createAsyncThunk<OrderList, { distributor
   'distributorOrders/confirmDistributorOrder',
   async ({ distributorId, orderId }, { rejectWithValue }) => {
     try {
-      const response = await axiosInstance.post(`/distributors/${distributorId}/orders/${orderId}/confirm`);
+      const response = await axiosInstance.post(`/distributors/orders/${orderId}/confirm`);
       return extractApiData<OrderList>(response.data);
     } catch (error: any) {
       return rejectWithValue(handleApiError(error));
@@ -142,23 +142,7 @@ export const confirmDistributorOrder = createAsyncThunk<OrderList, { distributor
   }
 );
 
-// Delete an order
-export const deleteDistributorOrder = createAsyncThunk<number, { distributorId: string; orderId: number }>(
-  'distributorOrders/deleteDistributorOrder',
-  async ({ distributorId, orderId }, { rejectWithValue }) => {
-    try {
-      const response = await axiosInstance.delete(`/distributors/${distributorId}/orders/${orderId}`);
-      // For delete operations, we only need to check if the response is successful
-      // The API returns success without data for delete operations
-      if (!response.data.success) {
-        throw new Error('Delete operation failed');
-      }
-      return orderId;
-    } catch (error: any) {
-      return rejectWithValue(handleApiError(error));
-    }
-  }
-);
+
 
 const distributorOrdersSlice = createSlice({
   name: 'distributorOrders',

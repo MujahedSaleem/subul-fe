@@ -36,6 +36,19 @@ const OrderForm: React.FC<OrderFormProps> = ({
   isBackLoading = false,
   isSubmitLoading = false,
 }) => {
+  // Ensure order is defined with default values if needed
+  const safeOrder: OrderList = order || {
+    id: 0,
+    orderNumber: '',
+    customer: {} as Customer,
+    location: {} as Location,
+    distributor: { id: '', name: '', phone: '' },
+    cost: undefined,
+    status: 'New',
+    createdAt: new Date().toISOString(),
+    confirmedAt: ''
+  };
+  
   const dispatch = useAppDispatch();
   const [isNewCustomer, setIsNewCustomer] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
@@ -48,9 +61,9 @@ const OrderForm: React.FC<OrderFormProps> = ({
    const findCustomer = async () => {
     setIsSearching(true);
     // Only search for customer if this is a new order or if we don't have a customer yet
-    if (!order?.customer?.id && order?.customer?.phone && isValidPhoneNumber(order?.customer?.phone)) {
+    if (!safeOrder?.customer?.id && safeOrder?.customer?.phone && isValidPhoneNumber(safeOrder?.customer?.phone)) {
       try {
-        const customerResults = await dispatch(findCustomerByPhone(order.customer.phone)).unwrap();
+        const customerResults = await dispatch(findCustomerByPhone(safeOrder.customer.phone)).unwrap();
         if (customerResults && customerResults.length > 0) {
           setIsNewCustomer(false);
           setOrder((prev) => ({
@@ -70,7 +83,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
     setIsSearching(false);
    }
    findCustomer()
-  }, [order?.customer?.phone, dispatch, setOrder]);
+  }, [safeOrder?.customer?.phone, dispatch, setOrder]);
 
  
 
@@ -79,22 +92,22 @@ const OrderForm: React.FC<OrderFormProps> = ({
     setGetttingGpsLocation(true);
     try {
       const gpsLocation = await getCurrentLocation();
-      if (gpsLocation?.coordinates && order.customer) {
+      if (gpsLocation?.coordinates && safeOrder.customer) {
         // Update the selected location's coordinates
-        const updatedLocations = order.customer.locations.map(loc => 
-          loc.id === order.location?.id 
+        const updatedLocations = safeOrder.customer.locations.map(loc => 
+          loc.id === safeOrder.location?.id 
             ? { ...loc, coordinates: gpsLocation.coordinates }
             : loc
         );
 
         // Update the customer with new locations
         const updatedCustomer = {
-          ...order.customer,
+          ...safeOrder.customer,
           locations: updatedLocations
         };
 
         // Update the order with new location and customer
-        const foundLocation = updatedLocations.find(loc => loc.id === order.location?.id);
+        const foundLocation = updatedLocations.find(loc => loc.id === safeOrder.location?.id);
         setOrder(prev => ({
           ...prev,
           location: foundLocation || {
@@ -103,7 +116,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
             coordinates: '',
             address: '',
             isActive: true,
-            customerId: order.customer?.id || ''
+            customerId: safeOrder.customer?.id || ''
           },
           customer: updatedCustomer
         }));
@@ -127,32 +140,32 @@ const OrderForm: React.FC<OrderFormProps> = ({
       <h2 className="text-xl font-semibold text-slate-800 mb-6">تفاصيل الطلب</h2>
 
       <CustomerPhoneInput
-        customer={order?.customer}
+        customer={safeOrder?.customer}
         setOrder={setOrder}
-        disabled={isEdit && order.status === 'Confirmed'}
+        disabled={isEdit && safeOrder?.status === 'Confirmed'}
       />
 
       {!isSearching && (
         <CustomerNameInput
-          customer={order?.customer}
+          customer={safeOrder?.customer}
           setOrder={setOrder}
           isNewCustomer={isNewCustomer}
-          disabled={isEdit && order.status === 'Confirmed'}
+          disabled={isEdit && safeOrder?.status === 'Confirmed'}
         />
       )}
 
       {!isSearching && (
         <LocationSelector
-          order={order}
-          setOrder={handleOrderUpdate}
+          order={safeOrder}
+          setOrder={setOrder as React.Dispatch<React.SetStateAction<OrderList | undefined>>}
           isNewCustomer={isNewCustomer}
-          disabled={(isEdit && order.status === 'Confirmed') || !order?.customer?.name}
-          customer={order?.customer}
+          disabled={(isEdit && safeOrder?.status === 'Confirmed') || !safeOrder?.customer?.name}
+          customer={safeOrder?.customer}
           ref={locationRef}
         />
       )}
 
-      {order?.location && order.location.name && !order.location.coordinates && (
+      {safeOrder?.location && safeOrder.location.name && !safeOrder.location.coordinates && (
         <div className="flex items-center gap-2 bg-yellow-50 p-3 rounded-lg border border-yellow-100">
           <div className="flex-1">
             <p className="text-yellow-800 text-sm">لا توجد إحداثيات متوفرة لهذا الموقع</p>
@@ -170,7 +183,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
       )}
 
       <DistributorSelector
-        selectedDistributorId={order.distributor?.id || null}
+        selectedDistributorId={safeOrder?.distributor?.id || null}
         onDistributorChange={(distributorId: string | null) => {
           setOrder(prev => ({
             ...prev,
@@ -180,17 +193,17 @@ const OrderForm: React.FC<OrderFormProps> = ({
       />
 
       <CostInput
-        cost={order.cost}
+        cost={safeOrder?.cost}
         setOrder={setOrder}
-        disabled={isEdit && order.status === 'Confirmed'}
+        disabled={isEdit && safeOrder?.status === 'Confirmed'}
       />
 
       <div className="flex justify-between items-center mt-6">
         <Button
           type="button"
           onClick={() => {
-            if (order?.customer && (order?.customer?.locations?.length || order?.customer?.name || order?.customer?.phone)) {
-              onBack(order?.customer);
+            if (safeOrder?.customer && (safeOrder?.customer?.locations?.length || safeOrder?.customer?.name || safeOrder?.customer?.phone)) {
+              onBack(safeOrder?.customer);
             } else {
               navigate(-1);
             }
@@ -198,16 +211,15 @@ const OrderForm: React.FC<OrderFormProps> = ({
           variant="secondary"
           icon={faArrowRight}
           disabled={isBackLoading || isSubmitLoading}
-          loading={isBackLoading}
         >
-          {isEdit ? 'رجوع للطلبات' : 'إلغاء'}
+          رجوع
         </Button>
         <Button
           type="submit"
           variant="primary"
           icon={faSave}
-          disabled={(isEdit && order.status === 'Confirmed') || isBackLoading || isSubmitLoading}
-          loading={isSubmitLoading || loading}
+          disabled={(isEdit && safeOrder?.status === 'Confirmed') || isSubmitLoading}
+          loading={isSubmitLoading}
         >
           {title}
         </Button>
