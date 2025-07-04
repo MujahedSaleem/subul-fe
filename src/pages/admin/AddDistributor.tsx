@@ -6,6 +6,7 @@ import DistributorForm from '../../components/DistributorForm';
 import { Distributor } from '../../types/distributor';
 import { AppDispatch } from '../../store/store';
 import { addDistributor } from '../../store/slices/distributorSlice';
+import { showError } from '../../store/slices/notificationSlice';
 
 const AddDistributor: React.FC = () => {
   const navigate = useNavigate();
@@ -28,7 +29,7 @@ const AddDistributor: React.FC = () => {
       navigate('/admin/distributors');
     } catch (error) {
       console.error('Error adding distributor:', error);
-      alert('حدث خطأ أثناء إضافة الموزع. يرجى المحاولة لاحقًا.');
+      dispatch(showError({message: 'حدث خطأ أثناء إضافة الموزع. يرجى المحاولة لاحقًا.'}));
     }
   };
 

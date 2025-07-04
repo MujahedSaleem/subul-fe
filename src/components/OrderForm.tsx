@@ -72,47 +72,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
    findCustomer()
   }, [order?.customer?.phone, dispatch, setOrder]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      // Check if we need to save a new location
-      if (order?.location && !order.location.id && order.customer) {
-        // Create a new location for the customer
-        const newLocation = {
-          ...order.location,
-          customerId: order.customer.id
-        };
-        
-        const updatedCustomer = await dispatch(updateCustomer({
-          ...order.customer,
-          locations: [...(order.customer.locations || []), newLocation]
-        })).unwrap();
-        
-        if (updatedCustomer) {
-          // Find the newly created location
-          const savedLocation = updatedCustomer.locations?.find(
-            loc => loc.coordinates === order.location?.coordinates
-          );
-          
-          if (savedLocation) {
-            setOrder(prev => ({
-              ...prev,
-              location: savedLocation,
-              customer: updatedCustomer
-            }));
-          }
-        }
-      }
-      
-      onSubmit(e);
-    } catch (error) {
-      console.error('Error saving location:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+ 
 
   const handleSetLocation = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -163,7 +123,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={onSubmit} className="space-y-4">
       <h2 className="text-xl font-semibold text-slate-800 mb-6">تفاصيل الطلب</h2>
 
       <CustomerPhoneInput

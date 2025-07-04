@@ -11,6 +11,7 @@ import {
   selectDistributors, 
   selectIsLoading 
 } from '../../store/slices/distributorSlice';
+import { showError } from '../../store/slices/notificationSlice';
 
 const EditDistributor: React.FC = () => {
   const navigate = useNavigate();
@@ -53,7 +54,7 @@ const EditDistributor: React.FC = () => {
     e.preventDefault();
 
     if (!id) {
-      alert('معرف الموزع مفقود');
+      dispatch(showError({message: 'معرف الموزع مفقود'}));
       return;
     }
 
@@ -62,7 +63,7 @@ const EditDistributor: React.FC = () => {
       navigate('/admin/distributors');
     } catch (error) {
       console.error('Error updating distributor:', error);
-      alert('حدث خطأ أثناء تحديث الموزع. يرجى المحاولة لاحقًا.');
+      dispatch(showError({message: 'حدث خطأ أثناء تحديث الموزع. يرجى المحاولة لاحقًا.'}));
     }
   };
 

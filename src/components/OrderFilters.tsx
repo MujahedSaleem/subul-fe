@@ -1,15 +1,12 @@
 import React, { useMemo, useCallback, useEffect } from 'react';
-import { faFilter, faTimes } from '@fortawesome/free-solid-svg-icons';
+import { faFilter } from '@fortawesome/free-solid-svg-icons';
 import { Select, Option, Input, Card, CardBody, Typography } from '@material-tailwind/react';
 import { Distributor } from '../types/distributor';
 import Button from './Button';
-import IconButton from './IconButton';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faXmark } from '@fortawesome/free-solid-svg-icons';
-import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { fetchOrders } from '../store/slices/orderSlice';
-import { RootState } from '../store/store';
-
+import { useAppDispatch,  } from '../store/hooks';
+import { showError } from '../store/slices/notificationSlice';
 interface OrderFilterProps {
   showFilters: boolean;
   setShowFilters: React.Dispatch<React.SetStateAction<boolean>>;
@@ -39,10 +36,9 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
   resetFilters,
   activeDistributors,
   selectedStatus,
-  setSelectedStatus,
-  currentPage = 1,
-  pageSize = 10,
+  setSelectedStatus
 }) => {
+  const dispatch = useAppDispatch();
   const statusOptions = useMemo(() => [
     { value: 'New', label: 'جديد' },
     { value: 'Confirmed', label: 'تم التأكيد' },
@@ -50,18 +46,6 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
     { value: 'Draft', label: 'مسودة' }
   ], []);
 
-  const getSelectedDistributorLabel = useCallback(() => {
-    if (!selectedDistributor) return 'جميع الموزعين';
-    const selectedDist = activeDistributors.find(d => d.id === selectedDistributor);
-    if (!selectedDist) return 'جميع الموزعين';
-    return `${selectedDist.firstName} ${selectedDist.lastName}`;
-  }, [selectedDistributor, activeDistributors]);
-
-  const getSelectedStatusLabel = useCallback(() => {
-    if (!selectedStatus) return 'الكل';
-    const status = statusOptions.find(s => s.value === selectedStatus);
-    return status ? status.label : 'الكل';
-  }, [selectedStatus, statusOptions]);
 
   const hasActiveFilters = useMemo(() => 
     selectedDistributor || dateFrom || dateTo || selectedStatus,
@@ -79,7 +63,7 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
   const handleDateFromChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newDateFrom = e.target.value;
     if (dateTo && newDateFrom && new Date(newDateFrom) > new Date(dateTo)) {
-      alert('تاريخ البداية يجب أن يكون أصغر من أو يساوي تاريخ النهاية');
+      dispatch(showError({message: 'تاريخ البداية يجب أن يكون أصغر من أو يساوي تاريخ النهاية'}));
       return;
     }
     setDateFrom(newDateFrom);
@@ -88,7 +72,7 @@ const OrderFilter: React.FC<OrderFilterProps> = ({
   const handleDateToChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newDateTo = e.target.value;
     if (dateFrom && newDateTo && new Date(newDateTo) < new Date(dateFrom)) {
-      alert('تاريخ النهاية يجب أن يكون أكبر من أو يساوي تاريخ البداية');
+      dispatch(showError({message: 'تاريخ النهاية يجب أن يكون أكبر من أو يساوي تاريخ البداية'}));
       return;
     }
     setDateTo(newDateTo);

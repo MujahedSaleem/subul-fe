@@ -3,6 +3,8 @@ import { faPlus, faXmark, faLocationDot } from "@fortawesome/free-solid-svg-icon
 import Button from "./Button";
 import IconButton from "./IconButton";
 import { Input } from "@material-tailwind/react";
+import { showError } from "../store/slices/notificationSlice";
+import { useAppDispatch } from "../store/hooks";
 
 interface Location {
   id: number;
@@ -24,15 +26,16 @@ const LocationsSection: React.FC<LocationsSectionProps> = ({
   removeLocation,
   updateLocation,
 }) => {
+  const dispatch = useAppDispatch();
   const handleOpenLocation = (coordinates: string) => {
     if (!coordinates.trim()) {
-      alert('لا توجد إحداثيات متوفرة لهذا الموقع');
+      dispatch(showError({message: 'لا توجد إحداثيات متوفرة لهذا الموقع'}));
       return;
     }
 
     const [latitude, longitude] = coordinates.split(',').map(coord => coord.trim());
     if (!latitude || !longitude) {
-      alert('تنسيق الإحداثيات غير صحيح. يجب أن يكون بالشكل: خط العرض، خط الطول');
+      dispatch(showError({message: 'تنسيق الإحداثيات غير صحيح. يجب أن يكون بالشكل: خط العرض، خط الطول'}));
       return;
     }
 
