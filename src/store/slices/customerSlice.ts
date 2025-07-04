@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import axiosInstance from '../../utils/axiosInstance';
 import { Customer, UpdateCustomerRequest } from '../../types/customer';
+import { handleApiResponse, handleApiError } from '../../utils/apiResponseHandler';
 
 interface CustomerState {
   customers: Customer[];
@@ -21,7 +22,7 @@ const initialState: CustomerState = {
 };
 
 // Async thunks with deduplication
-export const fetchCustomers = createAsyncThunk(
+export const fetchCustomers = createAsyncThunk<Customer[]>(
   'customers/fetchCustomers',
   async (_, { getState, rejectWithValue }) => {
     const state = getState() as { customers: CustomerState };
@@ -38,10 +39,12 @@ export const fetchCustomers = createAsyncThunk(
     
     try {
       // Create and store the pending request
-      pendingFetchRequest = axiosInstance.get<Customer[]>('/customers')
+      pendingFetchRequest = axiosInstance.get('/customers')
         .then(response => {
           pendingFetchRequest = null; // Clear when done
-          return response.data;
+          const { data, error } = handleApiResponse(response.data);
+          if (error) throw new Error(error);
+          return data;
         })
         .catch(error => {
           pendingFetchRequest = null; // Clear on error too
@@ -50,50 +53,54 @@ export const fetchCustomers = createAsyncThunk(
       
       return await pendingFetchRequest;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch customers');
+      return rejectWithValue(handleApiError(error));
     }
   }
 );
 
-export const addCustomer = createAsyncThunk(
+export const addCustomer = createAsyncThunk<Customer, Omit<Customer, 'id'>>(
   'customers/addCustomer',
   async (customer: Omit<Customer, 'id'>, { rejectWithValue }) => {
     try {
-      const response = await axiosInstance.post<Customer>('/customers', customer);
-      return response.data;
+      const response = await axiosInstance.post('/customers', customer);
+      const { data, error } = handleApiResponse<Customer>(response.data);
+      if (error) return rejectWithValue(error);
+      return data as Customer;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to add customer');
+      return rejectWithValue(handleApiError(error));
     }
   }
 );
 
-export const updateCustomer = createAsyncThunk(
+export const updateCustomer = createAsyncThunk<Customer, Customer>(
   'customers/updateCustomer',
   async (customer: Customer, { rejectWithValue }) => {
     try {
-      const response = await axiosInstance.put<Customer>(`/customers/${customer.id}`, customer);
-      return response.data;
+      const response = await axiosInstance.put(`/customers/${customer.id}`, customer);
+      const { data, error } = handleApiResponse<Customer>(response.data);
+      if (error) return rejectWithValue(error);
+      return data as Customer;
     } catch (error: any) {
-      // Try to extract the most meaningful error message from the backend
-      const backendError = error.response?.data?.error || error.response?.data?.message;
-      return rejectWithValue(backendError || 'Failed to update customer');
+      return rejectWithValue(handleApiError(error));
     }
   }
 );
 
-export const updateCustomerWithFormat = createAsyncThunk(
+export const updateCustomerWithFormat = createAsyncThunk<Customer, { customerId: string; updateRequest: UpdateCustomerRequest }>(
   'customers/updateCustomerWithFormat',
   async ({ customerId, updateRequest }: { customerId: string; updateRequest: UpdateCustomerRequest }, { rejectWithValue }) => {
     try {
-      const response = await axiosInstance.put<Customer>(`/customers/${customerId}`, updateRequest);
-      return response.data;
+      const response = await axiosInstance.put(`/customers/${customerId}`, updateRequest);
+      const { data, error } = handleApiResponse<Customer>(response.data);
+      if (error) return rejectWithValue(error);
+      return data as Customer;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to update customer');
+      return rejectWithValue(handleApiError(error));
     }
   }
 );
 
-export const updateCustomerLocation = createAsyncThunk(
+export const updateCustomerLocation = createAsyncThunk<Customer, { customerId: string; locationId: number; location: { name: string; coordinates: string; address: string } }>(
   'customers/updateCustomerLocation',
   async (
     { customerId, locationId, location }: { 
@@ -104,27 +111,34 @@ export const updateCustomerLocation = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      const response = await axiosInstance.put<Customer>(`/customers/${customerId}/locations/${locationId}`, location);
-      return response.data;
+      const response = await axiosInstance.put(`/customers/${customerId}/locations/${locationId}`, location);
+      const { data, error } = handleApiResponse<Customer>(response.data);
+      if (error) return rejectWithValue(error);
+      return data as Customer;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to update customer location');
+      return rejectWithValue(handleApiError(error));
     }
   }
 );
 
-export const deleteCustomer = createAsyncThunk(
+export const deleteCustomer = createAsyncThunk<string, string>(
   'customers/deleteCustomer',
   async (id: string, { rejectWithValue }) => {
     try {
-      await axiosInstance.delete(`/customers/${id}`);
-      return id;
+      const response = await axiosInstance.delete(`/customers/${id}`);
+      // For delete operations, we only need to check if the response is successful
+      // The API returns success without data for delete operations
+      if (!response.data.success) {
+        throw new Error('Delete operation failed');
+      }
+      return id; // Return the deleted ID for state management
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to delete customer');
+      return rejectWithValue(handleApiError(error));
     }
   }
 );
 
-export const getCustomerById = createAsyncThunk(
+export const getCustomerById = createAsyncThunk<Customer, string>(
   'customers/getCustomerById',
   async (id: string, { getState, rejectWithValue }) => {
     try {
@@ -143,10 +157,12 @@ export const getCustomerById = createAsyncThunk(
       }
 
       // Create and store the pending request
-      const requestPromise = axiosInstance.get<Customer>(`/customers/${id}`)
+      const requestPromise = axiosInstance.get(`/customers/${id}`)
         .then(response => {
           pendingGetByIdRequests.delete(requestKey); // Clear when done
-          return response.data;
+          const { data, error } = handleApiResponse(response.data);
+          if (error) throw new Error(error);
+          return data;
         })
         .catch(error => {
           pendingGetByIdRequests.delete(requestKey); // Clear on error too
@@ -156,24 +172,26 @@ export const getCustomerById = createAsyncThunk(
       pendingGetByIdRequests.set(requestKey, requestPromise);
       return await requestPromise;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch customer');
+      return rejectWithValue(handleApiError(error));
     }
   }
 );
 
-export const findCustomerByPhone = createAsyncThunk(
+export const findCustomerByPhone = createAsyncThunk<Customer[], string>(
   'customers/findCustomerByPhone',
   async (phone: string, { rejectWithValue }) => {
     try {
-      const response = await axiosInstance.get<Customer[]>('/customers/filter', { params: { phone } });
-      return response.data;
+      const response = await axiosInstance.get('/customers/filter', { params: { phone } });
+      const { data, error } = handleApiResponse<Customer[]>(response.data);
+      if (error) return rejectWithValue(error);
+      return data as Customer[];
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to find customer');
+      return rejectWithValue(handleApiError(error));
     }
   }
 );
 
-export const findOrCreateCustomer = createAsyncThunk(
+export const findOrCreateCustomer = createAsyncThunk<Customer, { customerName: string; locationData: { name: string; coordinates: string; phone: string } }>(
   'customers/findOrCreateCustomer',
   async (
     { customerName, locationData }: {
@@ -213,7 +231,7 @@ export const findOrCreateCustomer = createAsyncThunk(
         return rejectWithValue('Failed to create customer');
       }
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to find or create customer');
+      return rejectWithValue(handleApiError(error));
     }
   }
 );

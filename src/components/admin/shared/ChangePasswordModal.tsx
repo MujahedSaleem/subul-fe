@@ -16,11 +16,6 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ onClose, onSa
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const validatePassword = (password: string): boolean => {
-    const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-    return regex.test(password);
-  };
-
   const handleSave = async () => {
     setError(null);
 
@@ -36,19 +31,12 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ onClose, onSa
       return;
     }
 
-    if (newPassword.length < 8) {
-      setError('كلمة المرور الجديدة يجب أن تحتوي على ما لا يقل عن 8 أحرف.');
-      return;
-    }
-
-    if (!validatePassword(newPassword)) {
-      setError(
-        'كلمة المرور الجديدة يجب أن تحتوي على حرف كبير، حرف صغير، رقم، ورمز خاص على الأقل.'
-      );
-      return;
-    }
-
     // Validate confirm password
+    if (!confirmPassword.trim()) {
+      setError('الرجاء تأكيد كلمة المرور الجديدة.');
+      return;
+    }
+
     if (newPassword !== confirmPassword) {
       setError('كلمات المرور لا تتطابق.');
       return;
@@ -83,8 +71,7 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ onClose, onSa
   const isFormValid = (): boolean => {
     if (!oldPassword.trim()) return false;
     if (!newPassword.trim()) return false;
-    if (newPassword.length < 8) return false;
-    if (!validatePassword(newPassword)) return false;
+    if (!confirmPassword.trim()) return false;
     if (newPassword !== confirmPassword) return false;
     return true;
   };
@@ -103,8 +90,11 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ onClose, onSa
             label="كلمة المرور القديمة"
             value={oldPassword}
             onChange={(e) => setOldPassword(e.target.value)}
-            error={error && !oldPassword.trim() ? 'الرجاء إدخال كلمة المرور القديمة.' : undefined}
+            error={!!(error && error !== 'كلمات المرور لا تتطابق.')}
             required
+            crossOrigin={undefined}
+            onPointerEnterCapture={undefined}
+            onPointerLeaveCapture={undefined}
           />
 
           {/* New Password Input */}
@@ -113,13 +103,11 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ onClose, onSa
             label="كلمة المرور الجديدة"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
-            error={
-              error &&
-              ((newPassword.length < 8 && 'كلمة المرور الجديدة يجب أن تحتوي على ما لا يقل عن 8 أحرف.') ||
-                (!validatePassword(newPassword) &&
-                  'كلمة المرور الجديدة يجب أن تحتوي على حرف كبير، حرف صغير، رقم، ورمز خاص على الأقل.'))
-            }
+            error={!!(error && error !== 'كلمات المرور لا تتطابق.')}
             required
+            crossOrigin={undefined}
+            onPointerEnterCapture={undefined}
+            onPointerLeaveCapture={undefined}
           />
 
           {/* Confirm Password Input */}
@@ -128,8 +116,11 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ onClose, onSa
             label="تأكيد كلمة المرور الجديدة"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            error={error === 'كلمات المرور لا تتطابق.' ? 'كلمات المرور لا تتطابق.' : undefined}
+            error={error === 'كلمات المرور لا تتطابق.'}
             required
+            crossOrigin={undefined}
+            onPointerEnterCapture={undefined}
+            onPointerLeaveCapture={undefined}
           />
 
           {/* Error Message */}

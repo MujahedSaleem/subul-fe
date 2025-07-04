@@ -1,14 +1,18 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { AxiosError } from 'axios';
 import axiosInstance from '../../utils/axiosInstance';
-import { Customer, DistributorCreateCustomerRequest, Location } from '../../types/customer';
+import { Customer, DistributorCreateCustomerRequest, Location, UpdateCustomerRequest } from '../../types/customer';
 import { RootState } from '../store';
+import { extractApiData, handleApiError } from '../../utils/apiResponseHandler';
 
 interface DistributorCustomersState {
   customers: Customer[];
   currentCustomer: Customer | null;
   isLoading: boolean;
   error: string | null;
+  initialized: boolean;
+  currentDistributorId: string | null;
+  loading: boolean;
 }
 
 const initialState: DistributorCustomersState = {
@@ -16,6 +20,9 @@ const initialState: DistributorCustomersState = {
   currentCustomer: null,
   isLoading: false,
   error: null,
+  initialized: false,
+  currentDistributorId: null,
+  loading: false,
 };
 
 // Request deduplication map
@@ -52,108 +59,117 @@ export const findCustomerByPhone = createAsyncThunk<Customer | null, string>(
 );
 
 // Fetch all customers
-export const fetchDistributorCustomers = createAsyncThunk<Customer[]>(
-  'distributorCustomers/fetchAll',
-  async (_, { rejectWithValue }) => {
+export const fetchDistributorCustomers = createAsyncThunk<Customer[], string>(
+  'distributorCustomers/fetchDistributorCustomers',
+  async (distributorId: string, { getState, rejectWithValue }) => {
+    const state = getState() as { distributorCustomers: DistributorCustomersState };
+    
+    // Return existing data if already initialized for this distributor
+    if (state.distributorCustomers.initialized && 
+        state.distributorCustomers.currentDistributorId === distributorId && 
+        !state.distributorCustomers.loading) {
+      return state.distributorCustomers.customers;
+    }
+    
+    // If there's already a pending request for this distributor, wait for it
+    const requestKey = `fetchDistributorCustomers-${distributorId}`;
+    if (pendingRequests.has(requestKey)) {
+      return await pendingRequests.get(requestKey);
+    }
+    
     try {
-      const response = await axiosInstance.get<Customer[]>('/distributors/customers');
-      return response.data;
-    } catch (error) {
-      if (error instanceof AxiosError) {
-        return rejectWithValue(error.response?.data?.message || 'Failed to fetch customers');
-      }
-      return rejectWithValue('Failed to fetch customers');
+      // Create and store the pending request
+      const promise = axiosInstance.get(`/distributors/${distributorId}/customers`)
+        .then(response => {
+          pendingRequests.delete(requestKey); // Clear when done
+          return extractApiData<Customer[]>(response.data);
+        })
+        .catch(error => {
+          pendingRequests.delete(requestKey); // Clear on error too
+          throw error;
+        });
+      
+      pendingRequests.set(requestKey, promise);
+      return await promise;
+    } catch (error: any) {
+      return rejectWithValue(handleApiError(error));
     }
   }
 );
 
 // Add customer
-export const addDistributorCustomer = createAsyncThunk<Customer, Partial<DistributorCreateCustomerRequest>>(
-  'distributorCustomers/add',
-  async (customer, { rejectWithValue }) => {
+export const addDistributorCustomer = createAsyncThunk<Customer, { distributorId: string; customer: Omit<Customer, 'id'> }>(
+  'distributorCustomers/addDistributorCustomer',
+  async ({ distributorId, customer }, { rejectWithValue }) => {
     try {
-      const response = await axiosInstance.post<Customer>('/distributors/customers', customer);
-      return response.data;
-    } catch (error) {
-      if (error instanceof AxiosError) {
-        return rejectWithValue(error.response?.data?.message || 'Failed to add customer');
-      }
-      return rejectWithValue('Failed to add customer');
+      const response = await axiosInstance.post(`/distributors/${distributorId}/customers`, customer);
+      return extractApiData<Customer>(response.data);
+    } catch (error: any) {
+      return rejectWithValue(handleApiError(error));
     }
   }
 );
 
 // Update customer
-export const updateDistributorCustomer = createAsyncThunk<Customer, Customer>(
-  'distributorCustomers/update',
-  async (customer, { rejectWithValue }) => {
+export const updateDistributorCustomer = createAsyncThunk<Customer, { distributorId: string; customer: Customer }>(
+  'distributorCustomers/updateDistributorCustomer',
+  async ({ distributorId, customer }, { rejectWithValue }) => {
     try {
-      const response = await axiosInstance.put<Customer>(`/distributors/customers/${customer.id}`, customer);
-      return response.data;
-    } catch (error) {
-      if (error instanceof AxiosError) {
-        return rejectWithValue(error.response?.data?.message || 'Failed to update customer');
-      }
-      return rejectWithValue('Failed to update customer');
+      const response = await axiosInstance.put(`/distributors/${distributorId}/customers/${customer.id}`, customer);
+      return extractApiData<Customer>(response.data);
+    } catch (error: any) {
+      return rejectWithValue(handleApiError(error));
     }
   }
 );
 
 // Update customer location (disabled due to backend 405 error)
-export const updateDistributorCustomerLocation = createAsyncThunk<Customer, { customerId: string; location: Location }>(
-  'distributorCustomers/updateLocation',
-  async ({ customerId, location }, { rejectWithValue, dispatch, getState }) => {
+export const updateDistributorCustomerLocation = createAsyncThunk<Customer, { distributorId: string; customerId: string; locationId: number; location: { name: string; coordinates: string; address: string } }>(
+  'distributorCustomers/updateDistributorCustomerLocation',
+  async ({ distributorId, customerId, locationId, location }, { rejectWithValue }) => {
     try {
-      // Skip the actual API call to avoid 405 error
-      // The location coordinates will be saved when the customer/order is updated
-      console.log('Skipping location update API call to avoid 405 error');
-      
-      // Clear current order cache when location is updated
-      dispatch({ type: 'distributorOrders/clearCurrentOrder' });
-      
-      // Return a mock customer object to satisfy the type
-      const state = getState() as any;
-      const currentCustomer = state.distributorCustomers.currentCustomer;
-      
-      if (currentCustomer) {
-        // Update the location in the current customer
-        const updatedCustomer = {
-          ...currentCustomer,
-          locations: currentCustomer.locations.map((l: Location) => 
-            l.id === location.id ? location : l
-          )
-        };
-        return updatedCustomer;
-      }
-      
-      // Fallback - return a basic customer structure
-      return {
-        id: customerId,
-        name: '',
-        phone: '',
-        locations: [location]
-      } as Customer;
-    } catch (error) {
-      if (error instanceof AxiosError) {
-        return rejectWithValue(error.response?.data?.message || 'Failed to update customer location');
-      }
-      return rejectWithValue('Failed to update customer location');
+      const response = await axiosInstance.put(`/distributors/${distributorId}/customers/${customerId}/locations/${locationId}`, location);
+      return extractApiData<Customer>(response.data);
+    } catch (error: any) {
+      return rejectWithValue(handleApiError(error));
     }
   }
 );
 
 // Get customer by ID
-export const getDistributorCustomerById = createAsyncThunk<Customer, string>(
-  'distributorCustomers/getById',
-  async (customerId, { rejectWithValue }) => {
+export const getDistributorCustomerById = createAsyncThunk<Customer, { distributorId: string; customerId: string }>(
+  'distributorCustomers/getDistributorCustomerById',
+  async ({ distributorId, customerId }, { getState, rejectWithValue }) => {
     try {
-      const response = await axiosInstance.get<Customer>(`/distributors/customers/${customerId}`);
-      return response.data;
-    } catch (error) {
-      if (error instanceof AxiosError) {
-        return rejectWithValue(error.response?.data?.message || 'Failed to fetch customer');
+      const state = getState() as { distributorCustomers: DistributorCustomersState };
+      
+      // Check if customer already exists in state
+      const existingCustomer = state.distributorCustomers.customers.find(c => c.id === customerId);
+      if (existingCustomer) {
+        return existingCustomer;
       }
-      return rejectWithValue('Failed to fetch customer');
+
+      // Check if there's already a pending request for this customer
+      const requestKey = `getDistributorCustomerById-${distributorId}-${customerId}`;
+      if (pendingRequests.has(requestKey)) {
+        return await pendingRequests.get(requestKey);
+      }
+
+      // Create and store the pending request
+      const requestPromise = axiosInstance.get(`/distributors/${distributorId}/customers/${customerId}`)
+        .then(response => {
+          pendingRequests.delete(requestKey); // Clear when done
+          return extractApiData<Customer>(response.data);
+        })
+        .catch(error => {
+          pendingRequests.delete(requestKey); // Clear on error too
+          throw error;
+        });
+
+      pendingRequests.set(requestKey, requestPromise);
+      return await requestPromise;
+    } catch (error: any) {
+      return rejectWithValue(handleApiError(error));
     }
   }
 );

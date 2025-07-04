@@ -7,6 +7,8 @@ import { SearchableDropdown, Option } from "./distributor/shared/SearchableDropd
 import { AddLocationModal } from "./AddLocationModal";
 import IconButton from "./IconButton";
 import { faLocationDot } from "@fortawesome/free-solid-svg-icons";
+import { useAppDispatch } from "../store/hooks";
+import { showWarning } from "../store/slices/notificationSlice";
 
 interface LocationSelectorProps {
   order: OrderList | undefined;
@@ -21,6 +23,7 @@ const LocationSelector = forwardRef<HTMLDivElement, LocationSelectorProps>((
   { order, setOrder, disabled, customer, isNewCustomer, isDistributor },
   ref
 ) => {
+    const dispatch = useAppDispatch();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedLocationName, setSelectedLocationName] = useState("");
     
@@ -153,7 +156,7 @@ const LocationSelector = forwardRef<HTMLDivElement, LocationSelectorProps>((
       e.stopPropagation();
       
       if (!order?.location?.coordinates) {
-        alert('لا توجد إحداثيات متوفرة لهذا الموقع');
+        dispatch(showWarning({ message: 'لا توجد إحداثيات متوفرة لهذا الموقع' }));
         return;
       }
 
@@ -161,12 +164,12 @@ const LocationSelector = forwardRef<HTMLDivElement, LocationSelectorProps>((
       const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       
       if (isMobileDevice) {
-        // For mobile, use navigation URL that opens in driving mode
-        const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&travelmode=driving`;
-        window.open(googleMapsUrl, '_blank');
+        // For mobile, use geo: protocol for better app integration
+        const googleMapsUrl = `geo:${latitude},${longitude}?q=${latitude},${longitude}`;
+        window.location.href = googleMapsUrl;
       } else {
         // For desktop, open in navigation/driving mode
-        const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&travelmode=driving`;
+        const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
         window.open(url, '_blank');
       }
     };

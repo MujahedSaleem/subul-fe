@@ -75,6 +75,7 @@ const IconButton: React.FC<IconButtonProps> = ({
 
   return (
     <button
+      type="button"
       className={`
         ${baseStyles}
         ${sizeStyles[size]}

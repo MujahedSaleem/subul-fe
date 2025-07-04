@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import type { OrderList } from '../types/order';
-import { customersStore } from '../store/customersStore';
 import Button from './Button';
 import { faArrowRight, faMapLocation, faSave } from '@fortawesome/free-solid-svg-icons';
 import CustomerPhoneInput from './CustomerPhoneInput';
@@ -8,11 +7,13 @@ import CustomerNameInput from './CustomerNameInput';
 import LocationSelector from './LocationSelector';
 import DistributorSelector from './DistributorSelector';
 import CostInput from './CostInput';
-import { Customer } from '../types/customer';
+import { Customer, Location } from '../types/customer';
 import { useNavigate } from 'react-router-dom';
 import { isValidPhoneNumber } from '../utils/formatters';
 import IconButton from './IconButton';
 import { getCurrentLocation } from '../services/locationService';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { findCustomerByPhone, updateCustomer } from '../store/slices/customerSlice';
 
 interface OrderFormProps {
   order: OrderList;
@@ -35,6 +36,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
   isBackLoading = false,
   isSubmitLoading = false,
 }) => {
+  const dispatch = useAppDispatch();
   const [isNewCustomer, setIsNewCustomer] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -47,14 +49,19 @@ const OrderForm: React.FC<OrderFormProps> = ({
     setIsSearching(true);
     // Only search for customer if this is a new order or if we don't have a customer yet
     if (!order?.customer?.id && order?.customer?.phone && isValidPhoneNumber(order?.customer?.phone)) {
-          const existingCustomer = await customersStore.findCustomerByPhone(order?.customer?.phone);
-      if (existingCustomer !== undefined && existingCustomer !== null) {
-        setIsNewCustomer(false);
-        setOrder((prev) => ({
-          ...prev,
-          customer: existingCustomer
-        }));
-      } else {
+      try {
+        const customerResults = await dispatch(findCustomerByPhone(order.customer.phone)).unwrap();
+        if (customerResults && customerResults.length > 0) {
+          setIsNewCustomer(false);
+          setOrder((prev) => ({
+            ...prev,
+            customer: customerResults[0] // Take the first matching customer
+          }));
+        } else {
+          setIsNewCustomer(true);
+        }
+      } catch (error) {
+        // Customer not found, treat as new customer
         setIsNewCustomer(true);
       }
     } else {
@@ -63,7 +70,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
     setIsSearching(false);
    }
    findCustomer()
-  }, [order?.customer?.phone]);
+  }, [order?.customer?.phone, dispatch, setOrder]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,10 +85,10 @@ const OrderForm: React.FC<OrderFormProps> = ({
           customerId: order.customer.id
         };
         
-        const updatedCustomer = await customersStore.updateCustomer({
+        const updatedCustomer = await dispatch(updateCustomer({
           ...order.customer,
           locations: [...(order.customer.locations || []), newLocation]
-        });
+        })).unwrap();
         
         if (updatedCustomer) {
           // Find the newly created location
@@ -127,9 +134,17 @@ const OrderForm: React.FC<OrderFormProps> = ({
         };
 
         // Update the order with new location and customer
+        const foundLocation = updatedLocations.find(loc => loc.id === order.location?.id);
         setOrder(prev => ({
           ...prev,
-          location: updatedLocations.find(loc => loc.id === order.location?.id),
+          location: foundLocation || {
+            id: 0,
+            name: '',
+            coordinates: '',
+            address: '',
+            isActive: true,
+            customerId: order.customer?.id || ''
+          },
           customer: updatedCustomer
         }));
       }
@@ -140,16 +155,10 @@ const OrderForm: React.FC<OrderFormProps> = ({
     }
   };
 
-  const handleLocationChange = async (location: Location) => {
-    if (!order?.customer) return;
-
+  const handleOrderUpdate = (updater: (prev: OrderList | undefined) => OrderList | undefined) => {
     setOrder(prev => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        location: location,
-        locationId: location.id
-      };
+      const result = updater(prev);
+      return result || prev;
     });
   };
 
@@ -175,7 +184,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
       {!isSearching && (
         <LocationSelector
           order={order}
-          setOrder={setOrder}
+          setOrder={handleOrderUpdate}
           isNewCustomer={isNewCustomer}
           disabled={(isEdit && order.status === 'Confirmed') || !order?.customer?.name}
           customer={order?.customer}
@@ -201,9 +210,13 @@ const OrderForm: React.FC<OrderFormProps> = ({
       )}
 
       <DistributorSelector
-        order={order}
-        setOrder={setOrder}
-        disabled={isEdit && order.status === 'Confirmed'}
+        selectedDistributorId={order.distributor?.id || null}
+        onDistributorChange={(distributorId: string | null) => {
+          setOrder(prev => ({
+            ...prev,
+            distributor: distributorId ? { id: distributorId, name: '', phone: '' } : null as any
+          }));
+        }}
       />
 
       <CostInput

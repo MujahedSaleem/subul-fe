@@ -1,246 +1,161 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { OrderList, OrderRequest } from '../../types/order';
 import axiosInstance from '../../utils/axiosInstance';
-import { AxiosError } from 'axios';
+import { extractApiData, handleApiError } from '../../utils/apiResponseHandler';
 
 interface DistributorOrdersState {
   orders: OrderList[];
   isLoading: boolean;
   error: string | null;
   currentOrder: OrderList | null;
+  initialized: boolean;
+  currentDistributorId: string | null;
+  loading: boolean;
 }
 
 const initialState: DistributorOrdersState = {
   orders: [],
   isLoading: false,
   error: null,
-  currentOrder: null
+  currentOrder: null,
+  initialized: false,
+  currentDistributorId: null,
+  loading: false
 };
 
 // Request deduplication map
 const pendingRequests = new Map<string, Promise<any>>();
 
 // Fetch all orders for the distributor
-export const fetchDistributorOrders = createAsyncThunk(
-  'distributorOrders/fetchAll',
-  async (_, { rejectWithValue }) => {
-    const requestKey = 'fetchDistributorOrders';
+export const fetchDistributorOrders = createAsyncThunk<OrderList[], string>(
+  'distributorOrders/fetchDistributorOrders',
+  async (distributorId: string, { getState, rejectWithValue }) => {
+    const state = getState() as { distributorOrders: DistributorOrdersState };
     
-    // If there's already a pending request, return it
-    if (pendingRequests.has(requestKey)) {
-      console.log('Using existing request for fetchDistributorOrders');
-      return pendingRequests.get(requestKey);
+    // Return existing data if already initialized for this distributor
+    if (state.distributorOrders.initialized && 
+        state.distributorOrders.currentDistributorId === distributorId && 
+        !state.distributorOrders.loading) {
+      return state.distributorOrders.orders;
     }
-
+    
+    // If there's already a pending request for this distributor, wait for it
+    const requestKey = `fetchDistributorOrders-${distributorId}`;
+    if (pendingRequests.has(requestKey)) {
+      return await pendingRequests.get(requestKey);
+    }
+    
     try {
-      console.log('Fetching distributor orders...');
-      const promise = axiosInstance.get<OrderList[]>('/distributors/orders')
+      // Create and store the pending request
+      const promise = axiosInstance.get(`/distributors/${distributorId}/orders`)
         .then(response => {
-          console.log('Fetched orders:', response.data);
-          return response.data;
+          pendingRequests.delete(requestKey); // Clear when done
+          return extractApiData<OrderList[]>(response.data);
         })
-        .finally(() => {
-          // Clean up the pending request
-          pendingRequests.delete(requestKey);
+        .catch(error => {
+          pendingRequests.delete(requestKey); // Clear on error too
+          throw error;
         });
-
-      // Store the promise in the map
+      
       pendingRequests.set(requestKey, promise);
       return await promise;
-    } catch (error) {
-      // Clean up the pending request on error
-      pendingRequests.delete(requestKey);
-      console.error('Error fetching distributor orders:', error);
-      if (error instanceof AxiosError) {
-        return rejectWithValue(error.response?.data?.message || 'Failed to fetch orders');
-      }
-      return rejectWithValue('Failed to fetch orders');
+    } catch (error: any) {
+      return rejectWithValue(handleApiError(error));
     }
   }
 );
 
 // Get a specific order by ID
-export const getDistributorOrderById = createAsyncThunk(
-  'distributorOrders/getById',
-  async (id: number, { rejectWithValue }) => {
-    const requestKey = `getDistributorOrderById-${id}`;
-    
-    // If there's already a pending request, return it
-    if (pendingRequests.has(requestKey)) {
-      console.log(`Using existing request for getDistributorOrderById-${id}`);
-      return pendingRequests.get(requestKey);
-    }
-
+export const getDistributorOrderById = createAsyncThunk<OrderList, { distributorId: string; orderId: number }>(
+  'distributorOrders/getDistributorOrderById',
+  async ({ distributorId, orderId }, { getState, rejectWithValue }) => {
     try {
-      const promise = axiosInstance.get<OrderList>(`/distributors/orders/${id}`)
-        .then(response => response.data)
-        .finally(() => {
-          // Clean up the pending request
-          pendingRequests.delete(requestKey);
+      const state = getState() as { distributorOrders: DistributorOrdersState };
+      
+      // Check if order already exists in state
+      const existingOrder = state.distributorOrders.orders.find(o => o.id === orderId);
+      if (existingOrder) {
+        return existingOrder;
+      }
+
+      // Check if there's already a pending request for this order
+      const requestKey = `getDistributorOrderById-${distributorId}-${orderId}`;
+      if (pendingRequests.has(requestKey)) {
+        return await pendingRequests.get(requestKey);
+      }
+
+      // Create and store the pending request
+      const requestPromise = axiosInstance.get(`/distributors/${distributorId}/orders/${orderId}`)
+        .then(response => {
+          pendingRequests.delete(requestKey); // Clear when done
+          return extractApiData<OrderList>(response.data);
+        })
+        .catch(error => {
+          pendingRequests.delete(requestKey); // Clear on error too
+          throw error;
         });
 
-      // Store the promise in the map
-      pendingRequests.set(requestKey, promise);
-      return await promise;
-    } catch (error) {
-      // Clean up the pending request on error
-      pendingRequests.delete(requestKey);
-      if (error instanceof AxiosError) {
-        return rejectWithValue(error.response?.data?.message || 'Failed to fetch order');
-      }
-      return rejectWithValue('Failed to fetch order');
+      pendingRequests.set(requestKey, requestPromise);
+      return await requestPromise;
+    } catch (error: any) {
+      return rejectWithValue(handleApiError(error));
     }
   }
 );
 
 // Add a new order
-export const addDistributorOrder = createAsyncThunk(
-  'distributorOrders/add',
-  async (order: Partial<OrderRequest>, { dispatch, rejectWithValue }) => {
-    const requestKey = 'addDistributorOrder';
-    
-    // If there's already a pending request, return it
-    if (pendingRequests.has(requestKey)) {
-      console.log('Using existing request for addDistributorOrder');
-      return pendingRequests.get(requestKey);
-    }
-
+export const addDistributorOrder = createAsyncThunk<OrderList, { distributorId: string; order: OrderRequest }>(
+  'distributorOrders/addDistributorOrder',
+  async ({ distributorId, order }, { rejectWithValue }) => {
     try {
-      const promise = axiosInstance.post<OrderList>('/distributors/orders', order)
-        .then(response => {
-          // Fetch fresh data after adding
-          dispatch(fetchDistributorOrders());
-          return response.data;
-        })
-        .finally(() => {
-          // Clean up the pending request
-          pendingRequests.delete(requestKey);
-        });
-
-      // Store the promise in the map
-      pendingRequests.set(requestKey, promise);
-      return await promise;
-    } catch (error) {
-      // Clean up the pending request on error
-      pendingRequests.delete(requestKey);
-      if (error instanceof AxiosError) {
-        return rejectWithValue(error.response?.data?.message || 'Failed to add order');
-      }
-      return rejectWithValue('Failed to add order');
+      const response = await axiosInstance.post(`/distributors/${distributorId}/orders`, order);
+      return extractApiData<OrderList>(response.data);
+    } catch (error: any) {
+      return rejectWithValue(handleApiError(error));
     }
   }
 );
 
 // Update an existing order
-export const updateDistributorOrder = createAsyncThunk(
-  'distributorOrders/update',
-  async (order: OrderRequest, { dispatch, rejectWithValue }) => {
-    const requestKey = `updateDistributorOrder-${order.id}`;
-    
-    // If there's already a pending request, return it
-    if (pendingRequests.has(requestKey)) {
-      console.log(`Using existing request for updateDistributorOrder-${order.id}`);
-      return pendingRequests.get(requestKey);
-    }
-
+export const updateDistributorOrder = createAsyncThunk<OrderList, { distributorId: string; order: OrderRequest }>(
+  'distributorOrders/updateDistributorOrder',
+  async ({ distributorId, order }, { rejectWithValue }) => {
     try {
-      const promise = axiosInstance.put<OrderList>(`/distributors/orders/${order.id}`, order)
-        .then(async response => {
-          // Fetch fresh data after update
-          dispatch(fetchDistributorOrders());
-          return response.data;
-        })
-        .finally(() => {
-          // Clean up the pending request
-          pendingRequests.delete(requestKey);
-        });
-
-      // Store the promise in the map
-      pendingRequests.set(requestKey, promise);
-      return await promise;
-    } catch (error) {
-      // Clean up the pending request on error
-      pendingRequests.delete(requestKey);
-      if (error instanceof AxiosError) {
-        return rejectWithValue(error.response?.data?.message || 'Failed to update order');
-      }
-      return rejectWithValue('Failed to update order');
+      const response = await axiosInstance.put(`/distributors/${distributorId}/orders/${order.id}`, order);
+      return extractApiData<OrderList>(response.data);
+    } catch (error: any) {
+      return rejectWithValue(handleApiError(error));
     }
   }
 );
 
 // Confirm an order
-export const confirmDistributorOrder = createAsyncThunk(
-  'distributorOrders/confirm',
-  async (id: number, { dispatch, rejectWithValue }) => {
-    const requestKey = `confirmDistributorOrder-${id}`;
-    
-    // If there's already a pending request, return it
-    if (pendingRequests.has(requestKey)) {
-      console.log(`Using existing request for confirmDistributorOrder-${id}`);
-      return pendingRequests.get(requestKey);
-    }
-
+export const confirmDistributorOrder = createAsyncThunk<OrderList, { distributorId: string; orderId: number }>(
+  'distributorOrders/confirmDistributorOrder',
+  async ({ distributorId, orderId }, { rejectWithValue }) => {
     try {
-      const promise = axiosInstance.post(`/distributors/orders/${id}/confirm`)
-        .then(async () => {
-          // Fetch fresh data after confirmation
-          dispatch(fetchDistributorOrders());
-          return id;
-        })
-        .finally(() => {
-          // Clean up the pending request
-          pendingRequests.delete(requestKey);
-        });
-
-      // Store the promise in the map
-      pendingRequests.set(requestKey, promise);
-      return await promise;
-    } catch (error) {
-      // Clean up the pending request on error
-      pendingRequests.delete(requestKey);
-      if (error instanceof AxiosError) {
-        return rejectWithValue(error.response?.data?.message || 'Failed to confirm order');
-      }
-      return rejectWithValue('Failed to confirm order');
+      const response = await axiosInstance.post(`/distributors/${distributorId}/orders/${orderId}/confirm`);
+      return extractApiData<OrderList>(response.data);
+    } catch (error: any) {
+      return rejectWithValue(handleApiError(error));
     }
   }
 );
 
 // Delete an order
-export const deleteDistributorOrder = createAsyncThunk(
-  'distributorOrders/delete',
-  async (id: number, { dispatch, rejectWithValue }) => {
-    const requestKey = `deleteDistributorOrder-${id}`;
-    
-    // If there's already a pending request, return it
-    if (pendingRequests.has(requestKey)) {
-      console.log(`Using existing request for deleteDistributorOrder-${id}`);
-      return pendingRequests.get(requestKey);
-    }
-
+export const deleteDistributorOrder = createAsyncThunk<number, { distributorId: string; orderId: number }>(
+  'distributorOrders/deleteDistributorOrder',
+  async ({ distributorId, orderId }, { rejectWithValue }) => {
     try {
-      const promise = axiosInstance.delete(`/distributors/orders/${id}`)
-        .then(async () => {
-          // Fetch fresh data after deletion
-          dispatch(fetchDistributorOrders());
-          return id;
-        })
-        .finally(() => {
-          // Clean up the pending request
-          pendingRequests.delete(requestKey);
-        });
-
-      // Store the promise in the map
-      pendingRequests.set(requestKey, promise);
-      return await promise;
-    } catch (error) {
-      // Clean up the pending request on error
-      pendingRequests.delete(requestKey);
-      if (error instanceof AxiosError) {
-        return rejectWithValue(error.response?.data?.message || 'Failed to delete order');
+      const response = await axiosInstance.delete(`/distributors/${distributorId}/orders/${orderId}`);
+      // For delete operations, we only need to check if the response is successful
+      // The API returns success without data for delete operations
+      if (!response.data.success) {
+        throw new Error('Delete operation failed');
       }
-      return rejectWithValue('Failed to delete order');
+      return orderId;
+    } catch (error: any) {
+      return rejectWithValue(handleApiError(error));
     }
   }
 );

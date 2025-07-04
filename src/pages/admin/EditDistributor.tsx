@@ -1,66 +1,99 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useSelector, useDispatch } from 'react-redux';
 import Layout from '../../components/Layout';
 import DistributorForm from '../../components/DistributorForm';
-import { distributorsStore } from '../../store/distributorsStore';
-import type { Distributor } from '../../types/distributor';
-import { useError } from '../../context/ErrorContext';
+import { Distributor } from '../../types/distributor';
+import { RootState, AppDispatch } from '../../store/store';
+import { 
+  fetchDistributors, 
+  updateDistributor, 
+  selectDistributors, 
+  selectIsLoading 
+} from '../../store/slices/distributorSlice';
 
 const EditDistributor: React.FC = () => {
-  const { id } = useParams(); // Get the id as a string
   const navigate = useNavigate();
-    const { dispatch } = useError(); // ✅ Use inside a React component
+  const { id } = useParams<{ id: string }>();
+  const dispatch = useDispatch<AppDispatch>();
   
+  // Redux state
+  const distributors = useSelector(selectDistributors);
+  const isLoading = useSelector(selectIsLoading);
+  
+  // Local state
   const [distributor, setDistributor] = useState<Partial<Distributor>>({
-    id: '',
     firstName: '',
     lastName: '',
     phone: '',
-    userName: '', // Assuming you have a userName field
+    userName: '',
     isActive: true,
   });
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   useEffect(() => {
-    if (id) {
-      // Find the distributor by id (as a string)
-      const existingDistributor = distributorsStore.distributors.find(
-        (d) => d.id === id
-      );
+    // Fetch distributors if not already loaded
+    if (distributors.length === 0 && !isLoading) {
+      dispatch(fetchDistributors());
+    }
+  }, [dispatch, distributors.length, isLoading]);
 
+  useEffect(() => {
+    // Find and set the distributor data when distributors are loaded
+    if (distributors.length > 0 && id && !initialLoadComplete) {
+      const existingDistributor = distributors.find(d => d.id === id);
       if (existingDistributor) {
         setDistributor(existingDistributor);
-      } else {
-        dispatch({ type: "SET_ERROR", payload: "غير موجود" });
-        navigate('/admin/distributors'); // Redirect to the distributors list if not found
+        setInitialLoadComplete(true);
       }
     }
-  }, [id, navigate]);
+  }, [distributors, id, initialLoadComplete]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!id) {
+      alert('معرف الموزع مفقود');
+      return;
+    }
+
     try {
-      // Ensure the distributor has an id before updating
-      if (!distributor.id) {
-        throw new Error('Invalid distributor ID.');
-      }
-
-      // Call the store's updateDistributor method
-      await distributorsStore.updateDistributor(distributor as Distributor);
-
-      // Redirect to the distributors list after successful update
-    } catch  {
-      dispatch({ type: "SET_ERROR", payload: "حدث خطأ أثناء تحديث الموزع. يرجى المحاولة لاحقًا" });
-      
-    }finally{
+      await dispatch(updateDistributor({ ...distributor, id } as Distributor)).unwrap();
       navigate('/admin/distributors');
-
+    } catch (error) {
+      console.error('Error updating distributor:', error);
+      alert('حدث خطأ أثناء تحديث الموزع. يرجى المحاولة لاحقًا.');
     }
   };
 
   const handleBack = () => {
     navigate('/admin/distributors');
   };
+
+  if (isLoading || !initialLoadComplete) {
+    return (
+      <Layout title="تعديل موزع">
+        <div className="max-w-2xl mx-auto">
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mx-auto"></div>
+            <p className="mt-2 text-gray-600">جاري التحميل...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!distributor.id) {
+    return (
+      <Layout title="تعديل موزع">
+        <div className="max-w-2xl mx-auto">
+          <div className="text-center py-8">
+            <p className="text-red-600">الموزع غير موجود</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout title="تعديل موزع">
@@ -69,7 +102,7 @@ const EditDistributor: React.FC = () => {
         setDistributor={setDistributor}
         onSubmit={handleSubmit}
         onBack={handleBack}
-        title="حفظ التعديلات"
+        title="تعديل موزع"
       />
     </Layout>
   );

@@ -141,13 +141,7 @@ export const useAdminOrderManagement = ({ initialOrder, isEdit = false }: UseAdm
         return;
       }
 
-      if (!order.distributor?.id) {
-        dispatch({
-          type: 'SET_ERROR',
-          payload: 'يرجى اختيار الموزع.',
-        });
-        return;
-      }
+  
 
       // For edit mode, check if order is already confirmed
       if (isEdit && order.status === 'Confirmed') {
@@ -167,7 +161,7 @@ export const useAdminOrderManagement = ({ initialOrder, isEdit = false }: UseAdm
         customerId: parseInt(customerId),
         locationId,
         cost: order.cost,
-        distributorId: order.distributor.id,
+        distributorId: order?.distributor?.id,
         statusString: targetStatus
       };
 

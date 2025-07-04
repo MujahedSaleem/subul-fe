@@ -1,7 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction, ActionReducerMapBuilder } from '@reduxjs/toolkit';
 import { OrderList, PaginatedOrders, OrderFilters, OrderRequest } from '../../types/order';
 import axiosInstance from '../../utils/axiosInstance';
-import { AxiosError } from 'axios';
+import { extractApiData, handleApiError } from '../../utils/apiResponseHandler';
 
 interface OrdersState {
   orders: OrderList[];
@@ -37,7 +37,7 @@ const CACHE_DURATION = 60 * 1000;
 // Cache storage
 const cache = new Map<string, CacheEntry>();
 
-// Separate maps for different types of requests
+// Track pending requests to prevent duplicates
 const pendingFetchRequests = new Map<string, Promise<PaginatedOrders>>();
 const pendingConfirmRequests = new Map<string, Promise<OrderList>>();
 const pendingDeleteRequests = new Map<string, Promise<number>>();
@@ -75,91 +75,55 @@ const clearOrdersCache = () => {
 
 export const fetchOrders = createAsyncThunk<PaginatedOrders, OrderFilters>(
   'orders/fetchOrders',
-  async (filters, { rejectWithValue }) => {
-    const requestKey = generateCacheKey(filters);
-    const existingRequest = pendingFetchRequests.get(requestKey);
-    
-    if (existingRequest) {
-      return existingRequest;
-    }
-
+  async (filters: OrderFilters, { rejectWithValue }) => {
     try {
-      const cachedEntry = cache.get(requestKey);
-      const headers: Record<string, string> = {};
+      // Generate a unique key for this request
+      const requestKey = generateCacheKey(filters);
       
-      if (shouldBypassCache) {
-        headers['Cache-Control'] = 'no-cache';
-        shouldBypassCache = false; // Reset flag after using it
-      } else if (cachedEntry && isCacheValid(cachedEntry)) {
-        headers['If-None-Match'] = cachedEntry.etag;
+      // Check if there's already a pending request with the same filters
+      if (pendingFetchRequests.has(requestKey)) {
+        console.log('Returning pending request for:', requestKey);
+        return await pendingFetchRequests.get(requestKey)!;
       }
 
-      const promise = axiosInstance.get<PaginatedOrders>('/orders', {
-        params: {
-          pageNumber: filters.page || 1,
-          pageSize: filters.pageSize || 10,
-          distributorId: filters.distributorId,
-          status: filters.status,
-          dateFrom: filters.dateFrom,
-          dateTo: filters.dateTo
-        },
-        headers,
-        validateStatus: (status) => status === 200 || status === 304
-      }).then(response => {
-        if (response.status === 304 && cachedEntry) {
-          return cachedEntry.data;
-        }
+      const params = new URLSearchParams();
+      if (filters.page) params.append('page', filters.page.toString());
+      if (filters.pageSize) params.append('pageSize', filters.pageSize.toString());
+      if (filters.distributorId) params.append('distributorId', filters.distributorId);
+      if (filters.status) params.append('status', filters.status);
+      if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
+      if (filters.dateTo) params.append('dateTo', filters.dateTo);
 
-        const etag = response.headers['etag'];
-        if (etag) {
-          cache.set(requestKey, {
-            data: response.data,
-            etag: etag,
-            timestamp: Date.now()
-          });
-        }
-        return response.data;
+      const requestPromise = axiosInstance.get(`/orders?${params.toString()}`).then(response => {
+        const data = extractApiData<PaginatedOrders>(response.data);
+        pendingFetchRequests.delete(requestKey);
+        return data;
       });
 
-      pendingFetchRequests.set(requestKey, promise);
-      const result = await promise;
+      pendingFetchRequests.set(requestKey, requestPromise);
+      console.log('Making new request for:', requestKey);
+      return await requestPromise;
+    } catch (error: any) {
+      const requestKey = generateCacheKey(filters);
       pendingFetchRequests.delete(requestKey);
-      return result;
-    } catch (error) {
-      pendingFetchRequests.delete(requestKey);
-      if (error instanceof AxiosError) {
-        return rejectWithValue(error.response?.data?.message || 'Failed to fetch orders');
-      }
-      return rejectWithValue('Failed to fetch orders');
+      return rejectWithValue(handleApiError(error));
     }
   }
 );
 
-export const deleteOrder = createAsyncThunk<number, number>(
+export const deleteOrder = createAsyncThunk<string, string>(
   'orders/deleteOrder',
-  async (orderId, { rejectWithValue }) => {
-    const requestKey = `delete-${orderId}`;
-    const existingRequest = pendingDeleteRequests.get(requestKey);
-    
-    if (existingRequest) {
-      return existingRequest;
-    }
-
+  async (id: string, { rejectWithValue }) => {
     try {
-      const promise = axiosInstance.delete(`/orders/${orderId}`).then(() => {
-        clearOrdersCache(); // This will also set shouldBypassCache flag
-        return orderId;
-      });
-      pendingDeleteRequests.set(requestKey, promise);
-      const result = await promise;
-      pendingDeleteRequests.delete(requestKey);
-      return result;
-    } catch (error) {
-      pendingDeleteRequests.delete(requestKey);
-      if (error instanceof AxiosError) {
-        return rejectWithValue(error.response?.data?.message || 'Failed to delete order');
+      const response = await axiosInstance.delete(`/orders/${id}`);
+      // For delete operations, we only need to check if the response is successful
+      // The API returns success without data for delete operations
+      if (!response.data.success) {
+        throw new Error('Delete operation failed');
       }
-      return rejectWithValue('An unexpected error occurred');
+      return id;
+    } catch (error: any) {
+      return rejectWithValue(handleApiError(error));
     }
   }
 );
@@ -175,106 +139,184 @@ export const confirmOrder = createAsyncThunk<OrderList, number>(
     }
 
     try {
-      const promise = axiosInstance.post<OrderList>(`/orders/${orderId}/confirm`).then(response => {
+      const promise = axiosInstance.post(`/orders/${orderId}/confirm`).then(response => {
         clearOrdersCache(); // This will also set shouldBypassCache flag
-        return response.data;
+        return extractApiData<OrderList>(response.data);
       });
       pendingConfirmRequests.set(requestKey, promise);
       const result = await promise;
       pendingConfirmRequests.delete(requestKey);
       return result;
-    } catch (error) {
+    } catch (error: any) {
       pendingConfirmRequests.delete(requestKey);
-      if (error instanceof AxiosError) {
-        return rejectWithValue(error.response?.data?.message || 'Failed to confirm order');
-      }
-      return rejectWithValue('Failed to confirm order');
+      return rejectWithValue(handleApiError(error));
     }
   }
 );
 
-export const getOrderById = createAsyncThunk<OrderList, number>(
+export const getOrderById = createAsyncThunk<OrderList, string>(
   'orders/getOrderById',
-  async (orderId, { rejectWithValue }) => {
-    const requestKey = `getById-${orderId}`;
-    const existingRequest = pendingConfirmRequests.get(requestKey);
-    
-    if (existingRequest) {
-      return existingRequest;
-    }
-
+  async (id: string, { rejectWithValue }) => {
     try {
-      const promise = axiosInstance.get<OrderList>(`/orders/${orderId}`).then(response => {
-        return response.data;
-      });
-      pendingConfirmRequests.set(requestKey, promise);
-      const result = await promise;
-      pendingConfirmRequests.delete(requestKey);
-      return result;
-    } catch (error) {
-      pendingConfirmRequests.delete(requestKey);
-      if (error instanceof AxiosError) {
-        return rejectWithValue(error.response?.data?.message || 'Failed to get order');
-      }
-      return rejectWithValue('Failed to get order');
+      const response = await axiosInstance.get(`/orders/${id}`);
+      return extractApiData<OrderList>(response.data);
+    } catch (error: any) {
+      return rejectWithValue(handleApiError(error));
     }
   }
 );
 
-export const addOrder = createAsyncThunk<OrderList, Partial<OrderRequest>>(
+export const addOrder = createAsyncThunk<OrderList, OrderRequest>(
   'orders/addOrder',
-  async (order, { rejectWithValue }) => {
-    const requestKey = 'addOrder';
-    const existingRequest = pendingConfirmRequests.get(requestKey);
-    
-    if (existingRequest) {
-      return existingRequest;
-    }
-
+  async (order: OrderRequest, { rejectWithValue }) => {
     try {
-      const promise = axiosInstance.post<OrderList>('/orders', order).then(response => {
-        clearOrdersCache(); // This will also set shouldBypassCache flag
-        return response.data;
-      });
-      pendingConfirmRequests.set(requestKey, promise);
-      const result = await promise;
-      pendingConfirmRequests.delete(requestKey);
-      return result;
-    } catch (error) {
-      pendingConfirmRequests.delete(requestKey);
-      if (error instanceof AxiosError) {
-        return rejectWithValue(error.response?.data?.message || 'Failed to add order');
-      }
-      return rejectWithValue('Failed to add order');
+      const response = await axiosInstance.post('/orders', order);
+      return extractApiData<OrderList>(response.data);
+    } catch (error: any) {
+      return rejectWithValue(handleApiError(error));
     }
   }
 );
 
 export const updateOrder = createAsyncThunk<OrderList, OrderRequest>(
   'orders/updateOrder',
-  async (order, { rejectWithValue }) => {
-    const requestKey = `update-${order.id}`;
-    const existingRequest = pendingConfirmRequests.get(requestKey);
-    
-    if (existingRequest) {
-      return existingRequest;
-    }
-
+  async (order: OrderRequest, { rejectWithValue }) => {
     try {
-      const promise = axiosInstance.put<OrderList>(`/orders/${order.id}`, order).then(response => {
-        clearOrdersCache(); // This will also set shouldBypassCache flag
-        return response.data;
+      const response = await axiosInstance.put(`/orders/${order.id}`, order);
+      return extractApiData<OrderList>(response.data);
+    } catch (error: any) {
+      return rejectWithValue(handleApiError(error));
+    }
+  }
+);
+
+export const updateOrderStatus = createAsyncThunk<
+  OrderList,
+  { orderId: string; status: string }
+>(
+  'orders/updateOrderStatus',
+  async ({ orderId, status }, { rejectWithValue }) => {
+    try {
+      const response = await axiosInstance.put(`/orders/${orderId}/status`, { status });
+      return extractApiData<OrderList>(response.data);
+    } catch (error: any) {
+      return rejectWithValue(handleApiError(error));
+    }
+  }
+);
+
+export const assignOrderToDistributor = createAsyncThunk<
+  OrderList,
+  { orderId: string; distributorId: string }
+>(
+  'orders/assignOrderToDistributor',
+  async ({ orderId, distributorId }, { rejectWithValue }) => {
+    try {
+      const response = await axiosInstance.put(`/orders/${orderId}/assign`, { distributorId });
+      return extractApiData<OrderList>(response.data);
+    } catch (error: any) {
+      return rejectWithValue(handleApiError(error));
+    }
+  }
+);
+
+export const unassignOrderFromDistributor = createAsyncThunk<
+  OrderList,
+  string
+>(
+  'orders/unassignOrderFromDistributor',
+  async (orderId: string, { rejectWithValue }) => {
+    try {
+      const response = await axiosInstance.put(`/orders/${orderId}/unassign`);
+      return extractApiData<OrderList>(response.data);
+    } catch (error: any) {
+      return rejectWithValue(handleApiError(error));
+    }
+  }
+);
+
+export const duplicateOrder = createAsyncThunk<OrderList, string>(
+  'orders/duplicateOrder',
+  async (orderId: string, { rejectWithValue }) => {
+    try {
+      const response = await axiosInstance.post(`/orders/${orderId}/duplicate`);
+      return extractApiData<OrderList>(response.data);
+    } catch (error: any) {
+      return rejectWithValue(handleApiError(error));
+    }
+  }
+);
+
+export const getOrdersByDistributor = createAsyncThunk<
+  OrderList[],
+  { distributorId: string; status?: string }
+>(
+  'orders/getOrdersByDistributor',
+  async ({ distributorId, status }, { rejectWithValue }) => {
+    try {
+      const params = status ? { status } : {};
+      const response = await axiosInstance.get(`/orders/distributor/${distributorId}`, { params });
+      return extractApiData<OrderList[]>(response.data);
+    } catch (error: any) {
+      return rejectWithValue(handleApiError(error));
+    }
+  }
+);
+
+export const getOrdersByCustomer = createAsyncThunk<OrderList[], string>(
+  'orders/getOrdersByCustomer',
+  async (customerId: string, { rejectWithValue }) => {
+    try {
+      const response = await axiosInstance.get(`/orders/customer/${customerId}`);
+      return extractApiData<OrderList[]>(response.data);
+    } catch (error: any) {
+      return rejectWithValue(handleApiError(error));
+    }
+  }
+);
+
+export const getOrdersByStatus = createAsyncThunk<OrderList[], string>(
+  'orders/getOrdersByStatus',
+  async (status: string, { rejectWithValue }) => {
+    try {
+      const response = await axiosInstance.get(`/orders/status/${status}`);
+      return extractApiData<OrderList[]>(response.data);
+    } catch (error: any) {
+      return rejectWithValue(handleApiError(error));
+    }
+  }
+);
+
+export const getOrdersByDateRange = createAsyncThunk<
+  OrderList[],
+  { startDate: string; endDate: string }
+>(
+  'orders/getOrdersByDateRange',
+  async ({ startDate, endDate }, { rejectWithValue }) => {
+    try {
+      const response = await axiosInstance.get('/orders/date-range', {
+        params: { startDate, endDate }
       });
-      pendingConfirmRequests.set(requestKey, promise);
-      const result = await promise;
-      pendingConfirmRequests.delete(requestKey);
-      return result;
-    } catch (error) {
-      pendingConfirmRequests.delete(requestKey);
-      if (error instanceof AxiosError) {
-        return rejectWithValue(error.response?.data?.message || 'Failed to update order');
-      }
-      return rejectWithValue('Failed to update order');
+      return extractApiData<OrderList[]>(response.data);
+    } catch (error: any) {
+      return rejectWithValue(handleApiError(error));
+    }
+  }
+);
+
+export const searchOrders = createAsyncThunk<
+  OrderList[],
+  { query: string; filters?: Record<string, any> }
+>(
+  'orders/searchOrders',
+  async ({ query, filters = {} }, { rejectWithValue }) => {
+    try {
+      const response = await axiosInstance.get('/orders/search', {
+        params: { query, ...filters }
+      });
+      return extractApiData<OrderList[]>(response.data);
+    } catch (error: any) {
+      return rejectWithValue(handleApiError(error));
     }
   }
 );
@@ -347,7 +389,7 @@ const ordersSlice = createSlice({
       })
       .addCase(deleteOrder.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.orders = state.orders.filter(order => order.id !== action.payload);
+        state.orders = state.orders.filter(order => order.id.toString() !== action.payload);
         state.total -= 1;
       })
       .addCase(deleteOrder.rejected, (state, action) => {
@@ -389,10 +431,77 @@ const ordersSlice = createSlice({
       .addCase(updateOrder.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
+      })
+      .addCase(updateOrderStatus.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(updateOrderStatus.fulfilled, (state, action) => {
+        state.isLoading = false;
+        const index = state.orders.findIndex(order => order.id === action.payload.id);
+        if (index !== -1) {
+          state.orders[index] = action.payload;
+        }
+        if (state.currentOrder?.id === action.payload.id) {
+          state.currentOrder = action.payload;
+        }
+      })
+      .addCase(updateOrderStatus.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(assignOrderToDistributor.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(assignOrderToDistributor.fulfilled, (state, action) => {
+        state.isLoading = false;
+        const index = state.orders.findIndex(order => order.id === action.payload.id);
+        if (index !== -1) {
+          state.orders[index] = action.payload;
+        }
+        if (state.currentOrder?.id === action.payload.id) {
+          state.currentOrder = action.payload;
+        }
+      })
+      .addCase(assignOrderToDistributor.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(unassignOrderFromDistributor.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(unassignOrderFromDistributor.fulfilled, (state, action) => {
+        state.isLoading = false;
+        const index = state.orders.findIndex(order => order.id === action.payload.id);
+        if (index !== -1) {
+          state.orders[index] = action.payload;
+        }
+        if (state.currentOrder?.id === action.payload.id) {
+          state.currentOrder = action.payload;
+        }
+      })
+      .addCase(unassignOrderFromDistributor.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(duplicateOrder.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(duplicateOrder.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.orders.unshift(action.payload); // Add to beginning
+        state.total += 1;
+      })
+      .addCase(duplicateOrder.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
       });
   },
 });
 
 export const { setCurrentOrder, clearCurrentOrder } = ordersSlice.actions;
-export const ordersReducer = ordersSlice.reducer;
+
 export default ordersSlice.reducer;

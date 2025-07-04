@@ -6,11 +6,14 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Button from '../../components/Button';
 import IconButton from '../../components/IconButton';
 import { useCustomers } from '../../hooks/useCustomers';
+import { useAppDispatch } from '../../store/hooks';
+import { showSuccess, showError } from '../../store/slices/notificationSlice';
 import { Card, CardHeader, CardBody, Typography, Input } from '@material-tailwind/react';
 
 const Customers: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const dispatch = useAppDispatch();
   const { customers, loading, fetchCustomers, deleteCustomer, refreshCustomers } = useCustomers();
   const [searchQuery, setSearchQuery] = useState<string>('');
   
@@ -32,9 +35,15 @@ const Customers: React.FC = () => {
   const handleDelete = async (id: string) => {
     if (window.confirm('هل أنت متأكد من حذف هذا العميل؟')) {
       try {
-        await deleteCustomer(id);
-      } catch (error) {
+        await deleteCustomer(id).unwrap();
+        // The Redux reducer will automatically remove the customer from state
+        dispatch(showSuccess({ message: 'تم حذف العميل بنجاح' }));
+      } catch (error: any) {
         console.error("Error deleting customer:", error);
+        dispatch(showError({ 
+          message: error.message || 'فشل في حذف العميل',
+          title: 'خطأ في الحذف'
+        }));
       }
     }
   };

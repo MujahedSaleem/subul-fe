@@ -1,19 +1,22 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import Layout from '../../components/Layout';
 import DistributorForm from '../../components/DistributorForm';
-import { distributorsStore } from '../../store/distributorsStore';
-import type { Distributor } from '../../types/distributor';
+import { Distributor } from '../../types/distributor';
+import { AppDispatch } from '../../store/store';
+import { addDistributor } from '../../store/slices/distributorSlice';
 
 const AddDistributor: React.FC = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
 
-  // Initialize the distributor state with the new userName field
+  // Initialize the distributor state
   const [distributor, setDistributor] = useState<Partial<Distributor>>({
     firstName: '',
     lastName: '',
     phone: '',
-    userName: '', // New field
+    userName: '',
     isActive: true,
   });
 
@@ -21,11 +24,10 @@ const AddDistributor: React.FC = () => {
     e.preventDefault();
 
     try {
-      // Call the store's addDistributor method
-      await distributorsStore.addDistributor(distributor as Omit<Distributor, 'id' | 'createdAt'>);
-      navigate('/admin/distributors'); // Redirect after successful addition
+      await dispatch(addDistributor(distributor as Omit<Distributor, 'id'>)).unwrap();
+      navigate('/admin/distributors');
     } catch (error) {
-      console.error('Failed to add distributor:', error);
+      console.error('Error adding distributor:', error);
       alert('حدث خطأ أثناء إضافة الموزع. يرجى المحاولة لاحقًا.');
     }
   };

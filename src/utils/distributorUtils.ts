@@ -78,11 +78,24 @@ export const handleDirectCall = (phone: string): void => {
 };
 
 /**
- * Handle opening location in maps
+ * Handle opening location in maps with drive mode
  */
 export const handleOpenLocation = (location: Location): void => {
-  if (location?.coordinates) {
-    window.open(`https://www.google.com/maps/search/?api=1&query=${location.coordinates}`, '_blank');
+  if (!location?.coordinates) {
+    return;
+  }
+  
+  const [latitude, longitude] = location.coordinates.split(',').map(Number);
+  const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  
+  if (isMobileDevice) {
+    // For mobile, use geo: protocol for better app integration
+    const googleMapsUrl = `geo:${latitude},${longitude}?q=${latitude},${longitude}`;
+    window.location.href = googleMapsUrl;
+  } else {
+    // For desktop, open in navigation/driving mode
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
+    window.open(url, '_blank');
   }
 };
 

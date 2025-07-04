@@ -7,54 +7,77 @@ import { Distributor } from '../../../types/distributor';
 import PageLayout from '../../../components/admin/shared/PageLayout';
 import OrderFilter from '../../../components/OrderFilters';
 import OrderTable from '../../../components/OrderTable';
-import { useDataFetching } from '../../../hooks/useDataFetching';
-import { ordersStore } from '../../../store/ordersStore';
-import { distributorsStore } from '../../../store/distributorsStore';
+import { useAppDispatch, useAppSelector } from '../../../store/hooks';
+import { fetchOrders, deleteOrder, confirmOrder } from '../../../store/slices/orderSlice';
+import { fetchActiveDistributors, selectActiveDistributors, selectIsLoading as selectDistributorsLoading } from '../../../store/slices/distributorSlice';
+import { showSuccess, showError, showWarning } from '../../../store/slices/notificationSlice';
+import { RootState } from '../../../store/store';
 
 const OrdersList: React.FC = () => {
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
   const [showFilters, setShowFilters] = React.useState(false);
-  const [selectedDistributor, setSelectedDistributor] = React.useState('');
+  const [selectedDistributor, setSelectedDistributor] = React.useState<string | null>(null);
+  const [selectedStatus, setSelectedStatus] = React.useState<string | null>(null);
   const [dateFrom, setDateFrom] = React.useState('');
   const [dateTo, setDateTo] = React.useState('');
-  const [activeDistributors, setActiveDistributors] = React.useState<Distributor[]>([]);
 
-  const { data: orders, isLoading, error, fetchData } = useDataFetching<OrderList[]>(
-    async () => {
-      await ordersStore.fetchOrders();
-      return ordersStore.orders;
-    },
-    {
-      onError: (error) => console.error('Failed to fetch orders:', error),
-    }
-  );
+  // Redux selectors
+  const orders = useAppSelector((state: RootState) => state.orders.orders);
+  const isLoading = useAppSelector((state: RootState) => state.orders.isLoading);
+  const error = useAppSelector((state: RootState) => state.orders.error);
+  const activeDistributors = useAppSelector(selectActiveDistributors);
+  const distributorsLoading = useAppSelector(selectDistributorsLoading);
 
   React.useEffect(() => {
-    fetchData();
-    const unsubscribeDistributors = distributorsStore.subscribe(() => {
-      setActiveDistributors(distributorsStore.distributors.filter(d => d.isActive));
-    });
-    return () => unsubscribeDistributors();
-  }, [fetchData]);
+    // Fetch orders and active distributors
+    dispatch(fetchOrders({}));
+    dispatch(fetchActiveDistributors());
+  }, [dispatch]);
 
   const handleAddOrder = () => {
     navigate('/admin/orders/add');
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number) => {
     if (window.confirm('هل أنت متأكد من حذف هذا الطلب؟')) {
-      ordersStore.deleteOrder(id);
+      try {
+        await dispatch(deleteOrder(id.toString())).unwrap();
+        // Refresh orders after deletion
+        dispatch(fetchOrders({}));
+        dispatch(showSuccess({ message: 'تم حذف الطلب بنجاح' }));
+      } catch (error: any) {
+        console.error('Failed to delete order:', error);
+        dispatch(showError({ 
+          message: error.message || 'فشل في حذف الطلب',
+          title: 'خطأ في الحذف'
+        }));
+      }
     }
   };
 
-  const handleConfirmOrder = (order: OrderList) => {
+  const handleConfirmOrder = async (order: OrderList) => {
     if (order.status === 'Confirmed') return;
     if (!order?.customer?.id || order.cost === undefined || order.cost === null) {
-      alert('لا يمكن تأكيد الطلب. بيانات العميل أو التكلفة غير مكتملة.');
+      dispatch(showWarning({ 
+        message: 'لا يمكن تأكيد الطلب. بيانات العميل أو التكلفة غير مكتملة.',
+        title: 'تحذير'
+      }));
       return;
     }
     if (window.confirm('هل أنت متأكد من تأكيد هذا الطلب؟')) {
-      ordersStore.confirmOrder(order.id);
+      try {
+        await dispatch(confirmOrder(order.id)).unwrap();
+        // Refresh orders after confirmation
+        dispatch(fetchOrders({}));
+        dispatch(showSuccess({ message: 'تم تأكيد الطلب بنجاح' }));
+      } catch (error: any) {
+        console.error('Failed to confirm order:', error);
+        dispatch(showError({ 
+          message: error.message || 'فشل في تأكيد الطلب',
+          title: 'خطأ في التأكيد'
+        }));
+      }
     }
   };
 
@@ -62,7 +85,7 @@ const OrdersList: React.FC = () => {
     if (customer?.phone) {
       // Implement call customer logic
     } else {
-      alert('رقم الهاتف غير متوفر لهذا العميل');
+      dispatch(showWarning({ message: 'رقم الهاتف غير متوفر لهذا العميل' }));
     }
   };
 
@@ -77,7 +100,7 @@ const OrdersList: React.FC = () => {
         window.open(url, '_blank');
       }
     } else {
-      alert('لا توجد إحداثيات متوفرة لهذا الموقع');
+      dispatch(showWarning({ message: 'لا توجد إحداثيات متوفرة لهذا الموقع' }));
     }
   };
 
@@ -94,7 +117,8 @@ const OrdersList: React.FC = () => {
   };
 
   const resetFilters = () => {
-    setSelectedDistributor('');
+    setSelectedDistributor(null);
+    setSelectedStatus(null);
     setDateFrom('');
     setDateTo('');
   };
@@ -116,6 +140,8 @@ const OrdersList: React.FC = () => {
           setShowFilters={setShowFilters}
           selectedDistributor={selectedDistributor}
           setSelectedDistributor={setSelectedDistributor}
+          selectedStatus={selectedStatus}
+          setSelectedStatus={setSelectedStatus}
           dateFrom={dateFrom}
           setDateFrom={setDateFrom}
           dateTo={dateTo}
@@ -124,11 +150,11 @@ const OrdersList: React.FC = () => {
           activeDistributors={activeDistributors}
         />
         
-        {isLoading ? (
+        {isLoading || distributorsLoading ? (
           <div className="text-center py-8">جاري التحميل...</div>
         ) : error ? (
           <div className="text-center py-8 text-red-500">
-            حدث خطأ أثناء تحميل البيانات
+            حدث خطأ أثناء تحميل البيانات: {error}
           </div>
         ) : (
           <OrderTable 

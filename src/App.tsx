@@ -17,6 +17,7 @@ import DistributorListOrder from "./pages/distributor/DistributorListOrder";
 import { ProtectedRoute } from "./components/authGuard";
 import { useAuth } from "./context/AuthContext";
 import ViewOrder from "./pages/admin/ViewOrder";
+import NotificationContainer from "./components/NotificationContainer";
 
 // ✅ Authentication & Role-Based Access
 
@@ -33,7 +34,9 @@ const RoleBasedRedirect = () => {
 
 function App() {
   return (
-    <Routes>
+    <>
+      <NotificationContainer />
+      <Routes>
       {/* Public Route */}
       <Route path="/login" element={<RoleBasedRedirect />} />
 
@@ -92,6 +95,7 @@ function App() {
       {/* Default Route - Redirect to Login */}
       <Route path="/" element={<RoleBasedRedirect />} />
     </Routes>
+    </>
   );
 }
 
