@@ -79,7 +79,7 @@ export const fetchDistributorCustomers = createAsyncThunk<Customer[], string>(
     
     try {
       // Create and store the pending request
-      const promise = axiosInstance.get(`/distributors/${distributorId}/customers`)
+      const promise = axiosInstance.get(`/distributors/customers`)
         .then(response => {
           pendingRequests.delete(requestKey); // Clear when done
           return extractApiData<Customer[]>(response.data);
@@ -102,7 +102,7 @@ export const addDistributorCustomer = createAsyncThunk<Customer, { distributorId
   'distributorCustomers/addDistributorCustomer',
   async ({ distributorId, customer }, { rejectWithValue }) => {
     try {
-      const response = await axiosInstance.post(`/distributors/${distributorId}/customers`, customer);
+      const response = await axiosInstance.post(`/distributors/customers`, customer);
       return extractApiData<Customer>(response.data);
     } catch (error: any) {
       return rejectWithValue(handleApiError(error));
@@ -115,7 +115,7 @@ export const updateDistributorCustomer = createAsyncThunk<Customer, { distributo
   'distributorCustomers/updateDistributorCustomer',
   async ({ distributorId, customer }, { rejectWithValue }) => {
     try {
-      const response = await axiosInstance.put(`/distributors/${distributorId}/customers/${customer.id}`, customer);
+      const response = await axiosInstance.put(`/distributors/customers/${customer.id}`, customer);
       return extractApiData<Customer>(response.data);
     } catch (error: any) {
       return rejectWithValue(handleApiError(error));
@@ -128,7 +128,7 @@ export const updateDistributorCustomerLocation = createAsyncThunk<Customer, { di
   'distributorCustomers/updateDistributorCustomerLocation',
   async ({ distributorId, customerId, locationId, location }, { rejectWithValue }) => {
     try {
-      const response = await axiosInstance.put(`/distributors/${distributorId}/customers/${customerId}/locations/${locationId}`, location);
+      const response = await axiosInstance.put(`/distributors/customers/${customerId}/locations/${locationId}`, location);
       return extractApiData<Customer>(response.data);
     } catch (error: any) {
       return rejectWithValue(handleApiError(error));
@@ -156,7 +156,7 @@ export const getDistributorCustomerById = createAsyncThunk<Customer, { distribut
       }
 
       // Create and store the pending request
-      const requestPromise = axiosInstance.get(`/distributors/${distributorId}/customers/${customerId}`)
+      const requestPromise = axiosInstance.get(`/distributors/customers/${customerId}`)
         .then(response => {
           pendingRequests.delete(requestKey); // Clear when done
           return extractApiData<Customer>(response.data);
