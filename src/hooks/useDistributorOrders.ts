@@ -29,7 +29,7 @@ export const useDistributorOrders = () => {
   }, [dispatch]);
 
   const addOrder = useCallback((order: Partial<OrderRequest>) => {
-    return dispatch(addDistributorOrder(order));
+    return dispatch(addDistributorOrder(order as OrderRequest));
   }, [dispatch]);
 
   const updateOrder = useCallback((order: OrderRequest) => {
@@ -40,6 +40,10 @@ export const useDistributorOrders = () => {
     return dispatch(confirmDistributorOrder(id));
   }, [dispatch]);
 
+  const refreshOrders = useCallback(() => {
+    // Force a fresh fetch by clearing the cache first
+    return dispatch(fetchDistributorOrders());
+  }, [dispatch]);
 
 
   const resetCurrentOrder = useCallback(() => {
@@ -63,7 +67,7 @@ export const useDistributorOrders = () => {
     addOrder,
     updateOrder,
     confirmOrder,
-    deleteOrder,
+    refreshOrders,
     resetCurrentOrder,
     resetErrors
   };

@@ -27,20 +27,19 @@ const initialState: DistributorOrdersState = {
 const pendingRequests = new Map<string, Promise<any>>();
 
 // Fetch all orders for the distributor
-export const fetchDistributorOrders = createAsyncThunk<OrderList[], string>(
+export const fetchDistributorOrders = createAsyncThunk<OrderList[]>(
   'distributorOrders/fetchDistributorOrders',
-  async (distributorId: string, { getState, rejectWithValue }) => {
+  async (_, { getState, rejectWithValue }) => {
     const state = getState() as { distributorOrders: DistributorOrdersState };
     
-    // Return existing data if already initialized for this distributor
+    // Return existing data if already initialized
     if (state.distributorOrders.initialized && 
-        state.distributorOrders.currentDistributorId === distributorId && 
         !state.distributorOrders.loading) {
       return state.distributorOrders.orders;
     }
     
-    // If there's already a pending request for this distributor, wait for it
-    const requestKey = `fetchDistributorOrders-${distributorId}`;
+    // If there's already a pending request, wait for it
+    const requestKey = `fetchDistributorOrders`;
     if (pendingRequests.has(requestKey)) {
       return await pendingRequests.get(requestKey);
     }
@@ -66,9 +65,9 @@ export const fetchDistributorOrders = createAsyncThunk<OrderList[], string>(
 );
 
 // Get a specific order by ID
-export const getDistributorOrderById = createAsyncThunk<OrderList, { distributorId: string; orderId: number }>(
+export const getDistributorOrderById = createAsyncThunk<OrderList, number>(
   'distributorOrders/getDistributorOrderById',
-  async ({ distributorId, orderId }, { getState, rejectWithValue }) => {
+  async (orderId, { getState, rejectWithValue }) => {
     try {
       const state = getState() as { distributorOrders: DistributorOrdersState };
       
@@ -79,7 +78,7 @@ export const getDistributorOrderById = createAsyncThunk<OrderList, { distributor
       }
 
       // Check if there's already a pending request for this order
-      const requestKey = `getDistributorOrderById-${distributorId}-${orderId}`;
+      const requestKey = `getDistributorOrderById-${orderId}`;
       if (pendingRequests.has(requestKey)) {
         return await pendingRequests.get(requestKey);
       }
@@ -104,9 +103,9 @@ export const getDistributorOrderById = createAsyncThunk<OrderList, { distributor
 );
 
 // Add a new order
-export const addDistributorOrder = createAsyncThunk<OrderList, { distributorId: string; order: OrderRequest }>(
+export const addDistributorOrder = createAsyncThunk<OrderList, OrderRequest>(
   'distributorOrders/addDistributorOrder',
-  async ({ distributorId, order }, { rejectWithValue }) => {
+  async (order, { rejectWithValue }) => {
     try {
       const response = await axiosInstance.post(`/distributors/orders`, order);
       return extractApiData<OrderList>(response.data);
@@ -117,9 +116,9 @@ export const addDistributorOrder = createAsyncThunk<OrderList, { distributorId: 
 );
 
 // Update an existing order
-export const updateDistributorOrder = createAsyncThunk<OrderList, { distributorId: string; order: OrderRequest }>(
+export const updateDistributorOrder = createAsyncThunk<OrderList, OrderRequest>(
   'distributorOrders/updateDistributorOrder',
-  async ({ distributorId, order }, { rejectWithValue }) => {
+  async (order, { rejectWithValue }) => {
     try {
       const response = await axiosInstance.put(`/distributors/orders/${order.id}`, order);
       return extractApiData<OrderList>(response.data);
@@ -130,9 +129,9 @@ export const updateDistributorOrder = createAsyncThunk<OrderList, { distributorI
 );
 
 // Confirm an order
-export const confirmDistributorOrder = createAsyncThunk<OrderList, { distributorId: string; orderId: number }>(
+export const confirmDistributorOrder = createAsyncThunk<OrderList, number>(
   'distributorOrders/confirmDistributorOrder',
-  async ({ distributorId, orderId }, { rejectWithValue }) => {
+  async (orderId, { rejectWithValue }) => {
     try {
       const response = await axiosInstance.post(`/distributors/orders/${orderId}/confirm`);
       return extractApiData<OrderList>(response.data);
@@ -141,8 +140,6 @@ export const confirmDistributorOrder = createAsyncThunk<OrderList, { distributor
     }
   }
 );
-
-
 
 const distributorOrdersSlice = createSlice({
   name: 'distributorOrders',
@@ -222,7 +219,6 @@ const distributorOrdersSlice = createSlice({
         state.isLoading = false;
         state.error = action.payload as string;
       })
-
   }
 });
 
