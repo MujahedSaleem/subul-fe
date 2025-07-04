@@ -38,6 +38,7 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [getttingGpsLocation, setGetttingGpsLocation] = useState(false);
   const [originalCustomerName, setOriginalCustomerName] = useState<string>('');
+  const [shouldAutoOpenLocation, setShouldAutoOpenLocation] = useState(false);
   const originalNameInitialized = useRef(false);
   const navigate = useNavigate();
   
@@ -73,6 +74,11 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
           ...prev,
           customer: existingCustomer
         }));
+        
+        // Auto-open location dropdown if customer has locations
+        if (existingCustomer.locations && existingCustomer.locations.length > 0) {
+          setShouldAutoOpenLocation(true);
+        }
       } else {
         setIsNewCustomer(true);
         // Only set empty original name if not in edit mode
@@ -86,7 +92,7 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
     } finally {
       setIsSearching(false);
     }
-  }, [findByPhone, setOrder]);
+  }, [findByPhone, setOrder, isEdit]);
 
   // Track phone to prevent unnecessary searches
   const [lastSearchedPhone, setLastSearchedPhone] = useState<string>('');
@@ -109,6 +115,16 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
       searchCustomerByPhone(currentPhone);
     }
   }, [order?.customer?.phone, lastSearchedPhone, searchCustomerByPhone]);
+
+  // Reset auto-open flag after a short delay to allow the dropdown to open
+  useEffect(() => {
+    if (shouldAutoOpenLocation) {
+      const timer = setTimeout(() => {
+        setShouldAutoOpenLocation(false);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [shouldAutoOpenLocation]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -195,6 +211,7 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
           disabled={isEdit && order.status === 'Confirmed'}
           customer={order?.customer}
           isDistributor={true}
+          autoOpenDropdown={shouldAutoOpenLocation}
         />
               {order?.location?.name && !(order?.location?.coordinates) && (
         <div className="flex items-center gap-1">

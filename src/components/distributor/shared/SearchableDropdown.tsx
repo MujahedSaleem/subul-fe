@@ -30,7 +30,8 @@ interface SearchableDropdownProps {
   className?: string;
   placeholder?: string;
   children: ReactNode;
-  addedOption?:ReactElement<any, any>
+  addedOption?:ReactElement<any, any>;
+  autoOpen?: boolean;
 }
 
 export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
@@ -42,7 +43,8 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
   className = "",
   placeholder = "اختر خيارًا",
   children,
-  addedOption
+  addedOption,
+  autoOpen
 }) => {
   
   const [query, setQuery] = useState("");
@@ -94,6 +96,14 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
     setSelectedLabel(value)
 
   }, [value]);
+
+  // Handle autoOpen functionality
+  useEffect(() => {
+    if (autoOpen && !disabled && !isOpen) {
+      updateDropdownPosition();
+      setIsOpen(true);
+    }
+  }, [autoOpen, disabled, isOpen, updateDropdownPosition]);
 
       const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;

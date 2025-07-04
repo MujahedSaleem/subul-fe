@@ -1,7 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { AxiosError } from 'axios';
 import axiosInstance from '../../utils/axiosInstance';
-import { Customer, DistributorCreateCustomerRequest, Location, UpdateCustomerRequest } from '../../types/customer';
+import { Customer,  } from '../../types/customer';
 import { RootState } from '../store';
 import { extractApiData, handleApiError } from '../../utils/apiResponseHandler';
 
@@ -39,8 +38,15 @@ export const findCustomerByPhone = createAsyncThunk<Customer | null, string>(
     }
 
     try {
-      const promise = axiosInstance.get<Customer>(`/distributors/customers`, { params: { phone } })
-        .then(response => response.data)
+      const promise = axiosInstance.get(`/distributors/customers`, { params: { phone } })
+        .then(response => {
+          try {
+            return extractApiData<Customer>(response.data);
+          } catch (error) {
+            // If extractApiData fails, it means no customer was found
+            return null;
+          }
+        })
         .catch(() => null) // Return null if customer not found
         .finally(() => {
           pendingRequests.delete(requestKey);
@@ -48,12 +54,9 @@ export const findCustomerByPhone = createAsyncThunk<Customer | null, string>(
 
       pendingRequests.set(requestKey, promise);
       return await promise;
-    } catch (error) {
+    } catch (error: any) {
       pendingRequests.delete(requestKey);
-      if (error instanceof AxiosError) {
-        return rejectWithValue(error.response?.data?.message || 'Failed to find customer');
-      }
-      return rejectWithValue('Failed to find customer');
+      return rejectWithValue(handleApiError(error));
     }
   }
 );

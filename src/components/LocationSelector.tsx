@@ -17,10 +17,11 @@ interface LocationSelectorProps {
   customer: Customer | undefined;
   isNewCustomer: boolean;
   isDistributor?: boolean;
+  autoOpenDropdown?: boolean;
 }
 
 const LocationSelector = forwardRef<HTMLDivElement, LocationSelectorProps>((
-  { order, setOrder, disabled, customer, isNewCustomer, isDistributor },
+  { order, setOrder, disabled, customer, isNewCustomer, isDistributor, autoOpenDropdown },
   ref
 ) => {
     const dispatch = useAppDispatch();
@@ -189,6 +190,7 @@ const LocationSelector = forwardRef<HTMLDivElement, LocationSelectorProps>((
             disabled={disabled}
             placeholder="اختر الموقع"
             className="flex-1"
+            autoOpen={autoOpenDropdown && customer?.locations && customer.locations.length > 0}
           >
             {customer?.locations?.map(location => (
               <Option key={location.id} value={location.id.toString()}>

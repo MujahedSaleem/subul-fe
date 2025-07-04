@@ -54,6 +54,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [loading, setLoading] = useState(false);
   const [getttingGpsLocation, setGetttingGpsLocation] = useState(false);
+  const [shouldAutoOpenLocation, setShouldAutoOpenLocation] = useState(false);
   const navigate = useNavigate();
   const locationRef = React.useRef(null);
 
@@ -66,10 +67,16 @@ const OrderForm: React.FC<OrderFormProps> = ({
         const customerResults = await dispatch(findCustomerByPhone(safeOrder.customer.phone)).unwrap();
         if (customerResults && customerResults.length > 0) {
           setIsNewCustomer(false);
+          const foundCustomer = customerResults[0];
           setOrder((prev) => ({
             ...prev,
-            customer: customerResults[0] // Take the first matching customer
+            customer: foundCustomer // Take the first matching customer
           }));
+          
+          // Auto-open location dropdown if customer has locations
+          if (foundCustomer.locations && foundCustomer.locations.length > 0) {
+            setShouldAutoOpenLocation(true);
+          }
         } else {
           setIsNewCustomer(true);
         }
@@ -85,7 +92,15 @@ const OrderForm: React.FC<OrderFormProps> = ({
    findCustomer()
   }, [safeOrder?.customer?.phone, dispatch, setOrder]);
 
- 
+  // Reset auto-open flag after a short delay to allow the dropdown to open
+  useEffect(() => {
+    if (shouldAutoOpenLocation) {
+      const timer = setTimeout(() => {
+        setShouldAutoOpenLocation(false);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [shouldAutoOpenLocation]);
 
   const handleSetLocation = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -162,6 +177,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
           disabled={(isEdit && safeOrder?.status === 'Confirmed') || !safeOrder?.customer?.name}
           customer={safeOrder?.customer}
           ref={locationRef}
+          autoOpenDropdown={shouldAutoOpenLocation}
         />
       )}
 
