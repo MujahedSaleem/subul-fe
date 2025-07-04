@@ -1,5 +1,5 @@
 import React from "react";
-import { faPlus, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { faPlus, faXmark, faLocationDot } from "@fortawesome/free-solid-svg-icons";
 import Button from "./Button";
 import IconButton from "./IconButton";
 import { Input } from "@material-tailwind/react";
@@ -24,6 +24,31 @@ const LocationsSection: React.FC<LocationsSectionProps> = ({
   removeLocation,
   updateLocation,
 }) => {
+  const handleOpenLocation = (coordinates: string) => {
+    if (!coordinates.trim()) {
+      alert('لا توجد إحداثيات متوفرة لهذا الموقع');
+      return;
+    }
+
+    const [latitude, longitude] = coordinates.split(',').map(coord => coord.trim());
+    if (!latitude || !longitude) {
+      alert('تنسيق الإحداثيات غير صحيح. يجب أن يكون بالشكل: خط العرض، خط الطول');
+      return;
+    }
+
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobileDevice) {
+      // For mobile, use geo: protocol for better app integration
+      const googleMapsUrl = `geo:${latitude},${longitude}?q=${latitude},${longitude}`;
+      window.location.href = googleMapsUrl;
+    } else {
+      // For desktop, open in navigation/driving mode
+      const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
+      window.open(url, '_blank');
+    }
+  };
+
   return (
     <div className="space-y-4 mt-8">
       <div className="flex justify-between items-center">
@@ -65,6 +90,9 @@ const LocationsSection: React.FC<LocationsSectionProps> = ({
                     }
                     className="block w-full border border-slate-200 rounded-lg py-2 px-3 focus:ring-primary-500/20 focus:border-primary-500"
                     required
+                    onPointerEnterCapture={() => {}}
+                    onPointerLeaveCapture={() => {}}
+                    crossOrigin={undefined}
                   />
                 </div>
 
@@ -73,15 +101,29 @@ const LocationsSection: React.FC<LocationsSectionProps> = ({
                   <label className="block text-sm font-medium text-slate-700 mb-1">
                     الإحداثيات (خط الطول، خط العرض)
                   </label>
-                  <Input
-                    type="text"
-                    value={location.coordinates}
-                    onChange={(e) =>
-                      updateLocation(location.id, "coordinates", e.target.value)
-                    }
-                    className="block w-full border border-slate-200 rounded-lg py-2 px-3 focus:ring-primary-500/20 focus:border-primary-500"
-                    placeholder="مثال: 31.2357, 30.0444"
-                  />
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="text"
+                      value={location.coordinates}
+                      onChange={(e) =>
+                        updateLocation(location.id, "coordinates", e.target.value)
+                      }
+                      className="flex-1 border border-slate-200 rounded-lg py-2 px-3 focus:ring-primary-500/20 focus:border-primary-500"
+                      placeholder="مثال: 31.2357, 30.0444"
+                      onPointerEnterCapture={() => {}}
+                      onPointerLeaveCapture={() => {}}
+                      crossOrigin={undefined}
+                    />
+                    {location.coordinates && (
+                      <IconButton
+                        onClick={() => handleOpenLocation(location.coordinates)}
+                        icon={faLocationDot}
+                        variant="primary"
+                        size="md"
+                        title="فتح الموقع في خريطة جوجل"
+                      />
+                    )}
+                  </div>
                 </div>
 
                 {/* Description */}
