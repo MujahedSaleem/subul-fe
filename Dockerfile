@@ -14,12 +14,12 @@ WORKDIR /app
 # Stage 1: Install production dependencies
 FROM base AS prod-deps
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm store prune && pnpm install --prod --frozen-lockfile
+RUN pnpm store prune && pnpm install --prod
 
 # Stage 2: Install all dependencies and build the app
 FROM base AS build
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm store prune && pnpm install --frozen-lockfile
+RUN pnpm store prune && pnpm install
 COPY . .
 RUN pnpm run build
 
