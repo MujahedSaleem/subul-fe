@@ -59,9 +59,10 @@ export const cleanPhoneNumber = (phone: string): string => {
   const cleaned = phone?.replace(/\D/g, '');
   const withoutLeadingZeros = cleaned?.replace(/^0+/, '');
   
- 
-  
-  return `+${withoutLeadingZeros}`;
+  if (withoutLeadingZeros && (withoutLeadingZeros.startsWith('970') || withoutLeadingZeros.startsWith('972'))) {
+    return `+${withoutLeadingZeros}`;
+  }
+  return `0${withoutLeadingZeros}`;
 };
 
 /**
