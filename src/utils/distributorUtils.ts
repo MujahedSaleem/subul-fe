@@ -59,15 +59,9 @@ export const cleanPhoneNumber = (phone: string): string => {
   const cleaned = phone?.replace(/\D/g, '');
   const withoutLeadingZeros = cleaned?.replace(/^0+/, '');
   
-  // Add Israel country code (+972) if not already present
-  if (withoutLeadingZeros && !withoutLeadingZeros.startsWith('972') && !withoutLeadingZeros.startsWith('+972')) {
-    return `+972${withoutLeadingZeros}`;
-  }
-  if (withoutLeadingZeros && !withoutLeadingZeros.startsWith('970') && !withoutLeadingZeros.startsWith('+970')) {
-    return `+970${withoutLeadingZeros}`;
-  }
+ 
   
-  return withoutLeadingZeros;
+  return `+${withoutLeadingZeros}`;
 };
 
 /**
