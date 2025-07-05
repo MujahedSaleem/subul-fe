@@ -1,32 +1,172 @@
-name: Deploy to Server
+name: Deploy Frontend Only
 
 on:
   push:
-    branches:
-      - main # Change to the branch you want to trigger deployment (e.g., main or master)
+    branches: [ main, master ]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - '.dockerignore'
+  repository_dispatch:
+    types: [frontend-deploy-only]
+  workflow_dispatch:
+    inputs:
+      frontend_ref:
+        description: 'Frontend branch/commit to deploy'
+        required: true
+        default: 'main'
+
+permissions:
+  contents: read
+  actions: read
 
 jobs:
-  deploy:
+  test:
+    name: Test Frontend
     runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout frontend code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run tests
+      run: npm test -- --watchAll=false
+
+    - name: Build frontend
+      run: npm run build
+
+  deploy-frontend:
+    name: Deploy Frontend Only
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'repository_dispatch' || github.event_name == 'workflow_dispatch'
+    
+    environment:
+      name: production
+      url: https://${{ vars.PRODUCTION_DOMAIN || 'your-domain.com' }}
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+    - name: Deploy frontend to production server
+      if: vars.DEPLOY_HOST != ''
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ vars.DEPLOY_HOST }}
+        username: ${{ vars.DEPLOY_USER }}
+        key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        port: ${{ vars.DEPLOY_PORT || '22' }}
+        script: |
+          # Navigate to frontend directory and pull latest code
+          cd ${{ vars.FRONTEND_DEPLOY_PATH || '/home/deployer/subul-fe' }}
+          echo "📥 Pulling latest frontend code..."
+          git fetch origin
+          
+          # Determine which branch to checkout
+          FRONTEND_BRANCH="${{ github.event.client_payload.ref || github.event.inputs.frontend_ref || github.ref_name || 'main' }}"
+          echo "🔀 Checking out branch: $FRONTEND_BRANCH"
+          git checkout $FRONTEND_BRANCH
+          git pull origin $FRONTEND_BRANCH
+          
+          # Navigate to backend directory for docker compose
+          cd /home/deployer/subul-be
+          
+          # BACKUP CURRENT FRONTEND IMAGE
+          echo "💾 Backing up current frontend image..."
+          if docker image inspect subul-fe:latest >/dev/null 2>&1; then
+            docker tag subul-fe:latest subul-fe:backup
+            echo "✅ Frontend image backed up as subul-fe:backup"
+          fi
+          
+          # BUILD FRONTEND
+          echo "🏗️ Building frontend with docker compose..."
+          docker compose -f docker-compose.unified.yml build subul-frontend || exit 1
+          
+          # DEPLOY FRONTEND (no nginx restart needed)
+          echo "🚀 Deploying frontend only..."
+          docker stop subul-fe || true
+          docker rm subul-fe || true
+          
+          echo "🚀 Starting frontend..."
+          docker compose -f docker-compose.unified.yml up -d --no-build subul-frontend
+          
+   
+          # FRONTEND HEALTH CHECK
+          FRONTEND_OK=false
+          echo "🔍 Checking frontend health via nginx proxy..."
+          for i in {1..10}; do
+            if docker ps | grep -q "subul-fe" && curl -f -s -k https://localhost >/dev/null 2>&1; then
+              echo "✅ Frontend is responding via nginx"
+              FRONTEND_OK=true
+              break
+            fi
+            echo "⏳ Frontend check attempt $i/10..."
+            sleep 5
+          done
+          
+          # FINAL STATUS
+          if [ "$FRONTEND_OK" = true ]; then
+            echo "✅ Frontend deployment successful!"
+            echo "⏱️  Frontend deployment - downtime: ~15-30 seconds"
+            # Clean up backup image
+            docker rmi subul-fe:backup 2>/dev/null || true
+            docker image prune -f
+          else
+            echo "❌ Frontend deployment failed - rolling back"
+            docker compose -f docker-compose.unified.yml logs subul-frontend --tail=20
+            
+            # ROLLBACK FRONTEND
+            echo "🔄 Rolling back frontend..."
+            docker stop subul-fe || true
+            docker rm subul-fe || true
+            
+            # Restore backup image if it exists
+            if docker image inspect subul-fe:backup >/dev/null 2>&1; then
+              docker tag subul-fe:backup subul-fe:latest
+              echo "✅ Frontend image restored from backup"
+              
+              # Restart frontend with restored image
+              docker compose -f docker-compose.unified.yml up -d --no-build subul-frontend
+              sleep 10
+              
+              # Verify rollback worked
+              if curl -f -s -k https://localhost >/dev/null 2>&1; then
+                echo "✅ Frontend rollback successful"
+              else
+                echo "❌ Frontend rollback failed - manual intervention required"
+                exit 1
+              fi
+            else
+              echo "⚠️ No frontend backup image found, cannot rollback"
+              exit 1
+            fi
+            
+            exit 1
+          fi
 
-      - name: Set up SSH Key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.PROD_SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -p 1221 -H ${{ secrets.PROD_SERVER_IP }} >> ~/.ssh/known_hosts || true
-        shell: bash
-
-      - name: Deploy via SSH
-        run: |
-          ssh -o StrictHostKeyChecking=no -p 1221 -i ~/.ssh/id_rsa deployer@${{ secrets.PROD_SERVER_IP }} << EOF
-           cd /home/deployer/subul-fe
-          git pull origin main # Change 'main' to your branch name if needed
-          docker compose -f ../subul-be/docker-compose.unified.yml down subul-frontend
-          docker compose -f ../subul-be/docker-compose.unified.yml up -d subul-frontend --build
-          EOF
-        shell: bash
+    - name: Deploy locally (for testing)
+      if: vars.DEPLOY_HOST == ''
+      run: |
+        echo "🚀 Deploying frontend locally for testing..."
+        echo "Frontend ref: ${{ github.event.client_payload.ref || github.event.inputs.frontend_ref || github.ref_name || 'main' }}"
+        echo "Repository: ${{ github.repository }}"
+        echo "Event: ${{ github.event_name }}"
+        echo "This would deploy frontend only locally"
+        echo ""
+        echo "To deploy to production server, configure these variables:"
+        echo "- DEPLOY_HOST: Production server IP/domain"
+        echo "- DEPLOY_USER: SSH username"
+        echo "- DEPLOY_PORT: SSH port (default: 22)"
+        echo "- FRONTEND_DEPLOY_PATH: Frontend repo path (default: /home/deployer/subul-fe)"
+        echo "- BACKEND_DEPLOY_PATH: Backend repo path (default: /home/deployer/subul-be)"
+        echo "- PRODUCTION_DOMAIN: Your production domain"
+        echo ""
+        echo "And these secrets:"
+        echo "- PROD_SSH_PRIVATE_KEY: SSH private key for deployment" 
