@@ -18,6 +18,7 @@ import { ProtectedRoute } from "./components/authGuard";
 import { useAuth } from "./context/AuthContext";
 import ViewOrder from "./pages/admin/ViewOrder";
 import NotificationContainer from "./components/NotificationContainer";
+import PWAInstallPrompt from "./components/PWAInstallPrompt";
 
 // ✅ Authentication & Role-Based Access
 
@@ -36,6 +37,7 @@ function App() {
   return (
     <>
       <NotificationContainer />
+      <PWAInstallPrompt />
       <Routes>
       {/* Public Route */}
       <Route path="/login" element={<RoleBasedRedirect />} />
