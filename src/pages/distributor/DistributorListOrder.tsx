@@ -231,6 +231,11 @@ const DistributorListOrder: React.FC = () => {
     }
   };
 
+  // New handler for blur event (clicking outside the input)
+  const handleCostBlur = (order: OrderList) => {
+    handleSaveCost(order);
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -526,7 +531,7 @@ const DistributorListOrder: React.FC = () => {
                                 variant="outlined"
                                 onClick={() => handleUpdateLocation(order)}
                                 disabled={locationLoadingStates[order.id] || order.status === 'Confirmed'}
-                                className="flex items-center gap-1"
+                                className={`flex items-center gap-1 ${order.location?.coordinates ? 'hidden' : ''}`}
                               >
                                 {locationLoadingStates[order.id] ? (
                                   <div className={`animate-spin w-3 h-3 border ${
@@ -556,7 +561,7 @@ const DistributorListOrder: React.FC = () => {
                                   التكلفة
                                 </Typography>
                                 {costEditingStates[order.id] ? (
-                                  <div className="flex items-center gap-1 mt-1">
+                                  <div className="mt-1">
                                     <input
                                       type="number"
                                       value={costInputValues[order.id] || ''}
@@ -565,27 +570,12 @@ const DistributorListOrder: React.FC = () => {
                                         [order.id]: e.target.value
                                       }))}
                                       onKeyDown={(e) => handleCostKeyPress(e, order)}
-                                      className="flex-1 px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                      onBlur={() => handleCostBlur(order)}
+                                      className="w-full px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                                       placeholder="0"
                                       min="0"
                                       step="0.01"
                                       autoFocus
-                                    />
-                                    <IconButton
-                                      icon={faCheck}
-                                      onClick={() => handleSaveCost(order)}
-                                      color="green"
-                                      size="sm"
-                                      className="w-6 h-6"
-                                      title="حفظ"
-                                    />
-                                    <IconButton
-                                      icon={faTimes}
-                                      onClick={() => handleCancelCostEdit(order)}
-                                      color="red"
-                                      size="sm"
-                                      className="w-6 h-6"
-                                      title="إلغاء"
                                     />
                                   </div>
                                 ) : (
