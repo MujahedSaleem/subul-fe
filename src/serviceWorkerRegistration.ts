@@ -18,6 +18,8 @@ const isLocalhost = Boolean(
 type Config = {
   onSuccess?: (registration: ServiceWorkerRegistration) => void;
   onUpdate?: (registration: ServiceWorkerRegistration) => void;
+  onOffline?: () => void;
+  onOnline?: () => void;
 };
 
 export function register(config?: Config): void {
@@ -49,6 +51,19 @@ export function register(config?: Config): void {
       } else {
         // Is not localhost. Just register service worker
         registerValidSW(swUrl, config);
+      }
+    });
+
+    // Add online/offline event listeners
+    window.addEventListener('online', () => {
+      if (config && config.onOnline) {
+        config.onOnline();
+      }
+    });
+
+    window.addEventListener('offline', () => {
+      if (config && config.onOffline) {
+        config.onOffline();
       }
     });
   }
@@ -123,6 +138,9 @@ function checkValidServiceWorker(swUrl: string, config?: Config) {
     })
     .catch(() => {
       console.log('No internet connection found. App is running in offline mode.');
+      if (config && config.onOffline) {
+        config.onOffline();
+      }
     });
 }
 

@@ -45,9 +45,29 @@
       text-decoration: none;
       font-weight: 500;
       transition: background-color 0.2s;
+      margin: 0.5rem;
     }
     .btn:hover {
       background-color: #2563eb;
+    }
+    .btn-secondary {
+      background-color: #64748b;
+    }
+    .btn-secondary:hover {
+      background-color: #475569;
+    }
+    .spinner {
+      display: none;
+      width: 40px;
+      height: 40px;
+      margin: 1rem auto;
+      border: 4px solid rgba(59, 130, 246, 0.3);
+      border-radius: 50%;
+      border-top-color: #3b82f6;
+      animation: spin 1s ease-in-out infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
   </style>
 </head>
@@ -56,8 +76,65 @@
     <div class="icon">📶</div>
     <h1>أنت غير متصل بالإنترنت</h1>
     <p>يبدو أنك غير متصل بالإنترنت. يرجى التحقق من اتصالك والمحاولة مرة أخرى.</p>
-    <p>يمكنك الوصول إلى بعض الميزات المخزنة مؤقتًا، ولكن قد لا تعمل جميع الوظائف بشكل صحيح.</p>
-    <a href="/" class="btn">إعادة المحاولة</a>
+    <p>عند استعادة الاتصال، سيتم توجيهك تلقائيًا إلى الصفحة التي كنت تستخدمها.</p>
+    <div class="spinner" id="spinner"></div>
+    <div>
+      <a href="/" class="btn" id="retry-btn">إعادة المحاولة</a>
+      <a href="/" class="btn btn-secondary" id="home-btn">الصفحة الرئيسية</a>
+    </div>
   </div>
+
+  <script>
+    // Check for connection periodically
+    const spinner = document.getElementById('spinner');
+    const retryBtn = document.getElementById('retry-btn');
+    
+    // Try to get the last route from localStorage
+    const savedRoute = localStorage.getItem('subul-current-route');
+    
+    // Update retry button to go to the saved route if available
+    if (savedRoute) {
+      retryBtn.href = savedRoute;
+    }
+    
+    // Check connection status every 5 seconds
+    function checkConnection() {
+      spinner.style.display = 'block';
+      
+      fetch('/', { method: 'HEAD', cache: 'no-store' })
+        .then(() => {
+          // We're back online!
+          if (savedRoute) {
+            window.location.href = savedRoute;
+          } else {
+            window.location.href = '/';
+          }
+        })
+        .catch(() => {
+          // Still offline
+          spinner.style.display = 'none';
+        });
+    }
+    
+    // Start checking connection after 5 seconds
+    setTimeout(() => {
+      const connectionCheck = setInterval(checkConnection, 5000);
+      
+      // Clear interval when page is hidden
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+          clearInterval(connectionCheck);
+        } else {
+          checkConnection();
+        }
+      });
+    }, 5000);
+    
+    // Manual retry
+    retryBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      checkConnection();
+    });
+  </script>
 </body>
 </html> 

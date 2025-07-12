@@ -1,5 +1,5 @@
-import React from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import React, { useEffect } from "react";
+import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import Login from "./pages/Login";
 import AdminDashboard from "./pages/admin/Dashboard";
 import Customers from "./pages/admin/Customers";
@@ -19,6 +19,7 @@ import { useAuth } from "./context/AuthContext";
 import ViewOrder from "./pages/admin/ViewOrder";
 import NotificationContainer from "./components/NotificationContainer";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
+import { saveCurrentRoute, getSavedRoute, clearSavedRoute } from "./utils/routeStateManager";
 
 // ✅ Authentication & Role-Based Access
 
@@ -34,6 +35,45 @@ const RoleBasedRedirect = () => {
 };
 
 function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+
+  // Save current route when location changes
+  useEffect(() => {
+    if (isAuthenticated && location.pathname !== '/login') {
+      saveCurrentRoute(location.pathname);
+    }
+  }, [location.pathname, isAuthenticated]);
+
+  // Restore saved route on app load
+  useEffect(() => {
+    if (isAuthenticated) {
+      const savedRoute = getSavedRoute();
+      if (savedRoute && savedRoute !== '/login' && savedRoute !== location.pathname) {
+        navigate(savedRoute);
+      }
+    }
+  }, [isAuthenticated, navigate, location.pathname]);
+
+  // Listen for visibility change events
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isAuthenticated) {
+        const savedRoute = getSavedRoute();
+        if (savedRoute && savedRoute !== '/login' && savedRoute !== location.pathname) {
+          navigate(savedRoute);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isAuthenticated, navigate, location.pathname]);
+
   return (
     <>
       <NotificationContainer />
