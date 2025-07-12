@@ -31,6 +31,7 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [originalCustomerName, setOriginalCustomerName] = useState<string>('');
   const [lastSearchedPhone, setLastSearchedPhone] = useState<string>('');
+  const [customerFound, setCustomerFound] = useState(false);
   const originalNameInitialized = useRef(false);
   const navigate = useNavigate();
   
@@ -57,6 +58,7 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
 
       if (existingCustomer) {
         setIsNewCustomer(false);
+        setCustomerFound(true);
         // Only set original name if not in edit mode (to preserve the original state)
         if (!isEdit) {
           setOriginalCustomerName(existingCustomer.name || '');
@@ -67,6 +69,13 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
         }));
       } else {
         setIsNewCustomer(true);
+        setCustomerFound(false);
+        // Reset location data when no customer is found
+        setOrder((prev) => ({
+          ...prev,
+          location: null as any,
+          locationId: null as any
+        }));
         // Only set empty original name if not in edit mode
         if (!isEdit) {
           setOriginalCustomerName('');
@@ -75,6 +84,13 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
     } catch (error) {
       console.error('Error finding customer:', error);
       setIsNewCustomer(true);
+      setCustomerFound(false);
+      // Reset location data on error
+      setOrder((prev) => ({
+        ...prev,
+        location: null as any,
+        locationId: null as any
+      }));
     } finally {
       setIsSearching(false);
     }
@@ -85,6 +101,7 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
     if (isEdit && order?.customer && !originalNameInitialized.current) {
       setOriginalCustomerName(order.customer.name || '');
       setIsNewCustomer(!order.customer.id);
+      setCustomerFound(!!order.customer.id);
       originalNameInitialized.current = true;
     }
   }, [isEdit, order?.customer?.id]);
@@ -95,17 +112,28 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
     
     // Only search if phone has changed and is different from last searched
     if (currentPhone !== lastSearchedPhone && (!order?.customer?.id || !isEdit)) {
+      // Reset location data when phone changes
+      if (!isEdit) {
+        setOrder((prev) => ({
+          ...prev,
+          location: null as any,
+          locationId: null as any
+        }));
+      }
       searchCustomerByPhone(currentPhone);
     } else if (order?.customer?.id) {
       // If we already have a customer ID, mark as existing customer
       setIsNewCustomer(false);
+      setCustomerFound(true);
     }
-  }, [order?.customer?.phone, searchCustomerByPhone, order?.customer?.id, isEdit, lastSearchedPhone]);
+  }, [order?.customer?.phone, searchCustomerByPhone, order?.customer?.id, isEdit, lastSearchedPhone, setOrder]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit(e);
   }, [onSubmit]);
+
+
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -126,15 +154,14 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
         />
       )}
 
-      {/* Location Selector - Only for Edit Mode */}
-      {isEdit && !isSearching && (
+      {!isSearching && (
         <LocationSelector
           order={order}
           setOrder={setOrder as React.Dispatch<React.SetStateAction<OrderList | undefined>>}
           isNewCustomer={isNewCustomer}
-          disabled={order.status === 'Confirmed' || !order?.customer?.name}
+          disabled={order.status === 'Confirmed'}
           customer={order?.customer}
-          autoOpenDropdown={false}
+          autoOpenDropdown={order?.customer?.locations && order?.customer?.locations.length > 0 ? true : false}
         />
       )}
 

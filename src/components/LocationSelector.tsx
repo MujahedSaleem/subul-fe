@@ -34,8 +34,10 @@ const LocationSelector = forwardRef<HTMLDivElement, LocationSelectorProps>((
   useEffect(() => {
     if (order?.location?.name) {
       setSelectedLocationName(order.location.name);
+    }else{
+      setSelectedLocationName("اختر الموقع");
     }
-  }, [order?.location?.name]);
+  }, [order?.customer, order?.location?.name]);
 
   // Auto-open modal when there are locations and autoOpenDropdown is true
   useEffect(() => {
