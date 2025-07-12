@@ -6,7 +6,6 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPhone, faLocationDot, faTrash, faPenToSquare, faEye, faUser, faCalendar, faMoneyBill, faCheckCircle, faHourglassHalf, faCircleCheck, faPencil, faMapMarkerAlt, faCheck, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { faWhatsapp } from '@fortawesome/free-brands-svg-icons';
 import CallModal from '../../components/admin/shared/CallModal';
-import { useError } from '../../context/ErrorContext';
 import Layout from '../../components/Layout';
 import { useAuth } from '../../context/AuthContext';
 import { useDistributorOrders } from '../../hooks/useDistributorOrders';
@@ -18,11 +17,14 @@ import { Customer, Location } from '../../types/customer';
 import axiosInstance from '../../utils/axiosInstance';
 import { getOrderStatusConfig, formatCurrency, handleDirectCall, handleOpenLocation, areAllRequiredFieldsFilled } from '../../utils/distributorUtils';
 import { getCurrentLocation } from '../../services/locationService';
+import { useDispatch } from 'react-redux';
+import { showError, showSuccess, showWarning } from '../../store/slices/notificationSlice';
+import { AppDispatch } from '../../store/store';
 
 const DistributorListOrder: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { dispatch } = useError();
+  const dispatch = useDispatch<AppDispatch>();
   const { logout } = useAuth();
   const [isCallModalOpen, setIsCallModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -77,10 +79,7 @@ const DistributorListOrder: React.FC = () => {
         if (!order.location?.name?.trim()) missingFields.push('الموقع');
         if (order.cost === undefined || order.cost === null) missingFields.push('التكلفة');
 
-        dispatch({ 
-          type: 'SET_ERROR', 
-          payload: `لا يمكن تأكيد الطلب. الحقول المطلوبة: ${missingFields.join(', ')}` 
-        });
+        dispatch(showError({ message: `لا يمكن تأكيد الطلب. الحقول المطلوبة: ${missingFields.join(', ')}` }));
         return;
       }
 
@@ -90,14 +89,9 @@ const DistributorListOrder: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to confirm order:', error);
-      dispatch({ 
-        type: 'SET_ERROR', 
-        payload: 'حدث خطأ أثناء تأكيد الطلب. يرجى المحاولة مرة أخرى.' 
-      });
+      dispatch(showError({ message: 'حدث خطأ أثناء تأكيد الطلب. يرجى المحاولة مرة أخرى.' }));
     }
   };
-
-
 
   const handleCallCustomer = (customer: Customer) => {
     setSelectedCustomer(customer);
@@ -145,10 +139,7 @@ const DistributorListOrder: React.FC = () => {
       
     } catch (error) {
       console.error('Error updating location:', error);
-      dispatch({ 
-        type: 'SET_ERROR', 
-        payload: 'حدث خطأ أثناء تحديث الموقع. يرجى المحاولة مرة أخرى.' 
-      });
+      dispatch(showError({ message: 'حدث خطأ أثناء تحديث الموقع. يرجى المحاولة مرة أخرى.' }));
     } finally {
       setLocationLoadingStates(prev => ({ ...prev, [order.id!]: false }));
     }
@@ -185,10 +176,7 @@ const DistributorListOrder: React.FC = () => {
         const parsedCost = parseFloat(inputValue);
         
         if (isNaN(parsedCost) || parsedCost < 0) {
-          dispatch({ 
-            type: 'SET_ERROR', 
-            payload: 'يرجى إدخال تكلفة صحيحة أو اتركها فارغة' 
-          });
+          dispatch(showError({ message: 'يرجى إدخال تكلفة صحيحة أو اتركها فارغة' }));
           return;
         }
         
@@ -216,10 +204,7 @@ const DistributorListOrder: React.FC = () => {
       
     } catch (error) {
       console.error('Error updating cost:', error);
-      dispatch({ 
-        type: 'SET_ERROR', 
-        payload: 'حدث خطأ أثناء تحديث التكلفة. يرجى المحاولة مرة أخرى.' 
-      });
+      dispatch(showError({ message: 'حدث خطأ أثناء تحديث التكلفة. يرجى المحاولة مرة أخرى.' }));
     }
   };
 
@@ -245,10 +230,7 @@ const DistributorListOrder: React.FC = () => {
     const pendingOrders = orders.filter(order => order.status !== 'Confirmed');
     
     if (pendingOrders.length > 0) {
-      dispatch({ 
-        type: 'SET_ERROR', 
-        payload: `لا يمكن إنهاء الوردية. يوجد ${pendingOrders.length} طلب غير مؤكد. يرجى تأكيد جميع الطلبات أولاً.` 
-      });
+      dispatch(showError({ message: `لا يمكن إنهاء الوردية. يوجد ${pendingOrders.length} طلب غير مؤكد. يرجى تأكيد جميع الطلبات أولاً.` }));
       return;
     }
 
@@ -262,17 +244,39 @@ const DistributorListOrder: React.FC = () => {
     try {
       await axiosInstance.post('/distributors/deactivate');
       
-      // Clear any existing errors and logout
-      dispatch({ type: 'CLEAR_ERROR' });
+      // Show success message
+      dispatch(showSuccess({ message: 'تم إنهاء الوردية بنجاح.' }));
+      
+      // Logout and redirect
       logout();
       navigate('/login');
     } catch (error) {
       console.error('Error deactivating account:', error);
-      dispatch({ 
-        type: 'SET_ERROR', 
-        payload: 'حدث خطأ أثناء إنهاء الوردية. يرجى المحاولة مرة أخرى أو الاتصال بالدعم الفني.' 
-      });
+      dispatch(showError({ message: 'حدث خطأ أثناء إنهاء الوردية. يرجى المحاولة مرة أخرى أو الاتصال بالدعم الفني.' }));
       setIsClosingShift(false);
+    }
+  };
+
+  const handleOpenLocation = (e: React.MouseEvent, coordinates: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!coordinates) {
+      dispatch(showWarning({ message: 'لا توجد إحداثيات متوفرة لهذا الموقع' }));
+      return;
+    }
+
+    const [latitude, longitude] = coordinates.split(',').map(Number);
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobileDevice) {
+      // For mobile, use geo: protocol for better app integration
+      const googleMapsUrl = `geo:${latitude},${longitude}?q=${latitude},${longitude}`;
+      window.location.href = googleMapsUrl;
+    } else {
+      // For desktop, open in navigation/driving mode
+      const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
+      window.open(url, '_blank');
     }
   };
 
@@ -495,11 +499,7 @@ const DistributorListOrder: React.FC = () => {
                                       ? 'cursor-pointer hover:underline' 
                                       : ''
                                   }`}
-                                  onClick={() => {
-                                    if (order.location?.coordinates) {
-                                      handleOpenLocation(order.location);
-                                    }
-                                  }}
+                                  onClick={(e) => handleOpenLocation(e, order.location?.coordinates || '')}
                                 >
                                   <Typography 
                                     variant="small" 

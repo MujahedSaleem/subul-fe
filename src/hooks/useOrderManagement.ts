@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useError } from '../context/ErrorContext';
+import { useAppDispatch } from '../store/hooks';
+import { showError } from '../store/slices/notificationSlice';
 import { useDistributorCustomers } from './useDistributorCustomers';
 import { useDistributorOrders } from './useDistributorOrders';
 import { Customer, Location } from '../types/customer';
@@ -20,7 +21,7 @@ interface UseOrderManagementProps {
 
 export const useOrderManagement = ({ initialOrder, isEdit = false }: UseOrderManagementProps) => {
   const navigate = useNavigate();
-  const { dispatch } = useError();
+  const dispatch = useAppDispatch();
   
   const [order, setOrder] = useState<OrderList>(initialOrder);
   const [originalOrder, setOriginalOrder] = useState<OrderList | null>(isEdit ? initialOrder : null);
@@ -122,10 +123,9 @@ export const useOrderManagement = ({ initialOrder, isEdit = false }: UseOrderMan
     try {
       // Basic validation - require at least basic order fields
       if (!areBasicOrderFieldsFilled(order)) {
-        dispatch({
-          type: 'SET_ERROR',
-          payload: 'يرجى إدخال اسم العميل ورقم الهاتف والموقع على الأقل.',
-        });
+        dispatch(showError({
+          message: 'يرجى إدخال اسم العميل ورقم الهاتف والموقع على الأقل.'
+        }));
         return;
       }
 
@@ -168,10 +168,9 @@ export const useOrderManagement = ({ initialOrder, isEdit = false }: UseOrderMan
       }
 
       // Dispatch the error globally
-      dispatch({
-        type: 'SET_ERROR',
-        payload: errorMessage || 'حدث خطأ أثناء العملية.',
-      });
+      dispatch(showError({
+        message: errorMessage || 'حدث خطأ أثناء العملية.'
+      }));
     } finally {
       setIsSubmitting(false);
     }
@@ -281,10 +280,9 @@ export const useOrderManagement = ({ initialOrder, isEdit = false }: UseOrderMan
       }
     } catch (error) {
       console.error('Failed to save order as draft:', error);
-      dispatch({
-        type: 'SET_ERROR',
-        payload: 'فشل حفظ الطلب كمسودة، الرجاء المحاولة لاحقًا.',
-      });
+      dispatch(showError({
+        message: 'فشل حفظ الطلب كمسودة، الرجاء المحاولة لاحقًا.'
+      }));
     } finally {
       setIsBackLoading(false);
       navigate('/distributor/orders');

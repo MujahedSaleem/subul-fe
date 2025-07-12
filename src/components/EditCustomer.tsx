@@ -2,7 +2,8 @@ import React, { useState, useEffect, forwardRef, useImperativeHandle } from "rea
 import CustomerForm from "./CustomerForm";
 import { Customer } from "../types/customer";
 import { useNavigate } from "react-router-dom";
-import { useError } from "../context/ErrorContext";
+import { useAppDispatch } from "../store/hooks";
+import { showError } from "../store/slices/notificationSlice";
 import { useCustomers } from "../hooks/useCustomers";
 
 interface EditCustomerProps {
@@ -16,7 +17,7 @@ const EditCustomer = forwardRef(({ customerId, onCustomerUpdated, onCloseModal }
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const navigate = useNavigate();
-  const { dispatch } = useError(); // ✅ Use inside a React component
+  const dispatch = useAppDispatch();
   const { customers, getCustomerById, updateCustomer, refreshCustomers } = useCustomers();
   
   useEffect(() => {
@@ -50,6 +51,7 @@ const EditCustomer = forwardRef(({ customerId, onCustomerUpdated, onCloseModal }
         refreshCustomers(); // Refresh the customer list
       } else {
         setErrorMsg(result.payload as string || '⚠️ خطأ في تعديل العميل، حاول مجددًا.');
+        dispatch(showError({ message: result.payload as string || '⚠️ خطأ في تعديل العميل، حاول مجددًا.' }));
       }
     }
   }));
@@ -68,6 +70,7 @@ const EditCustomer = forwardRef(({ customerId, onCustomerUpdated, onCloseModal }
       navigate("/admin/customers", { state: { shouldRefresh: true } });
     } else {
       setErrorMsg(result.payload as string || '⚠️ خطأ في تعديل العميل، حاول مجددًا.');
+      dispatch(showError({ message: result.payload as string || '⚠️ خطأ في تعديل العميل، حاول مجددًا.' }));
     }
   };
 

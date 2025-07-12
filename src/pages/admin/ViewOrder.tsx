@@ -18,7 +18,8 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import Button from '../../components/Button';
 import { OrderList } from '../../types/order';
-import { useError } from '../../context/ErrorContext';
+import { useAppDispatch } from '../../store/hooks';
+import { showError } from '../../store/slices/notificationSlice';
 import { getOrderById, clearCurrentOrder } from '../../store/slices/orderSlice';
 import type { AppDispatch, RootState } from '../../store/store';
 
@@ -26,7 +27,7 @@ const ViewOrder: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const reduxDispatch = useDispatch<AppDispatch>();
-  const { dispatch: errorDispatch } = useError();
+  const notificationDispatch = useAppDispatch();
   
   const { currentOrder, isLoading, error: reduxError } = useSelector((state: RootState) => state.orders);
   
@@ -41,7 +42,7 @@ const ViewOrder: React.FC = () => {
           const errorMsg = 'Order ID is missing';
           console.error(errorMsg);
           setLocalError(errorMsg);
-          errorDispatch({ type: 'SET_ERROR', payload: errorMsg });
+          notificationDispatch(showError({ message: errorMsg }));
           return;
         }
 
@@ -54,12 +55,12 @@ const ViewOrder: React.FC = () => {
         console.error('Error in fetchData:', error);
         const errorMsg = error.message || 'Failed to fetch order details';
         setLocalError(errorMsg);
-        errorDispatch({ type: 'SET_ERROR', payload: errorMsg });
+        notificationDispatch(showError({ message: errorMsg }));
       }
     };
 
     fetchData();
-  }, [id, reduxDispatch, errorDispatch]);
+  }, [id, reduxDispatch, notificationDispatch]);
 
   // Cleanup on unmount
   useEffect(() => {

@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { useError } from '../context/ErrorContext';
+import { useAppDispatch } from '../store/hooks';
+import { showError } from '../store/slices/notificationSlice';
 import { useCustomers } from './useCustomers';
 import { Customer, Location } from '../types/customer';
 import { OrderList, OrderRequest } from '../types/order';
@@ -24,7 +25,7 @@ interface UseAdminOrderManagementProps {
 export const useAdminOrderManagement = ({ initialOrder, isEdit = false }: UseAdminOrderManagementProps) => {
   const navigate = useNavigate();
   const reduxDispatch = useDispatch<AppDispatch>();
-  const { dispatch } = useError();
+  const notificationDispatch = useAppDispatch();
   
   const [order, setOrder] = useState<OrderList>(initialOrder);
   const [originalOrder, setOriginalOrder] = useState<OrderList | null>(isEdit ? initialOrder : null);
@@ -142,10 +143,9 @@ export const useAdminOrderManagement = ({ initialOrder, isEdit = false }: UseAdm
     try {
       // Basic validation - require at least basic order fields
       if (!areBasicAdminFieldsFilled(order)) {
-        dispatch({
-          type: 'SET_ERROR',
-          payload: 'يرجى إدخال اسم العميل ورقم الهاتف والموقع على الأقل.',
-        });
+        notificationDispatch(showError({
+          message: 'يرجى إدخال اسم العميل ورقم الهاتف والموقع على الأقل.'
+        }));
         return;
       }
 
@@ -201,14 +201,13 @@ export const useAdminOrderManagement = ({ initialOrder, isEdit = false }: UseAdm
       }
 
       // Dispatch the error globally
-      dispatch({
-        type: 'SET_ERROR',
-        payload: errorMessage || 'حدث خطأ أثناء العملية.',
-      });
+      notificationDispatch(showError({
+        message: errorMessage || 'حدث خطأ أثناء العملية.'
+      }));
     } finally {
       setIsSubmitting(false);
     }
-  }, [order, isEdit, processCustomerAndLocation, reduxDispatch, navigate, dispatch, areAllAdminFieldsFilled]);
+  }, [order, isEdit, processCustomerAndLocation, reduxDispatch, navigate, notificationDispatch, areAllAdminFieldsFilled]);
 
   /**
    * Handle back navigation with draft saving
@@ -322,15 +321,14 @@ export const useAdminOrderManagement = ({ initialOrder, isEdit = false }: UseAdm
       }
     } catch (error) {
       console.error('Failed to save order as draft:', error);
-      dispatch({
-        type: 'SET_ERROR',
-        payload: 'فشل حفظ الطلب كمسودة، الرجاء المحاولة لاحقًا.',
-      });
+      notificationDispatch(showError({
+        message: 'فشل حفظ الطلب كمسودة، الرجاء المحاولة لاحقًا.'
+      }));
     } finally {
       setIsBackLoading(false);
       navigate('/admin/orders');
     }
-  }, [order, originalOrder, isEdit, processCustomerAndLocation, reduxDispatch, updateCustomer, navigate, dispatch]);
+  }, [order, originalOrder, isEdit, processCustomerAndLocation, reduxDispatch, updateCustomer, navigate, notificationDispatch]);
 
   /**
    * Calculate dynamic button title based on required fields (including distributor)

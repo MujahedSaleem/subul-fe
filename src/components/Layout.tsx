@@ -8,12 +8,10 @@ import {
   faGauge, 
   faUsers, 
   faBox, 
-  faUserCheck, 
-  faTriangleExclamation 
+  faUserCheck
 } from '@fortawesome/free-solid-svg-icons';
 import Button from './Button';
 import IconButton from './IconButton';
-import { useError } from "../context/ErrorContext";
 import { useAuth } from "../context/AuthContext";
 import { Typography } from '@material-tailwind/react';
 
@@ -23,7 +21,6 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children, title }) => {
-  const { state, dispatch } = useError();
   const { logout } = useAuth();
 
   const navigate = useNavigate();
@@ -126,15 +123,6 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
         
         <main className="pt-20 px-4 lg:px-8 pb-8">
           <div className="max-w-7xl mx-auto">
-            {state.message && (
-              <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg mb-4 flex items-center justify-between">
-                <div className="flex items-center">
-                  <FontAwesomeIcon icon={faTriangleExclamation} className="mr-2 text-red-500" />
-                  <span>{state.message}</span>
-                </div>
-                <IconButton icon={faXmark} onClick={() => dispatch({ type: "CLEAR_ERROR" })}  variant="danger" rounded />
-              </div>
-            )}
             {children}
           </div>
         </main>
