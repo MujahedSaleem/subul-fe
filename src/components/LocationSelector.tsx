@@ -112,8 +112,13 @@ const LocationSelector = forwardRef<HTMLDivElement, LocationSelectorProps>((
 
   const handleAddNewLocation = () => {
     if (newLocationName.trim() !== '') {
+      // First add the new location
       setNewLocation(newLocationName);
-      setIsModalOpen(false);
+      
+      // Then explicitly close the modal
+      setTimeout(() => {
+        setIsModalOpen(false);
+      }, 0);
     }
   };
 

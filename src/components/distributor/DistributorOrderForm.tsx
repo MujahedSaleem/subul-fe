@@ -154,7 +154,7 @@ const DistributorOrderForm: React.FC<DistributorOrderFormProps> = ({
         />
       )}
 
-      {!isSearching && (
+      {!isSearching && order?.customer?.phone && (
         <LocationSelector
           order={order}
           setOrder={setOrder as React.Dispatch<React.SetStateAction<OrderList | undefined>>}
