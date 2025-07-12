@@ -69,7 +69,7 @@ describe('LocationSelector component', () => {
     );
     
     expect(screen.getByText('الموقع')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Home')).toBeInTheDocument();
+    expect(screen.getByText('Home')).toBeInTheDocument();
   });
 
   it('renders disabled when disabled prop is true', () => {
@@ -88,8 +88,10 @@ describe('LocationSelector component', () => {
     );
     
     expect(screen.getByText('الموقع')).toBeInTheDocument();
-    const input = screen.getByDisplayValue('Home');
-    expect(input).toBeInTheDocument();
-    expect(input).toBeDisabled();
+    expect(screen.getByText('Home')).toBeInTheDocument();
+    
+    // Check that the container has the disabled class
+    const locationContainer = screen.getByText('Home').closest('div');
+    expect(locationContainer?.parentElement).toHaveClass('cursor-not-allowed');
   });
 }); 

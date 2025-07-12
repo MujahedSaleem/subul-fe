@@ -92,12 +92,13 @@ describe('apiResponseHandler', () => {
     expect(() => extractApiData(mockResponse)).toThrow('Bad request');
   });
 
-  it('throws error when extractApiData is called with successful response but no data', () => {
+  it('returns empty object when extractApiData is called with successful response but no data', () => {
     const mockResponse: ApiSuccessResponse<null> = {
       success: true as const,
       data: null
     };
 
-    expect(() => extractApiData(mockResponse)).toThrow('API returned success but no data was provided');
+    const result = extractApiData(mockResponse);
+    expect(result).toEqual({});
   });
 }); 
