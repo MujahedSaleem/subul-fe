@@ -18,7 +18,7 @@ interface OrderTableProps {
   handleCallCustomer: (customer: Customer) => void;
   handleOpenLocation: (location: Location) => void;
   formatDate: (date: string) => string;
-  formatCurrency: (amount: number) => string;
+  formatCurrency: (amount: number | undefined | null) => string;
 }
 
 const OrderTable: React.FC<OrderTableProps> = ({

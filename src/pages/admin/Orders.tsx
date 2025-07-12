@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardBody, CardHeader, Typography } from '@material-tailwind/react';
 import CallModal from '../../components/admin/shared/CallModal';
 import { OrderList } from '../../types/order';
@@ -15,6 +15,9 @@ import { fetchOrders, deleteOrder, confirmOrder } from '../../store/slices/order
 import { fetchDistributors, selectDistributors, selectIsLoading as selectDistributorsLoading } from '../../store/slices/distributorSlice';
 import { showSuccess, showError, showWarning } from '../../store/slices/notificationSlice';
 import { RootState } from '../../store/store';
+import Loader from '../../components/admin/shared/Loader';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faPlus } from '@fortawesome/free-solid-svg-icons';
 
 interface FilterState {
   distributorId: string | null;
@@ -27,6 +30,7 @@ interface FilterState {
 
 const Orders = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useAppDispatch();
   
   // Orders state
@@ -61,6 +65,16 @@ const Orders = () => {
     dateFrom: filters.dateFrom || undefined,
     dateTo: filters.dateTo || undefined
   }), [filters.page, filters.pageSize, filters.distributorId, filters.status, filters.dateFrom, filters.dateTo]);
+
+  // Handle force refresh when navigating from order creation
+  useEffect(() => {
+    if (location.state?.forceRefresh) {
+      console.log('Force refreshing orders after creation...');
+      dispatch(fetchOrders(filterParams));
+      // Clear the state to prevent repeated refreshes
+      navigate('.', { replace: true, state: {} });
+    }
+  }, [location.state, dispatch, filterParams, navigate]);
 
   // Only fetch distributors once when component mounts
   useEffect(() => {
@@ -207,7 +221,12 @@ const Orders = () => {
 
   // Memoize format functions to prevent unnecessary re-renders
   const formatDate = useCallback((date: string) => new Date(date).toLocaleDateString(), []);
-  const formatCurrency = useCallback((amount: number) => amount.toLocaleString('en-US', { style: 'currency', currency: 'ILS' }), []);
+  const formatCurrency = useCallback((amount: number | undefined | null) => {
+    if (amount === null || amount === undefined) {
+      return '-';
+    }
+    return amount.toLocaleString('en-US', { style: 'currency', currency: 'ILS' });
+  }, []);
 
   return (
     <Layout title="Orders">
@@ -220,31 +239,31 @@ const Orders = () => {
         <CardHeader 
           floated={false} 
           shadow={false} 
-          className="rounded-none"
+          className="rounded-none bg-white p-6"
           placeholder={undefined}
           onPointerEnterCapture={() => {}}
           onPointerLeaveCapture={() => {}}
         >
-          <div className="mb-4 flex flex-col justify-between gap-8 md:flex-row md:items-center">
-            <div>
-              <Typography 
-                variant="h5" 
-                color="blue-gray" 
-                placeholder={undefined}
-                onPointerEnterCapture={() => {}}
-                onPointerLeaveCapture={() => {}}
-              >
-                Orders
-              </Typography>
+          <div className="flex flex-col gap-4">
+            {/* Title Section */}
+            <div className="flex flex-col gap-1">
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
+                الطلبات
+              </h1>
+              <p className="text-sm text-gray-600">
+                إدارة الطلبات وإضافة طلبات جديدة
+              </p>
             </div>
+            {/* Add Button Section */}
             <div className="flex w-full shrink-0 gap-2 md:w-max">
-              <Button
-                className="flex items-center gap-3"
-                size="sm"
-                onClick={() => navigate('/admin/orders/add')}
+              <button 
+                onClick={() => navigate('/admin/orders/add')} 
+                className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg transition-colors font-medium whitespace-nowrap"
               >
-                Add Order
-              </Button>
+                <FontAwesomeIcon icon={faPlus} />
+                <span className="hidden sm:inline">إضافة طلب</span>
+                <span className="sm:hidden">إضافة</span>
+              </button>
             </div>
           </div>
         </CardHeader>
@@ -274,7 +293,9 @@ const Orders = () => {
             />
 
             {isLoading ? (
-              <div className="text-center py-8">Loading...</div>
+              <div className="text-center py-8">
+                <Loader />
+              </div>
             ) : error ? (
               <div className="text-center py-8 text-red-500">
                 {error}

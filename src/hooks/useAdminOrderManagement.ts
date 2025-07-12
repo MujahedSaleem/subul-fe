@@ -5,10 +5,11 @@ import { useError } from '../context/ErrorContext';
 import { useCustomers } from './useCustomers';
 import { Customer, Location } from '../types/customer';
 import { OrderList, OrderRequest } from '../types/order';
-import { addOrder, updateOrder, confirmOrder } from '../store/slices/orderSlice';
+import { addOrder, updateOrder, confirmOrder, fetchOrders } from '../store/slices/orderSlice';
 import type { AppDispatch } from '../store/store';
 import { 
-  areAllRequiredFieldsFilled, 
+  areAllRequiredFieldsFilled,
+  areBasicOrderFieldsFilled,
   getOrderButtonTitle, 
   getTargetOrderStatus, 
   findMatchingLocation, 
@@ -39,6 +40,13 @@ export const useAdminOrderManagement = ({ initialOrder, isEdit = false }: UseAdm
     const baseFieldsFilled = areAllRequiredFieldsFilled(orderData);
     const hasDistributor = orderData.distributor?.id;
     return baseFieldsFilled && !!hasDistributor;
+  }, []);
+
+  /**
+   * Check if admin order has basic fields filled (for draft)
+   */
+  const areBasicAdminFieldsFilled = useCallback((orderData: OrderList): boolean => {
+    return areBasicOrderFieldsFilled(orderData);
   }, []);
 
   /**
@@ -132,16 +140,14 @@ export const useAdminOrderManagement = ({ initialOrder, isEdit = false }: UseAdm
     let errorMessage: string | null = null;
 
     try {
-      // Admin validation - require all fields including distributor
-      if (!order.customer || !order.customer.phone?.trim()) {
+      // Basic validation - require at least basic order fields
+      if (!areBasicAdminFieldsFilled(order)) {
         dispatch({
           type: 'SET_ERROR',
-          payload: 'يرجى إدخال رقم الهاتف على الأقل.',
+          payload: 'يرجى إدخال اسم العميل ورقم الهاتف والموقع على الأقل.',
         });
         return;
       }
-
-  
 
       // For edit mode, check if order is already confirmed
       if (isEdit && order.status === 'Confirmed') {
@@ -160,7 +166,7 @@ export const useAdminOrderManagement = ({ initialOrder, isEdit = false }: UseAdm
         orderNumber: order.orderNumber,
         customerId: parseInt(customerId),
         locationId,
-        cost: order.cost,
+        cost: order.cost ?? null, // Convert undefined to null for API
         distributorId: order?.distributor?.id,
         statusString: targetStatus
       };
@@ -183,8 +189,8 @@ export const useAdminOrderManagement = ({ initialOrder, isEdit = false }: UseAdm
         }
       }
 
-      // Navigate to the orders page after successful submission
-      navigate('/admin/orders');
+      // Navigate to the orders page after successful submission and force refresh
+      navigate('/admin/orders', { replace: true, state: { forceRefresh: true } });
     } catch (exception: any) {
       // Handle errors from the backend
       if (exception.response?.status === 400) {
@@ -293,7 +299,7 @@ export const useAdminOrderManagement = ({ initialOrder, isEdit = false }: UseAdm
             orderNumber: order.orderNumber,
             customerId: parseInt(order.customer.id),
             locationId: finalLocationId,
-            cost: order.cost,
+            cost: order.cost ?? null, // Convert undefined to null for API
             distributorId: order.distributor?.id,
             statusString: order.status as 'New' | 'Pending' | 'Confirmed' | 'Draft'
           };
@@ -307,7 +313,7 @@ export const useAdminOrderManagement = ({ initialOrder, isEdit = false }: UseAdm
           orderNumber: order.orderNumber,
           customerId: parseInt(customerId),
           locationId,
-          cost: order.cost,
+          cost: order.cost ?? null, // Convert undefined to null for API
           distributorId: order.distributor?.id,
           statusString: 'Draft' as const
         };
@@ -336,9 +342,15 @@ export const useAdminOrderManagement = ({ initialOrder, isEdit = false }: UseAdm
       return 'حفظ التغييرات';
     }
     
+    const basicFieldsFilled = areBasicAdminFieldsFilled(order);
     const allFieldsFilled = areAllAdminFieldsFilled(order);
+    
+    if (!basicFieldsFilled) {
+      return 'حفظ كمسودة';
+    }
+    
     return allFieldsFilled ? 'تأكيد الطلب' : 'حفظ كمسودة';
-  }, [order, isEdit, areAllAdminFieldsFilled]);
+  }, [order, isEdit, areAllAdminFieldsFilled, areBasicAdminFieldsFilled]);
 
   return {
     order,
@@ -350,10 +362,9 @@ export const useAdminOrderManagement = ({ initialOrder, isEdit = false }: UseAdm
       setOriginalOrder(newOriginalOrder);
     }, []),
     isSubmitting,
-    isBackLoading,
     handleSubmit,
-    handleBack,
     buttonTitle,
-    areAllAdminFieldsFilled
+    areAllAdminFieldsFilled,
+    areBasicAdminFieldsFilled
   };
 }; 

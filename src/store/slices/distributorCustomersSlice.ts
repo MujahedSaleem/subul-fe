@@ -142,18 +142,11 @@ export const updateDistributorCustomerLocation = createAsyncThunk<Customer, {  c
 // Get customer by ID
 export const getDistributorCustomerById = createAsyncThunk<Customer, {  customerId: string }>(
   'distributorCustomers/getDistributorCustomerById',
-  async ({  customerId }, { getState, rejectWithValue }) => {
+  async ({  customerId }, { rejectWithValue }) => {
     try {
-      const state = getState() as { distributorCustomers: DistributorCustomersState };
-      
-      // Check if customer already exists in state
-      const existingCustomer = state.distributorCustomers.customers.find(c => c.id === customerId);
-      if (existingCustomer) {
-        return existingCustomer;
-      }
-
+      // Always fetch fresh customer data to ensure we get complete location information
       // Check if there's already a pending request for this customer
-      const requestKey = `getDistributorCustomerById-${distributorId}-${customerId}`;
+      const requestKey = `getDistributorCustomerById-${customerId}`;
       if (pendingRequests.has(requestKey)) {
         return await pendingRequests.get(requestKey);
       }

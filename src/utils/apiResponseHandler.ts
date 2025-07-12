@@ -6,7 +6,7 @@
 export interface ApiSuccessResponse<T = any> {
   success: true;
   message?: string;
-  data: T;
+  data?: T;
 }
 
 export interface ApiErrorResponse {
@@ -29,10 +29,6 @@ export interface ProcessedApiResponse<T = any> {
  */
 export function handleApiResponse<T>(response: ApiResponse<T>): ProcessedApiResponse<T> {
   if (response.success) {
-    // Ensure data is always present in success responses
-    if (response.data === undefined || response.data === null) {
-      throw new Error('API returned success but no data was provided');
-    }
     return { 
       data: response.data, 
       message: response.message 
@@ -55,8 +51,10 @@ export function handleApiResponse<T>(response: ApiResponse<T>): ProcessedApiResp
  */
 export function extractApiData<T>(response: ApiResponse<T>): T {
   if (response.success) {
+    // Modified to handle cases where data is not provided but success is true
     if (response.data === undefined || response.data === null) {
-      throw new Error('API returned success but no data was provided');
+      // Return an empty object cast as T instead of throwing an error
+      return {} as T;
     }
     return response.data;
   } else {

@@ -27,14 +27,15 @@ const initialState: DistributorOrdersState = {
 const pendingRequests = new Map<string, Promise<any>>();
 
 // Fetch all orders for the distributor
-export const fetchDistributorOrders = createAsyncThunk<OrderList[]>(
+export const fetchDistributorOrders = createAsyncThunk<OrderList[], boolean | undefined>(
   'distributorOrders/fetchDistributorOrders',
-  async (_, { getState, rejectWithValue }) => {
+  async (forceRefresh = false, { getState, rejectWithValue }) => {
     const state = getState() as { distributorOrders: DistributorOrdersState };
     
-    // Return existing data if already initialized
+    // Return existing data if already initialized and not forcing refresh
     if (state.distributorOrders.initialized && 
-        !state.distributorOrders.loading) {
+        !state.distributorOrders.loading && 
+        !forceRefresh) {
       return state.distributorOrders.orders;
     }
     
@@ -67,16 +68,9 @@ export const fetchDistributorOrders = createAsyncThunk<OrderList[]>(
 // Get a specific order by ID
 export const getDistributorOrderById = createAsyncThunk<OrderList, number>(
   'distributorOrders/getDistributorOrderById',
-  async (orderId, { getState, rejectWithValue }) => {
+  async (orderId, { rejectWithValue }) => {
     try {
-      const state = getState() as { distributorOrders: DistributorOrdersState };
-      
-      // Check if order already exists in state
-      const existingOrder = state.distributorOrders.orders.find(o => o.id === orderId);
-      if (existingOrder) {
-        return existingOrder;
-      }
-
+      // Always fetch fresh data from API, don't use cached data
       // Check if there's already a pending request for this order
       const requestKey = `getDistributorOrderById-${orderId}`;
       if (pendingRequests.has(requestKey)) {
@@ -150,6 +144,9 @@ const distributorOrdersSlice = createSlice({
     },
     clearErrors: (state) => {
       state.error = null;
+    },
+    forceRefresh: (state) => {
+      state.initialized = false;
     }
   },
   extraReducers: (builder) => {
@@ -164,6 +161,7 @@ const distributorOrdersSlice = createSlice({
         console.log('Fetching orders fulfilled:', action.payload);
         state.isLoading = false;
         state.orders = action.payload;
+        state.initialized = true;
       })
       .addCase(fetchDistributorOrders.rejected, (state, action) => {
         console.error('Fetching orders rejected:', action.payload);
@@ -178,6 +176,12 @@ const distributorOrdersSlice = createSlice({
       .addCase(getDistributorOrderById.fulfilled, (state, action) => {
         state.isLoading = false;
         state.currentOrder = action.payload;
+        
+        // Update the order in the orders array if it exists
+        const orderIndex = state.orders.findIndex(order => order.id === action.payload.id);
+        if (orderIndex !== -1) {
+          state.orders[orderIndex] = action.payload;
+        }
       })
       .addCase(getDistributorOrderById.rejected, (state, action) => {
         state.isLoading = false;
@@ -188,8 +192,10 @@ const distributorOrdersSlice = createSlice({
         state.isLoading = true;
         state.error = null;
       })
-      .addCase(addDistributorOrder.fulfilled, (state) => {
+      .addCase(addDistributorOrder.fulfilled, (state, action) => {
         state.isLoading = false;
+        // Add the new order to the orders array
+        state.orders.unshift(action.payload);
       })
       .addCase(addDistributorOrder.rejected, (state, action) => {
         state.isLoading = false;
@@ -200,8 +206,13 @@ const distributorOrdersSlice = createSlice({
         state.isLoading = true;
         state.error = null;
       })
-      .addCase(updateDistributorOrder.fulfilled, (state) => {
+      .addCase(updateDistributorOrder.fulfilled, (state, action) => {
         state.isLoading = false;
+        // Update the order in the orders array
+        const orderIndex = state.orders.findIndex(order => order.id === action.payload.id);
+        if (orderIndex !== -1) {
+          state.orders[orderIndex] = action.payload;
+        }
       })
       .addCase(updateDistributorOrder.rejected, (state, action) => {
         state.isLoading = false;
@@ -212,8 +223,18 @@ const distributorOrdersSlice = createSlice({
         state.isLoading = true;
         state.error = null;
       })
-      .addCase(confirmDistributorOrder.fulfilled, (state) => {
+      .addCase(confirmDistributorOrder.fulfilled, (state, action) => {
         state.isLoading = false;
+        // Update the confirmed order in the orders array
+        const orderIndex = state.orders.findIndex(order => order.id === action.payload.id);
+        if (orderIndex !== -1) {
+          state.orders[orderIndex] = action.payload;
+        }
+        
+        // Also update currentOrder if it matches
+        if (state.currentOrder && state.currentOrder.id === action.payload.id) {
+          state.currentOrder = action.payload;
+        }
       })
       .addCase(confirmDistributorOrder.rejected, (state, action) => {
         state.isLoading = false;
@@ -222,5 +243,5 @@ const distributorOrdersSlice = createSlice({
   }
 });
 
-export const { clearCurrentOrder, clearErrors } = distributorOrdersSlice.actions;
+export const { clearCurrentOrder, clearErrors, forceRefresh } = distributorOrdersSlice.actions;
 export default distributorOrdersSlice.reducer; 

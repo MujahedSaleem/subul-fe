@@ -2,7 +2,7 @@ import { Input } from '@material-tailwind/react';
 import React from 'react';
 
 interface CostInputProps {
-  cost: number | undefined;
+  cost: number | undefined | null;
   setOrder: React.Dispatch<React.SetStateAction<any>>;
   disabled: boolean;
 }
@@ -17,7 +17,7 @@ const CostInput: React.FC<CostInputProps> = ({ cost, setOrder, disabled }) => {
         type="number"
         id="cost"
         step="0.01"
-        value={cost !== undefined ? cost.toString() : ''}
+        value={cost !== undefined && cost !== null ? cost.toString() : ''}
         onChange={(e) => {
           const value = e.target.value;
           if (value === '') {

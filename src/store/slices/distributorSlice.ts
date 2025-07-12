@@ -23,19 +23,19 @@ const initialState: DistributorState = {
 // Track pending requests to prevent duplicates
 const pendingRequests = new Map<string, Promise<Distributor[]>>();
 
-export const fetchDistributors = createAsyncThunk<Distributor[], void, { state: RootState }>(
+export const fetchDistributors = createAsyncThunk<Distributor[], boolean | void, { state: RootState }>(
   'distributors/fetchDistributors',
-  async (_, { rejectWithValue, getState }) => {
+  async (force = false, { rejectWithValue, getState }) => {
     const state = getState();
     
-    // If distributors are already loaded and not loading, return cached data
-    if (state.distributors.distributors.length > 0 && !state.distributors.loading) {
+    // If distributors are already loaded and not loading, return cached data unless force=true
+    if (!force && state.distributors.distributors.length > 0 && !state.distributors.loading) {
       return state.distributors.distributors;
     }
     
     // Check if there's already a pending request
     const requestKey = 'fetchDistributors';
-    if (pendingRequests.has(requestKey)) {
+    if (!force && pendingRequests.has(requestKey)) {
       return await pendingRequests.get(requestKey)!;
     }
     

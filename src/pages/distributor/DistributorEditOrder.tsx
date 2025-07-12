@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import DistributorOrderForm from '../../components/distributor/DistributorOrderForm';
@@ -7,21 +7,25 @@ import { Customer, Location } from '../../types/customer';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheckCircle, faClock } from '@fortawesome/free-solid-svg-icons';
 import { useDistributorOrders } from '../../hooks/useDistributorOrders';
+import { useDistributorCustomers } from '../../hooks/useDistributorCustomers';
 import { useOrderManagement } from '../../hooks/useOrderManagement';
 
 const DistributorEditOrder: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
-  const [orderLoaded, setOrderLoaded] = useState(false);
+  const [initialOrder, setInitialOrder] = useState<OrderList | null>(null);
   
   const {
     currentOrder,
-    getOrderById
+    getOrderById,
+    resetCurrentOrder
   } = useDistributorOrders();
 
+  const { findByPhone } = useDistributorCustomers();
+
   // Default order state for initialization
-  const [defaultOrder] = useState<OrderList>({
+  const defaultOrder: OrderList = {
     id: 0,
     orderNumber: '',
     customer: {
@@ -38,7 +42,7 @@ const DistributorEditOrder: React.FC = () => {
       isActive: true,
       customerId: ''
     },
-    cost: 0,
+    cost: undefined,
     status: 'New',
     distributor: {
       id: '',
@@ -47,83 +51,105 @@ const DistributorEditOrder: React.FC = () => {
     },
     createdAt: new Date().toISOString(),
     confirmedAt: new Date().toISOString()
-  });
+  };
 
-  // Use the order management hook with loaded order or default
+  // Use the order management hook with stable initial order
   const {
     order,
     setOrder,
     setOriginalOrder,
     isSubmitting,
-    isBackLoading,
     handleSubmit,
-    handleBack,
     buttonTitle
   } = useOrderManagement({ 
-    initialOrder: currentOrder || defaultOrder, 
+    initialOrder: initialOrder || defaultOrder, 
     isEdit: true 
   });
 
-  // Memoize the order loading function to prevent infinite loops
-  const loadOrder = useCallback(async (orderId: number) => {
-    if (orderLoaded) return; // Prevent multiple loads
-
-    try {
-      setIsLoading(true);
-      await getOrderById(orderId);
-      setOrderLoaded(true);
-    } catch (error) {
-      console.error('Error loading order:', error);
-      navigate('/distributor/orders');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [getOrderById, navigate, orderLoaded]);
-
+  // Load order data once
   useEffect(() => {
-    if (!id) {
-      navigate('/distributor/orders');
-      return;
-    }
+    const loadOrder = async () => {
+      if (!id) {
+        navigate('/distributor/orders');
+        return;
+      }
 
-    const orderId = parseInt(id);
-    if (isNaN(orderId)) {
-      navigate('/distributor/orders');
-      return;
-    }
+      const orderId = parseInt(id);
+      if (isNaN(orderId)) {
+        navigate('/distributor/orders');
+        return;
+      }
 
-    // Only load if not already loaded
-    if (!orderLoaded) {
-      loadOrder(orderId);
-    }
-  }, [id, navigate, loadOrder, orderLoaded]);
+      try {
+        setIsLoading(true);
+        // Clear previous order data to ensure fresh fetch
+        resetCurrentOrder();
+        
+        // Fetch order via API - this will always fetch fresh data
+        await getOrderById(orderId);
+      } catch (error) {
+        console.error('Error loading order:', error);
+        navigate('/distributor/orders');
+      }
+    };
 
-  // Update order state when currentOrder changes
+    loadOrder();
+  }, [id, navigate, getOrderById, resetCurrentOrder]);
+
+  // Update order state when currentOrder is loaded
   useEffect(() => {
-    if (currentOrder && orderLoaded) {
-      const fullOrderData = {
-        ...currentOrder,
-        customer: {
-          ...currentOrder.customer,
-          locations: currentOrder.customer.locations || []
-        },
-        location: currentOrder.location || {
-          id: 0,
-          name: '',
-          address: '',
-          coordinates: '',
-          isActive: true,
-          customerId: currentOrder.customer.id
+    const loadCustomerData = async () => {
+      if (currentOrder && !initialOrder) {
+        console.log('Current order received:', currentOrder);
+        console.log('Customer data:', currentOrder.customer);
+        console.log('Customer locations:', currentOrder.customer?.locations);
+        
+        // Fetch complete customer data with locations
+        let fullOrderData = currentOrder;
+        if (currentOrder.customer?.phone) {
+          try {
+            const customerResult = await findByPhone(currentOrder.customer.phone);
+            const customerData = customerResult.payload as Customer | null;
+            if (customerData && customerData.id) {
+              console.log('Found complete customer data:', customerData);
+              console.log('Customer locations from API:', customerData.locations);
+              fullOrderData = {
+                ...currentOrder,
+                customer: customerData
+              };
+            }
+          } catch (customerError) {
+            console.warn('Could not fetch customer details:', customerError);
+          }
         }
-      };
+        
+        // Set location data
+        const orderWithLocation = {
+          ...fullOrderData,
+          location: currentOrder.location || {
+            id: 0,
+            name: '',
+            address: '',
+            coordinates: '',
+            isActive: true,
+            customerId: fullOrderData.customer.id
+          }
+        };
 
-      setOrder(fullOrderData);
-      setOriginalOrder(fullOrderData);
-      setIsLoading(false);
-    }
-  }, [currentOrder, orderLoaded, setOrder, setOriginalOrder]);
+        console.log('Final order data:', orderWithLocation);
+        console.log('Final customer locations:', orderWithLocation.customer.locations);
 
-  if (isLoading) {
+        setInitialOrder(orderWithLocation);
+        setOrder(orderWithLocation);
+        setOriginalOrder(orderWithLocation);
+        setIsLoading(false);
+      }
+    };
+
+    loadCustomerData();
+  }, [currentOrder, initialOrder, setOrder, setOriginalOrder, findByPhone]);
+
+  if (isLoading || !initialOrder) {
     return (
       <Layout title="تعديل الطلبية">
         <div className="flex justify-center items-center min-h-[60vh]">
@@ -134,10 +160,6 @@ const DistributorEditOrder: React.FC = () => {
         </div>
       </Layout>
     );
-  }
-
-  if (!order) {
-    return null;
   }
 
   return (
@@ -163,9 +185,9 @@ const DistributorEditOrder: React.FC = () => {
                   </span>
                   <div className="flex items-center text-gray-500 text-sm">
                     <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 002 2z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 00-2-2V7a2 2 0 002 2z" />
                     </svg>
-                    {new Date(order.createdAt).toLocaleDateString('ar-SA')}
+                    {new Date(order.createdAt).toLocaleDateString('en-US')}
                   </div>
                 </div>
               </div>
@@ -178,11 +200,9 @@ const DistributorEditOrder: React.FC = () => {
               order={order}
               setOrder={setOrder}
               onSubmit={handleSubmit}
-              onBack={handleBack}
               title={buttonTitle}
               isEdit={true}
               isSubmitting={isSubmitting}
-              isBackLoading={isBackLoading}
             />
           </div>
         </div>

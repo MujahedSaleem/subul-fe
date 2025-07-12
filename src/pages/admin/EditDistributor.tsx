@@ -60,7 +60,12 @@ const EditDistributor: React.FC = () => {
 
     try {
       await dispatch(updateDistributor({ ...distributor, id } as Distributor)).unwrap();
-      navigate('/admin/distributors');
+      
+      // Force refresh the distributors list to ensure we have the latest data
+      await dispatch(fetchDistributors(true));
+      
+      // Navigate to the distributors list with state to indicate refresh needed
+      navigate('/admin/distributors', { state: { forceRefresh: true } });
     } catch (error) {
       console.error('Error updating distributor:', error);
       dispatch(showError({message: 'حدث خطأ أثناء تحديث الموزع. يرجى المحاولة لاحقًا.'}));

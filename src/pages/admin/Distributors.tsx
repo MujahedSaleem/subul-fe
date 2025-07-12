@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import Layout from '../../components/Layout';
 import { faPlus, faPenToSquare, faTrash, faKey } from '@fortawesome/free-solid-svg-icons';
@@ -18,9 +18,12 @@ import {
   selectError
 } from '../../store/slices/distributorSlice';
 import { showSuccess, showError } from '../../store/slices/notificationSlice';
+import Loader from '../../components/admin/shared/Loader';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 const Distributors: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useDispatch<AppDispatch>();
   
   // Redux state
@@ -30,13 +33,18 @@ const Distributors: React.FC = () => {
   
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState<boolean>(false);
   const [selectedDistributorId, setSelectedDistributorId] = useState<string | null>(null);
-
+  
   useEffect(() => {
-    // Only fetch distributors if they haven't been loaded yet
-    if (distributors.length === 0 && !isLoading) {
-      dispatch(fetchDistributors());
+    // Always fetch fresh data when component mounts
+    dispatch(fetchDistributors(true));
+    
+    // Check if we need to force refresh based on location state
+    const forceRefresh = location.state?.forceRefresh;
+    if (forceRefresh) {
+      // Clear the state to prevent repeated refreshes
+      navigate('.', { replace: true, state: {} });
     }
-  }, [dispatch, distributors.length, isLoading]);
+  }, [dispatch, location.state, navigate]);
 
   const handleSavePassword = async (oldPassword: string, newPassword: string, confirmPassword: string) => {
     if (!selectedDistributorId) return { status: 400, error: 'No distributor selected' };
@@ -64,6 +72,8 @@ const Distributors: React.FC = () => {
       try {
         await dispatch(deleteDistributor(id)).unwrap();
         dispatch(showSuccess({ message: 'تم حذف الموزع بنجاح' }));
+        // Refresh the list after deletion
+        dispatch(fetchDistributors(true));
       } catch (error: any) {
         console.error("Error deleting distributor:", error);
         dispatch(showError({ 
@@ -117,16 +127,31 @@ const Distributors: React.FC = () => {
   return (
     <Layout title="الموزعون">
       <Card className="h-full w-full" placeholder="" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}}>
-        <CardHeader floated={false} shadow={false} className="rounded-none flex justify-between items-center" placeholder="" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}}>
-          <Typography variant="h6" color="blue-gray" placeholder="" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}}>الموزعون</Typography>
-          <Button variant="gradient" onClick={() => navigate('/admin/distributors/add')} className="flex items-center gap-2">
-            إضافة موزع
-          </Button>
+        <CardHeader floated={false} shadow={false} className="rounded-none bg-white p-6 flex justify-between items-center" placeholder="" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}}>
+          <div className="flex flex-col gap-4">
+            {/* Title Section */}
+            <div className="flex flex-col gap-1">
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
+                الموزعون
+              </h1>
+              <p className="text-sm text-gray-600">
+                إدارة الموزعين وإضافة موزعين جدد
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={() => navigate('/admin/distributors/add')} 
+            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg transition-colors font-medium whitespace-nowrap"
+          >
+            <FontAwesomeIcon icon={faPlus} />
+            <span className="hidden sm:inline">إضافة موزع</span>
+            <span className="sm:hidden">إضافة</span>
+          </button>
         </CardHeader>
         
         {isLoading ? (
           <CardBody className="text-center py-8" placeholder="" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}}>
-            <Typography variant="h6" color="blue-gray" placeholder="" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}}>جاري التحميل...</Typography>
+            <Loader />
           </CardBody>
         ) : (
           <CardBody className="overflow-scroll px-0" placeholder="" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}}>

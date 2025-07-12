@@ -1,30 +1,36 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { faPlus, faCheckDouble, faRightFromBracket } from '@fortawesome/free-solid-svg-icons';
 import { Card, CardBody, CardHeader, Typography } from '@material-tailwind/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPhone, faLocationDot, faTrash, faPenToSquare, faEye, faUser, faCalendar, faMoneyBill, faCheckCircle, faHourglassHalf, faCircleCheck, faPencil } from '@fortawesome/free-solid-svg-icons';
+import { faPhone, faLocationDot, faTrash, faPenToSquare, faEye, faUser, faCalendar, faMoneyBill, faCheckCircle, faHourglassHalf, faCircleCheck, faPencil, faMapMarkerAlt, faCheck, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { faWhatsapp } from '@fortawesome/free-brands-svg-icons';
 import CallModal from '../../components/admin/shared/CallModal';
 import { useError } from '../../context/ErrorContext';
 import Layout from '../../components/Layout';
 import { useAuth } from '../../context/AuthContext';
 import { useDistributorOrders } from '../../hooks/useDistributorOrders';
+import { useDistributorCustomers } from '../../hooks/useDistributorCustomers';
 import Button from '../../components/Button';
 import IconButton from '../../components/IconButton';
-import { OrderList } from '../../types/order';
+import { OrderList, OrderRequest } from '../../types/order';
 import { Customer, Location } from '../../types/customer';
 import axiosInstance from '../../utils/axiosInstance';
-import { getOrderStatusConfig, formatCurrency, handleDirectCall, handleOpenLocation } from '../../utils/distributorUtils';
+import { getOrderStatusConfig, formatCurrency, handleDirectCall, handleOpenLocation, areAllRequiredFieldsFilled } from '../../utils/distributorUtils';
+import { getCurrentLocation } from '../../services/locationService';
 
 const DistributorListOrder: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { dispatch } = useError();
   const { logout } = useAuth();
   const [isCallModalOpen, setIsCallModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isClosingShift, setIsClosingShift] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [locationLoadingStates, setLocationLoadingStates] = useState<{ [key: number]: boolean }>({});
+  const [costEditingStates, setCostEditingStates] = useState<{ [key: number]: boolean }>({});
+  const [costInputValues, setCostInputValues] = useState<{ [key: number]: string }>({});
 
   const {
     orders,
@@ -32,7 +38,10 @@ const DistributorListOrder: React.FC = () => {
     error,
     fetchOrders,
     confirmOrder,
+    updateOrder,
   } = useDistributorOrders();
+
+  const { updateCustomerLocation } = useDistributorCustomers();
 
   useEffect(() => {
     console.log('Fetching orders...');
@@ -43,21 +52,48 @@ const DistributorListOrder: React.FC = () => {
     console.log('Orders updated:', orders);
   }, [orders]);
 
+  // Handle force refresh when navigating from order creation
+  useEffect(() => {
+    if (location.state?.forceRefresh) {
+      console.log('Force refreshing orders after creation...');
+      fetchOrders(true); // Force refresh
+      // Clear the state to prevent repeated refreshes
+      navigate('.', { replace: true, state: {} });
+    }
+  }, [location.state, fetchOrders, navigate]);
+
   const handleConfirmOrder = async (order: OrderList) => {
     try {
       // Validate order before confirming
       if (order.status === 'Confirmed') {
         return;
       }
-      if (!order?.customer?.id || order.cost === undefined || order.cost === null) {
-        alert('Cannot confirm order. Customer data or cost is incomplete.');
-      return;
-    }
-      if (window.confirm('هل أنت متأكد من تأكيد هذا الطلب؟')) {
-        await confirmOrder(order.id);
+
+      // Use comprehensive validation logic
+      if (!areAllRequiredFieldsFilled(order)) {
+        let missingFields = [];
+        if (!order.customer?.name?.trim()) missingFields.push('اسم العميل');
+        if (!order.customer?.phone?.trim()) missingFields.push('رقم الهاتف');
+        if (!order.location?.name?.trim()) missingFields.push('الموقع');
+        if (order.cost === undefined || order.cost === null) missingFields.push('التكلفة');
+
+        dispatch({ 
+          type: 'SET_ERROR', 
+          payload: `لا يمكن تأكيد الطلب. الحقول المطلوبة: ${missingFields.join(', ')}` 
+        });
+        return;
       }
-      } catch (error) {
+
+      if (window.confirm('هل أنت متأكد من تأكيد هذا الطلب؟')) {
+        await confirmOrder(order.id as number);
+        // The hook automatically refreshes the orders list after confirmation
+      }
+    } catch (error) {
       console.error('Failed to confirm order:', error);
+      dispatch({ 
+        type: 'SET_ERROR', 
+        payload: 'حدث خطأ أثناء تأكيد الطلب. يرجى المحاولة مرة أخرى.' 
+      });
     }
   };
 
@@ -66,6 +102,133 @@ const DistributorListOrder: React.FC = () => {
   const handleCallCustomer = (customer: Customer) => {
     setSelectedCustomer(customer);
     setIsCallModalOpen(true);
+  };
+
+  const handleUpdateLocation = async (order: OrderList) => {
+    if (!order.id) return;
+    
+    setLocationLoadingStates(prev => ({ ...prev, [order.id!]: true }));
+    
+    try {
+      // Get current GPS location
+      const gpsLocation = await getCurrentLocation();
+      
+      if (!gpsLocation?.coordinates) {
+        throw new Error('Could not get current location');
+      }
+
+      // Update customer location if customer and location exist
+      if (order.customer?.id && order.location?.id) {
+        const updatedLocation = {
+          ...order.location,
+          coordinates: gpsLocation.coordinates
+        };
+        
+        await updateCustomerLocation(order.customer.id, updatedLocation);
+      }
+
+      // Update order location
+      const updatedOrderRequest: OrderRequest = {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        customerId: parseInt(order.customer.id),
+        locationId: order.location?.id,
+        cost: order.cost,
+        statusString: order.status as 'New' | 'Pending' | 'Confirmed' | 'Draft',
+        distributorId: order.distributor.id
+      };
+
+      await updateOrder(updatedOrderRequest);
+      
+      // Refresh orders to show updated location
+      await fetchOrders();
+      
+    } catch (error) {
+      console.error('Error updating location:', error);
+      dispatch({ 
+        type: 'SET_ERROR', 
+        payload: 'حدث خطأ أثناء تحديث الموقع. يرجى المحاولة مرة أخرى.' 
+      });
+    } finally {
+      setLocationLoadingStates(prev => ({ ...prev, [order.id!]: false }));
+    }
+  };
+
+  const handleStartCostEdit = (order: OrderList) => {
+    if (!order.id) return;
+    
+    setCostEditingStates(prev => ({ ...prev, [order.id!]: true }));
+    setCostInputValues(prev => ({ 
+      ...prev, 
+      [order.id!]: order.cost ? order.cost.toString() : '' 
+    }));
+  };
+
+  const handleCancelCostEdit = (order: OrderList) => {
+    if (!order.id) return;
+    
+    setCostEditingStates(prev => ({ ...prev, [order.id!]: false }));
+    setCostInputValues(prev => ({ ...prev, [order.id!]: '' }));
+  };
+
+  const handleSaveCost = async (order: OrderList) => {
+    if (!order.id) return;
+    
+    try {
+      const inputValue = costInputValues[order.id] || '';
+      let newCost: number | null = null;
+      
+      // If input is empty, set cost to null
+      if (inputValue.trim() === '') {
+        newCost = null;
+      } else {
+        const parsedCost = parseFloat(inputValue);
+        
+        if (isNaN(parsedCost) || parsedCost < 0) {
+          dispatch({ 
+            type: 'SET_ERROR', 
+            payload: 'يرجى إدخال تكلفة صحيحة أو اتركها فارغة' 
+          });
+          return;
+        }
+        
+        newCost = parsedCost;
+      }
+
+      const updatedOrderRequest: OrderRequest = {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        customerId: parseInt(order.customer.id),
+        locationId: order.location?.id,
+        cost: newCost,
+        statusString: order.status as 'New' | 'Pending' | 'Confirmed' | 'Draft',
+        distributorId: order.distributor.id
+      };
+
+      await updateOrder(updatedOrderRequest);
+      
+      // Refresh orders to show updated cost
+      await fetchOrders();
+      
+      // Exit edit mode
+      setCostEditingStates(prev => ({ ...prev, [order.id!]: false }));
+      setCostInputValues(prev => ({ ...prev, [order.id!]: '' }));
+      
+    } catch (error) {
+      console.error('Error updating cost:', error);
+      dispatch({ 
+        type: 'SET_ERROR', 
+        payload: 'حدث خطأ أثناء تحديث التكلفة. يرجى المحاولة مرة أخرى.' 
+      });
+    }
+  };
+
+  const handleCostKeyPress = (e: React.KeyboardEvent<HTMLInputElement>, order: OrderList) => {
+    if (e.key === 'Enter') {
+      handleSaveCost(order);
+    } else if (e.key === 'Escape') {
+      handleCancelCostEdit(order);
+    }
   };
 
   const handleLogout = () => {
@@ -285,7 +448,7 @@ const DistributorListOrder: React.FC = () => {
                                 onPointerEnterCapture={() => {}}
                                 onPointerLeaveCapture={() => {}}
                               >
-                                {new Date(order.createdAt).toLocaleDateString('ar-SA', {
+                                {new Date(order.createdAt).toLocaleDateString('en-US', {
                                   day: '2-digit',
                                   month: '2-digit',
                                   year: 'numeric'
@@ -308,49 +471,141 @@ const DistributorListOrder: React.FC = () => {
                               </Typography>
                             </div>
 
-                            {/* Location Info */}
-                            <div 
-                              className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
-                              onClick={() => handleOpenLocation(order.location)}
-                            >
-                              <FontAwesomeIcon icon={faLocationDot} className="w-4 h-4 text-blue-600" />
-                              <Typography 
-                                variant="small" 
-                                color="blue-gray"
-                                className="font-medium"
-                                placeholder=""
-                                onPointerEnterCapture={() => {}}
-                                onPointerLeaveCapture={() => {}}
-                              >
-                                {order.location?.name || 'الموقع'}
-                              </Typography>
-                            </div>
-
-                            {/* Cost */}
-                            <div className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                              <div className="flex items-center gap-2">
-                                <FontAwesomeIcon icon={faMoneyBill} className="w-4 h-4 text-green-600" />
+                            {/* Location Button */}
+                            <div className={`flex items-center gap-2 p-2 rounded-lg ${
+                              order.location?.coordinates 
+                                ? 'bg-green-50 border border-green-200' 
+                                : 'bg-red-50 border border-red-200'
+                            }`}>
+                              <FontAwesomeIcon 
+                                icon={faLocationDot} 
+                                className={`w-4 h-4 ${
+                                  order.location?.coordinates ? 'text-green-600' : 'text-red-600'
+                                }`} 
+                              />
+                              <div className="flex-1">
+                                <div
+                                  className={`${
+                                    order.location?.coordinates 
+                                      ? 'cursor-pointer hover:underline' 
+                                      : ''
+                                  }`}
+                                  onClick={() => {
+                                    if (order.location?.coordinates) {
+                                      handleOpenLocation(order.location);
+                                    }
+                                  }}
+                                >
+                                  <Typography 
+                                    variant="small" 
+                                    color="blue-gray"
+                                    className="font-medium"
+                                    placeholder=""
+                                    onPointerEnterCapture={() => {}}
+                                    onPointerLeaveCapture={() => {}}
+                                  >
+                                    {order.location?.name || 'الموقع'}
+                                  </Typography>
+                                </div>
                                 <Typography 
                                   variant="small" 
                                   color="blue-gray"
-                                  className="font-medium"
+                                  className={`text-xs ${
+                                    order.location?.coordinates ? 'text-green-600' : 'text-red-600'
+                                  }`}
+                                  placeholder=""
+                                  onPointerEnterCapture={() => {}}
+                                  onPointerLeaveCapture={() => {}}
+                                >
+                                  {order.location?.coordinates ? 'محدد (اضغط للخريطة)' : 'غير محدد'}
+                                </Typography>
+                              </div>
+                              <Button
+                                size="sm"
+                                color={order.location?.coordinates ? "green" : "red"}
+                                variant="outlined"
+                                onClick={() => handleUpdateLocation(order)}
+                                disabled={locationLoadingStates[order.id] || order.status === 'Confirmed'}
+                                className="flex items-center gap-1"
+                              >
+                                {locationLoadingStates[order.id] ? (
+                                  <div className={`animate-spin w-3 h-3 border ${
+                                    order.location?.coordinates 
+                                      ? 'border-green-500 border-t-transparent' 
+                                      : 'border-red-500 border-t-transparent'
+                                  } rounded-full`}></div>
+                                ) : (
+                                  <FontAwesomeIcon icon={faMapMarkerAlt} className="w-3 h-3" />
+                                )}
+                                <span className="text-xs">تحديث</span>
+                              </Button>
+                            </div>
+
+                            {/* Cost Input */}
+                            <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                              <FontAwesomeIcon icon={faMoneyBill} className="w-4 h-4 text-green-600" />
+                              <div className="flex-1">
+                                <Typography 
+                                  variant="small" 
+                                  color="blue-gray"
+                                  className="font-medium text-xs"
                                   placeholder=""
                                   onPointerEnterCapture={() => {}}
                                   onPointerLeaveCapture={() => {}}
                                 >
                                   التكلفة
                                 </Typography>
+                                {costEditingStates[order.id] ? (
+                                  <div className="flex items-center gap-1 mt-1">
+                                    <input
+                                      type="number"
+                                      value={costInputValues[order.id] || ''}
+                                      onChange={(e) => setCostInputValues(prev => ({
+                                        ...prev,
+                                        [order.id]: e.target.value
+                                      }))}
+                                      onKeyDown={(e) => handleCostKeyPress(e, order)}
+                                      className="flex-1 px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                      placeholder="0"
+                                      min="0"
+                                      step="0.01"
+                                      autoFocus
+                                    />
+                                    <IconButton
+                                      icon={faCheck}
+                                      onClick={() => handleSaveCost(order)}
+                                      color="green"
+                                      size="sm"
+                                      className="w-6 h-6"
+                                      title="حفظ"
+                                    />
+                                    <IconButton
+                                      icon={faTimes}
+                                      onClick={() => handleCancelCostEdit(order)}
+                                      color="red"
+                                      size="sm"
+                                      className="w-6 h-6"
+                                      title="إلغاء"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div 
+                                    className="cursor-pointer hover:bg-gray-100 p-1 rounded transition-colors"
+                                    onClick={() => handleStartCostEdit(order)}
+                                  >
+                                    <Typography 
+                                      variant="small" 
+                                      color="green"
+                                      className="font-bold"
+                                      placeholder=""
+                                      onPointerEnterCapture={() => {}}
+                                      onPointerLeaveCapture={() => {}}
+                                    >
+                                      {formatCurrency(order.cost)}
+                                    </Typography>
+                                  </div>
+                                )}
                               </div>
-                              <Typography 
-                                variant="small" 
-                                color="green"
-                                className="font-bold"
-                                placeholder=""
-                                onPointerEnterCapture={() => {}}
-                                onPointerLeaveCapture={() => {}}
-                              >
-                                {formatCurrency(order.cost)}
-                              </Typography>
                             </div>
 
                             {/* Contact Buttons */}
@@ -379,13 +634,14 @@ const DistributorListOrder: React.FC = () => {
                             <div className="mt-2">
                               <Button
                                 className="w-full flex items-center justify-center gap-2"
-                                color="amber"
+                                color={areAllRequiredFieldsFilled(order) && order.status !== 'Confirmed' ? "amber" : "gray"}
                                 size="sm"
                                 onClick={() => handleConfirmOrder(order)}
-                                disabled={order.status === 'Confirmed'}
+                                disabled={order.status === 'Confirmed' || !areAllRequiredFieldsFilled(order)}
                               >
                                 <FontAwesomeIcon icon={faCheckCircle} className="w-4 h-4" />
-                                {order.status === 'Confirmed' ? 'تم التأكيد' : 'تأكيد الطلب'}
+                                {order.status === 'Confirmed' ? 'تم التأكيد' : 
+                                 areAllRequiredFieldsFilled(order) ? 'تأكيد الطلب' : 'بيانات ناقصة'}
                               </Button>
                             </div>
                           </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { OrderList } from '../types/order';
 import Button from './Button';
 import { faArrowRight, faMapLocation, faSave } from '@fortawesome/free-solid-svg-icons';
@@ -12,17 +12,15 @@ import { useNavigate } from 'react-router-dom';
 import { isValidPhoneNumber } from '../utils/formatters';
 import IconButton from './IconButton';
 import { getCurrentLocation } from '../services/locationService';
-import { useAppDispatch,  } from '../store/hooks';
+import { useAppDispatch } from '../store/hooks';
 import { findCustomerByPhone } from '../store/slices/customerSlice';
 
 interface OrderFormProps {
   order: OrderList;
   setOrder: React.Dispatch<React.SetStateAction<OrderList>>;
   onSubmit: (e?: React.FormEvent) => void;
-  onBack: (customer?: Customer) => void;
   title: string;
   isEdit?: boolean;
-  isBackLoading?: boolean;
   isSubmitLoading?: boolean;
 }
 
@@ -30,10 +28,8 @@ const OrderForm: React.FC<OrderFormProps> = ({
   order,
   setOrder,
   onSubmit,
-  onBack,
   title,
   isEdit = false,
-  isBackLoading = false,
   isSubmitLoading = false,
 }) => {
   // Ensure order is defined with default values if needed
@@ -55,42 +51,56 @@ const OrderForm: React.FC<OrderFormProps> = ({
   const [loading, setLoading] = useState(false);
   const [getttingGpsLocation, setGetttingGpsLocation] = useState(false);
   const [shouldAutoOpenLocation, setShouldAutoOpenLocation] = useState(false);
+  const [lastSearchedPhone, setLastSearchedPhone] = useState<string>('');
   const navigate = useNavigate();
   const locationRef = React.useRef(null);
 
-  useEffect(() => {
-   const findCustomer = async () => {
+  // Memoize the customer search function
+  const findCustomer = useCallback(async (phone: string) => {
+    if (!phone || !isValidPhoneNumber(phone) || phone === lastSearchedPhone) {
+      return;
+    }
+
     setIsSearching(true);
-    // Only search for customer if this is a new order or if we don't have a customer yet
-    if (!safeOrder?.customer?.id && safeOrder?.customer?.phone && isValidPhoneNumber(safeOrder?.customer?.phone)) {
-      try {
-        const customerResults = await dispatch(findCustomerByPhone(safeOrder.customer.phone)).unwrap();
-        if (customerResults && customerResults.length > 0) {
-          setIsNewCustomer(false);
-          const foundCustomer = customerResults[0];
-          setOrder((prev) => ({
-            ...prev,
-            customer: foundCustomer // Take the first matching customer
-          }));
-          
-          // Auto-open location dropdown if customer has locations
-          if (foundCustomer.locations && foundCustomer.locations.length > 0) {
-            setShouldAutoOpenLocation(true);
-          }
-        } else {
-          setIsNewCustomer(true);
+    setLastSearchedPhone(phone);
+    
+    try {
+      const customerResults = await dispatch(findCustomerByPhone(phone)).unwrap();
+      if (customerResults && customerResults.length > 0) {
+        setIsNewCustomer(false);
+        const foundCustomer = customerResults[0];
+        setOrder((prev) => ({
+          ...prev,
+          customer: foundCustomer
+        }));
+        
+        // Auto-open location dropdown if customer has locations - only in add mode, not edit mode
+        if (!isEdit && foundCustomer.locations && foundCustomer.locations.length > 0) {
+          setShouldAutoOpenLocation(true);
         }
-      } catch (error) {
-        // Customer not found, treat as new customer
+      } else {
         setIsNewCustomer(true);
       }
-    } else {
+    } catch (error) {
+      // Customer not found, treat as new customer
+      setIsNewCustomer(true);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [dispatch, setOrder, isEdit, lastSearchedPhone]);
+
+  // Search for customer when phone changes
+  useEffect(() => {
+    const currentPhone = safeOrder?.customer?.phone || '';
+    
+    // Only search if phone has changed and is different from last searched
+    if (currentPhone !== lastSearchedPhone && (!safeOrder?.customer?.id || !isEdit)) {
+      findCustomer(currentPhone);
+    } else if (safeOrder?.customer?.id) {
+      // If we already have a customer ID, mark as existing customer
       setIsNewCustomer(false);
     }
-    setIsSearching(false);
-   }
-   findCustomer()
-  }, [safeOrder?.customer?.phone, dispatch, setOrder]);
+  }, [safeOrder?.customer?.phone, findCustomer, safeOrder?.customer?.id, isEdit, lastSearchedPhone]);
 
   // Reset auto-open flag after a short delay to allow the dropdown to open
   useEffect(() => {
@@ -102,7 +112,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
     }
   }, [shouldAutoOpenLocation]);
 
-  const handleSetLocation = async (e: React.MouseEvent) => {
+  const handleSetLocation = useCallback(async (e: React.MouseEvent) => {
     e.preventDefault();
     setGetttingGpsLocation(true);
     try {
@@ -141,14 +151,14 @@ const OrderForm: React.FC<OrderFormProps> = ({
     } finally {
       setGetttingGpsLocation(false);
     }
-  };
+  }, [safeOrder.customer, safeOrder.location, setOrder]);
 
-  const handleOrderUpdate = (updater: (prev: OrderList | undefined) => OrderList | undefined) => {
+  const handleOrderUpdate = useCallback((updater: (prev: OrderList | undefined) => OrderList | undefined) => {
     setOrder(prev => {
       const result = updater(prev);
       return result || prev;
     });
-  };
+  }, [setOrder]);
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
@@ -181,21 +191,25 @@ const OrderForm: React.FC<OrderFormProps> = ({
         />
       )}
 
-      {safeOrder?.location && safeOrder.location.name && !safeOrder.location.coordinates && (
-        <div className="flex items-center gap-2 bg-yellow-50 p-3 rounded-lg border border-yellow-100">
+      {safeOrder?.location && safeOrder.location.name && (
+        <div className="flex items-center gap-2">
           <div className="flex-1">
-            <p className="text-yellow-800 text-sm">لا توجد إحداثيات متوفرة لهذا الموقع</p>
-            <p className="text-yellow-600 text-xs mt-1">يمكنك تحديد الموقع الحالي لتحديث الإحداثيات</p>
+            <p className={`text-sm ${safeOrder.location.coordinates ? 'text-green-800' : 'text-red-800'}`}>
+              {safeOrder.location.coordinates ? 'تم تحديد الإحداثيات بنجاح' : 'لا توجد إحداثيات متوفرة لهذا الموقع'}
+            </p>
+            {!safeOrder.location.coordinates && (
+              <p className="text-red-600 text-xs mt-1">يمكنك تحديد الموقع الحالي لتحديث الإحداثيات</p>
+            )}
           </div>
-                <IconButton 
-                  onClick={handleSetLocation}
-                  icon={faMapLocation}
-            variant="warning"
-                  size="lg"
-                  loading={getttingGpsLocation}
-            title="استخدام الموقع الحالي"
+          <IconButton 
+            onClick={handleSetLocation}
+            icon={faMapLocation}
+            variant={safeOrder.location.coordinates ? "success" : "danger"}
+            size="lg"
+            loading={getttingGpsLocation}
+            title={safeOrder.location.coordinates ? "تحديث الموقع الحالي" : "استخدام الموقع الحالي"}
           />
-      </div>
+        </div>
       )}
 
       <DistributorSelector
@@ -214,28 +228,14 @@ const OrderForm: React.FC<OrderFormProps> = ({
         disabled={isEdit && safeOrder?.status === 'Confirmed'}
       />
 
-      <div className="flex justify-between items-center mt-6">
-        <Button
-          type="button"
-          onClick={() => {
-            if (safeOrder?.customer && (safeOrder?.customer?.locations?.length || safeOrder?.customer?.name || safeOrder?.customer?.phone)) {
-              onBack(safeOrder?.customer);
-            } else {
-              navigate(-1);
-            }
-          }}
-          variant="secondary"
-          icon={faArrowRight}
-          disabled={isBackLoading || isSubmitLoading}
-        >
-          رجوع
-        </Button>
+      <div className="flex justify-center items-center mt-6">
         <Button
           type="submit"
           variant="primary"
           icon={faSave}
           disabled={(isEdit && safeOrder?.status === 'Confirmed') || isSubmitLoading}
           loading={isSubmitLoading}
+          className="w-full max-w-xs"
         >
           {title}
         </Button>

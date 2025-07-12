@@ -105,15 +105,18 @@ const OrdersList: React.FC = () => {
   };
 
   const formatDate = (date: string): string => {
-    return new Date(date).toLocaleDateString('ar-EG', {
+    return new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
     });
   };
 
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('ar-EG', { style: 'currency', currency: 'EGP' }).format(amount);
+  const formatCurrency = (amount: number | undefined | null): string => {
+    if (amount === null || amount === undefined) {
+      return '-';
+    }
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'ILS' }).format(amount);
   };
 
   const resetFilters = () => {

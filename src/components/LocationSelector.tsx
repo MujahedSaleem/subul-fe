@@ -3,12 +3,12 @@ import { Customer, Location } from "../types/customer";
 import { OrderList } from "../types/order";
 import Modal from "./modal";
 import EditCustomer from "./EditCustomer";
-import { SearchableDropdown, Option } from "./distributor/shared/SearchableDropdown";
-import { AddLocationModal } from "./AddLocationModal";
 import IconButton from "./IconButton";
-import { faLocationDot } from "@fortawesome/free-solid-svg-icons";
+import { faLocationDot, faPlus, faMapMarkerAlt } from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useAppDispatch } from "../store/hooks";
 import { showWarning } from "../store/slices/notificationSlice";
+import Button from "./Button";
 
 interface LocationSelectorProps {
   order: OrderList | undefined;
@@ -24,201 +24,288 @@ const LocationSelector = forwardRef<HTMLDivElement, LocationSelectorProps>((
   { order, setOrder, disabled, customer, isNewCustomer, isDistributor, autoOpenDropdown },
   ref
 ) => {
-    const dispatch = useAppDispatch();
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedLocationName, setSelectedLocationName] = useState("");
-    
-    useEffect(() => {
-      if (order?.location?.name) {
-        setSelectedLocationName(order.location.name);
-      }
-    }, [order?.location?.name]);
+  const dispatch = useAppDispatch();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedLocationName, setSelectedLocationName] = useState("");
+  const [newLocationName, setNewLocationName] = useState("");
+  const [isAddingLocation, setIsAddingLocation] = useState(false);
+  
+  useEffect(() => {
+    if (order?.location?.name) {
+      setSelectedLocationName(order.location.name);
+    }
+  }, [order?.location?.name]);
 
-    const setNewLocationName = (newLocationName: string) => {
-      if (newLocationName.trim() !== '') {
-        // Check if the location already exists
-        const existingLocation = customer?.locations?.some(
-          (location) => location.name === newLocationName
-        );
-    
-        if (existingLocation) {
-          return;
-        }
-    
-        // Create new location object
-        const newLocation: Location = {
-          id: 0, // ID for a new location
-          name: newLocationName,
-          coordinates: '',
-          address: '',
-          isActive: true,
-          customerId: customer?.id || ''
-        };
-    
-        // Update state with the new location and customer
-        setOrder((prev: OrderList | undefined) => {
-          if (!prev) return prev;
-          const updatedCustomer = {
-            ...prev.customer,
-            locations: [...(prev.customer?.locations ?? []), newLocation],
-          };
-          return {
-          ...prev,
-            customer: updatedCustomer,
-            location: newLocation,
-            locationId: newLocation.id
-          };
-        });
-        setSelectedLocationName(newLocationName);
-      }
-    };
+  // Auto-open modal when there are locations and autoOpenDropdown is true
+  useEffect(() => {
+    if (autoOpenDropdown && customer?.locations && customer.locations.length > 0 && !disabled) {
+      setIsModalOpen(true);
+    }
+  }, [autoOpenDropdown, customer?.locations, disabled]);
 
-    const handleSaveCustomer = (updatedCustomer: Customer) => {
-      setOrder((prev: OrderList | undefined) => {
-        if (!prev) return prev;
-        return { ...prev, customer: updatedCustomer };
-      });
-      setIsModalOpen(false);
-    };
-
-    const handleLocationSelect = (value: string | number) => {
-      if (!customer) return;
-      
-      const locationId = parseInt(value.toString());
-      const selectedLocation = customer.locations.find(loc => loc.id === locationId);
-      if (!selectedLocation) return;
-      
-      setOrder(prev => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          location: selectedLocation,
-          locationId: locationId
-        };
-      });
-      setSelectedLocationName(selectedLocation.name);
-    };
-
-    const handleAddLocation = (newLocationName: string) => {
-      setNewLocationName(newLocationName);
-    };
-
-    const handleInputChange = (inputValue: string) => {
-      // If input is being cleared and we have a current location
-      if (inputValue.trim() === '' && order?.location) {
-        const currentLocation = order.location;
-        
-        // Create empty location object to clear selection
-        const emptyLocation: Location = {
-          id: 0,
-          name: '',
-          coordinates: '',
-          address: '',
-          isActive: true,
-          customerId: customer?.id || ''
-        };
-        
-        // If it's a new location (id = 0), remove it from customer's locations
-        if (currentLocation.id === 0) {
-          setOrder((prev: OrderList | undefined) => {
-            if (!prev || !prev.customer) return prev;
-            
-            const updatedCustomer = {
-              ...prev.customer,
-              locations: prev.customer.locations.filter(loc => 
-                !(loc.id === 0 && loc.name === currentLocation.name)
-              )
-            };
-            
-            return {
-              ...prev,
-              customer: updatedCustomer,
-              location: emptyLocation,
-              locationId: 0
-            };
-          });
-        } else {
-          // If it's an existing location, just clear the selection
-          setOrder((prev: OrderList | undefined) => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              location: emptyLocation,
-              locationId: 0
-            };
-          });
-        }
-        setSelectedLocationName('');
-      }
-    };
-
-    const handleOpenLocation = (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      
-      if (!order?.location?.coordinates) {
-        dispatch(showWarning({ message: 'لا توجد إحداثيات متوفرة لهذا الموقع' }));
+  const setNewLocation = (locationName: string) => {
+    if (locationName.trim() !== '') {
+      // Check if the location already exists
+      const existingLocation = customer?.locations?.some(
+        (location) => location.name === locationName
+      );
+  
+      if (existingLocation) {
         return;
       }
+  
+      // Create new location object
+      const newLocation: Location = {
+        id: 0, // ID for a new location
+        name: locationName,
+        coordinates: '',
+        address: '',
+        isActive: true,
+        customerId: customer?.id || ''
+      };
+  
+      // Update state with the new location and customer
+      setOrder((prev: OrderList | undefined) => {
+        if (!prev) return prev;
+        const updatedCustomer = {
+          ...prev.customer,
+          locations: [...(prev.customer?.locations ?? []), newLocation],
+        };
+        return {
+          ...prev,
+          customer: updatedCustomer,
+          location: newLocation,
+          locationId: newLocation.id
+        };
+      });
+      setSelectedLocationName(locationName);
+      setNewLocationName("");
+      setIsAddingLocation(false);
+    }
+  };
 
-      const [latitude, longitude] = order.location.coordinates.split(',').map(Number);
-      const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  const handleSaveCustomer = (updatedCustomer: Customer) => {
+    setOrder((prev: OrderList | undefined) => {
+      if (!prev) return prev;
+      return { ...prev, customer: updatedCustomer };
+    });
+    setIsEditModalOpen(false);
+  };
+
+  const handleLocationSelect = (location: Location) => {
+    if (!customer) return;
+    
+    setOrder(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        location: location,
+        locationId: location.id
+      };
+    });
+    setSelectedLocationName(location.name);
+    setIsModalOpen(false);
+  };
+
+  const handleAddNewLocation = () => {
+    if (newLocationName.trim() !== '') {
+      setNewLocation(newLocationName);
+      setIsModalOpen(false);
+    }
+  };
+
+  const handleOpenLocationModal = () => {
+    if (!disabled) {
+      setIsModalOpen(true);
+    }
+  };
+
+  const handleOpenLocation = (e: React.MouseEvent, coordinates: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!coordinates) {
+      dispatch(showWarning({ message: 'لا توجد إحداثيات متوفرة لهذا الموقع' }));
+      return;
+    }
+
+    const [latitude, longitude] = coordinates.split(',').map(Number);
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobileDevice) {
+      // For mobile, use geo: protocol for better app integration
+      const googleMapsUrl = `geo:${latitude},${longitude}?q=${latitude},${longitude}`;
+      window.location.href = googleMapsUrl;
+    } else {
+      // For desktop, open in navigation/driving mode
+      const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
+      window.open(url, '_blank');
+    }
+  };
+
+  return (
+    <div ref={ref} className="flex flex-col">
+      <label htmlFor="location" className="text-sm font-medium text-slate-700 mb-2">
+        الموقع
+      </label>
       
-      if (isMobileDevice) {
-        // For mobile, use geo: protocol for better app integration
-        const googleMapsUrl = `geo:${latitude},${longitude}?q=${latitude},${longitude}`;
-        window.location.href = googleMapsUrl;
-      } else {
-        // For desktop, open in navigation/driving mode
-        const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
-        window.open(url, '_blank');
-      }
-    };
-
-
-    return (
-      <div ref={ref} className="flex flex-col">
-        <label htmlFor="location" className="text-sm font-medium text-slate-700">
-          الموقع
-        </label>
-        <div className="flex items-center gap-2">
-          <SearchableDropdown
-            value={selectedLocationName}
-            onChange={handleLocationSelect}
-            onAddOption={!disabled ? handleAddLocation : undefined}
-            onInputChange={!disabled ? handleInputChange : undefined}
-            disabled={disabled}
-            placeholder="اختر الموقع"
-            className="flex-1"
-            autoOpen={autoOpenDropdown && customer?.locations && customer.locations.length > 0}
-          >
-            {customer?.locations?.map((location, index) => (
-              <Option key={location.id === 0 ? `new-location-${index}-${location.name}` : location.id} value={location.id.toString()}>
-                {location.name}
-              </Option>
-            ))}
-          </SearchableDropdown>
-          
-          {/* Location button - only show when coordinates exist */}
-          {order?.location?.coordinates && (
-            <IconButton 
-              onClick={handleOpenLocation}
-              icon={faLocationDot}
-              variant="primary"
-              size="md"
-              title="فتح الموقع في خريطة جوجل"
-            />
-          )}
+      {/* Location Display Label */}
+      <div className="flex items-center gap-2">
+        <div 
+          onClick={handleOpenLocationModal}
+          className={`flex-1 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer transition-colors ${
+            disabled 
+              ? 'bg-gray-100 cursor-not-allowed' 
+              : 'bg-white hover:bg-gray-50'
+          } ${
+            selectedLocationName ? 'text-gray-800' : 'text-gray-500'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <FontAwesomeIcon icon={faMapMarkerAlt} className="w-4 h-4 text-gray-400" />
+            <span>
+              {selectedLocationName || "اختر الموقع"}
+            </span>
+          </div>
         </div>
-
-        {/* Add Location Modal */}
-        <AddLocationModal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          onAdd={(location) => handleAddLocation(location.name)}
-        />
+        
+        {/* Location button - only show when coordinates exist */}
+        {order?.location?.coordinates && (
+          <IconButton 
+            onClick={(e) => handleOpenLocation(e, order.location.coordinates || '')}
+            icon={faLocationDot}
+            variant="primary"
+            size="md"
+            title="فتح الموقع في خريطة جوجل"
+          />
+        )}
       </div>
-    );
+
+      {/* Location Selection Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                اختر الموقع
+              </h3>
+              
+              {/* Existing Locations */}
+              {customer?.locations && customer.locations.length > 0 ? (
+                <div className="space-y-2 mb-4">
+                  {customer.locations.map((location, index) => (
+                    <div
+                      key={location.id === 0 ? `new-location-${index}-${location.name}` : location.id}
+                      onClick={() => handleLocationSelect(location)}
+                      className={`p-3 rounded-lg cursor-pointer transition-colors border ${
+                        selectedLocationName === location.name
+                          ? 'bg-blue-50 border-blue-200'
+                          : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                      }`}
+                    >
+                                             <div className="flex items-center justify-between">
+                         <div className="flex items-center gap-2">
+                           <FontAwesomeIcon icon={faMapMarkerAlt} className="w-4 h-4 text-gray-400" />
+                           <span className="text-gray-800">{location.name}</span>
+                         </div>
+                         {location.coordinates && (
+                           <IconButton
+                             onClick={(e) => handleOpenLocation(e, location.coordinates || '')}
+                             icon={faLocationDot}
+                             variant="primary"
+                             size="sm"
+                             title="فتح الموقع في خريطة جوجل"
+                           />
+                         )}
+                       </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4 text-gray-500 mb-4">
+                  لا توجد مواقع محفوظة
+                </div>
+              )}
+
+              {/* Add New Location Section */}
+              <div className="border-t pt-4">
+                {isAddingLocation ? (
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      value={newLocationName}
+                      onChange={(e) => setNewLocationName(e.target.value)}
+                      placeholder="اسم الموقع الجديد"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      autoFocus
+                    />
+                    <div className="flex gap-2">
+                                             <Button
+                         onClick={handleAddNewLocation}
+                         disabled={!newLocationName.trim()}
+                         className="flex-1"
+                         size="sm"
+                       >
+                         إضافة
+                       </Button>
+                       <Button
+                         onClick={() => {
+                           setIsAddingLocation(false);
+                           setNewLocationName("");
+                         }}
+                         variant="outlined"
+                         className="flex-1"
+                         size="sm"
+                       >
+                         إلغاء
+                       </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    onClick={() => setIsAddingLocation(true)}
+                    variant="primary"
+                    className="w-full"
+                    size="sm"
+                  >
+                    <FontAwesomeIcon icon={faPlus} className="w-4 h-4 ml-2" />
+                    إضافة موقع جديد
+                  </Button>
+                )}
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex justify-end gap-2 mt-6">
+                <Button
+                  onClick={() => setIsModalOpen(false)}
+                  variant="outline"
+                  size="sm"
+                >
+                  إغلاق
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Customer Modal */}
+      <Modal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        className="w-full max-w-4xl"
+      >
+        {customer && (
+          <EditCustomer
+            customer={customer}
+            onSave={handleSaveCustomer}
+            onCancel={() => setIsEditModalOpen(false)}
+          />
+        )}
+      </Modal>
+    </div>
+  );
 });
 
 LocationSelector.displayName = 'LocationSelector';

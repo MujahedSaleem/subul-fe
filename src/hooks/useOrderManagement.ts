@@ -6,7 +6,7 @@ import { useDistributorOrders } from './useDistributorOrders';
 import { Customer, Location } from '../types/customer';
 import { OrderList, OrderRequest } from '../types/order';
 import { 
-  areAllRequiredFieldsFilled, 
+  areBasicOrderFieldsFilled,
   getOrderButtonTitle, 
   getTargetOrderStatus, 
   findMatchingLocation, 
@@ -28,7 +28,7 @@ export const useOrderManagement = ({ initialOrder, isEdit = false }: UseOrderMan
   const [isBackLoading, setIsBackLoading] = useState(false);
 
   const { addCustomer, updateCustomer } = useDistributorCustomers();
-  const { addOrder, updateOrder, confirmOrder } = useDistributorOrders();
+  const { addOrder, updateOrder } = useDistributorOrders();
 
   /**
    * Process customer and location updates
@@ -120,11 +120,11 @@ export const useOrderManagement = ({ initialOrder, isEdit = false }: UseOrderMan
     let errorMessage: string | null = null;
 
     try {
-      // Basic validation - only require customer with phone number
-      if (!order.customer || !order.customer.phone?.trim()) {
+      // Basic validation - require at least basic order fields
+      if (!areBasicOrderFieldsFilled(order)) {
         dispatch({
           type: 'SET_ERROR',
-          payload: 'يرجى إدخال رقم الهاتف على الأقل.',
+          payload: 'يرجى إدخال اسم العميل ورقم الهاتف والموقع على الأقل.',
         });
         return;
       }
@@ -137,39 +137,27 @@ export const useOrderManagement = ({ initialOrder, isEdit = false }: UseOrderMan
 
       const { customerId, locationId } = await processCustomerAndLocation(order);
 
-      // Determine the appropriate status and action
+      // Always save as draft - confirmation happens from order list page
       const targetStatus = getTargetOrderStatus(order);
-      const shouldConfirm = areAllRequiredFieldsFilled(order) && order.status !== 'Confirmed';
 
       const orderRequest: OrderRequest = {
         ...(isEdit && { id: order.id }), // Include ID for updates
         customerId,
         locationId,
-        cost: order.cost,
+        cost: order.cost ?? null, // Convert undefined to null for API
         statusString: targetStatus
       };
 
       if (isEdit) {
-        // Update existing order
+        // Update existing order (save as draft only)
         await updateOrder(orderRequest);
-        
-        // Confirm if all fields are filled
-        if (shouldConfirm) {
-          await confirmOrder(order.id);
-        }
       } else {
-        // Create new order
-        const orderResult = await addOrder(orderRequest);
-        const newOrder = orderResult.payload as OrderList;
-        
-        // Only confirm if all required fields are filled
-        if (newOrder && shouldConfirm) {
-          await confirmOrder(newOrder.id);
-        }
+        // Create new order (save as draft only)
+        await addOrder(orderRequest);
       }
 
-      // Navigate to the orders page after successful submission
-      navigate('/distributor/orders');
+      // Navigate to the orders page after successful submission and force refresh
+      navigate('/distributor/orders', { replace: true, state: { forceRefresh: true } });
     } catch (exception: any) {
       // Handle errors from the backend
       if (exception.response?.status === 400) {
@@ -187,7 +175,7 @@ export const useOrderManagement = ({ initialOrder, isEdit = false }: UseOrderMan
     } finally {
       setIsSubmitting(false);
     }
-  }, [order, isEdit, processCustomerAndLocation, addOrder, updateOrder, confirmOrder, navigate, dispatch]);
+  }, [order, isEdit, processCustomerAndLocation, addOrder, updateOrder, navigate, dispatch]);
 
   /**
    * Handle back navigation with draft saving
@@ -275,7 +263,7 @@ export const useOrderManagement = ({ initialOrder, isEdit = false }: UseOrderMan
             id: order.id,
             customerId: parseInt(order.customer.id),
             locationId: finalLocationId,
-            cost: order.cost,
+            cost: order.cost ?? null, // Convert undefined to null for API
             statusString: order.status as 'New' | 'Pending' | 'Confirmed' | 'Draft'
           };
           await updateOrder(orderRequest);
@@ -287,7 +275,7 @@ export const useOrderManagement = ({ initialOrder, isEdit = false }: UseOrderMan
         await addOrder({ 
           customerId,
           locationId,
-          cost: order.cost,
+          cost: order.cost ?? null, // Convert undefined to null for API
           statusString: 'Draft' as const
         });
       }
@@ -318,9 +306,7 @@ export const useOrderManagement = ({ initialOrder, isEdit = false }: UseOrderMan
     originalOrder,
     setOriginalOrder,
     isSubmitting,
-    isBackLoading,
     handleSubmit,
-    handleBack,
     buttonTitle
   };
 }; 

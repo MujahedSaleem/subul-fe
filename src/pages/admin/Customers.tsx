@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
-import { faPlus, faPenToSquare, faTrash, faSearch, faSpinner, faLocationDot, faPhone } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faPenToSquare, faTrash, faSearch, faLocationDot, faPhone } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Button from '../../components/Button';
 import IconButton from '../../components/IconButton';
@@ -9,6 +9,7 @@ import { useCustomers } from '../../hooks/useCustomers';
 import { useAppDispatch } from '../../store/hooks';
 import { showSuccess, showError } from '../../store/slices/notificationSlice';
 import { Card, CardHeader, CardBody, Typography, Input } from '@material-tailwind/react';
+import Loader from '../../components/admin/shared/Loader';
 
 const Customers: React.FC = () => {
   const navigate = useNavigate();
@@ -113,25 +114,10 @@ const Customers: React.FC = () => {
           <CardBody 
             className="text-center py-12"
             placeholder=""
-            
-            
+            onPointerEnterCapture={() => {}}
+            onPointerLeaveCapture={() => {}}
           >
-            <div className="flex flex-col items-center gap-4">
-              <FontAwesomeIcon 
-                icon={faSpinner} 
-                className="h-8 w-8 text-blue-500 animate-spin" 
-              />
-              <Typography 
-                variant="h6" 
-                color="blue-gray"
-                className="font-medium"
-                placeholder=""
-                
-                
-              >
-                جاري تحميل البيانات...
-              </Typography>
-            </div>
+            <Loader />
           </CardBody>
         ) : (
           <CardBody 

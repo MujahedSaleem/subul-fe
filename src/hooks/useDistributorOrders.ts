@@ -8,7 +8,8 @@ import {
   updateDistributorOrder,
   confirmDistributorOrder,
   clearCurrentOrder,
-  clearErrors
+  clearErrors,
+  forceRefresh
 } from '../store/slices/distributorOrdersSlice';
 
 export const useDistributorOrders = () => {
@@ -20,8 +21,8 @@ export const useDistributorOrders = () => {
     error
   } = useAppSelector(state => state.distributorOrders);
 
-  const fetchOrders = useCallback(() => {
-    return dispatch(fetchDistributorOrders());
+  const fetchOrders = useCallback((forceRefresh = false) => {
+    return dispatch(fetchDistributorOrders(forceRefresh));
   }, [dispatch]);
 
   const getOrderById = useCallback((id: number) => {
@@ -36,15 +37,18 @@ export const useDistributorOrders = () => {
     return dispatch(updateDistributorOrder(order));
   }, [dispatch]);
 
-  const confirmOrder = useCallback((id: number) => {
-    return dispatch(confirmDistributorOrder(id));
+  const confirmOrder = useCallback(async (id: number) => {
+    const result = await dispatch(confirmDistributorOrder(id));
+    // Force refresh the orders list after confirming
+    await dispatch(fetchDistributorOrders(true));
+    return result;
   }, [dispatch]);
 
   const refreshOrders = useCallback(() => {
     // Force a fresh fetch by clearing the cache first
-    return dispatch(fetchDistributorOrders());
+    dispatch(forceRefresh());
+    return dispatch(fetchDistributorOrders(true));
   }, [dispatch]);
-
 
   const resetCurrentOrder = useCallback(() => {
     dispatch(clearCurrentOrder());

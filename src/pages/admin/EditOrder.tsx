@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import Layout from '../../components/Layout';
@@ -16,9 +16,7 @@ const EditOrderForm: React.FC<{ initialOrder: OrderList }> = ({ initialOrder }) 
     order,
     setOrder,
     isSubmitting,
-    isBackLoading,
     handleSubmit,
-    handleBack,
     buttonTitle
   } = useAdminOrderManagement({ 
     initialOrder, 
@@ -43,9 +41,9 @@ const EditOrderForm: React.FC<{ initialOrder: OrderList }> = ({ initialOrder }) 
                 </span>
                 <div className="flex items-center text-gray-500 text-sm">
                   <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 00-2-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 00-2-2V7a2 2 0 002 2z" />
                   </svg>
-                  {new Date(order.createdAt).toLocaleDateString('ar-SA')}
+                  {new Date(order.createdAt).toLocaleDateString('en-US')}
                 </div>
               </div>
             </div>
@@ -58,10 +56,8 @@ const EditOrderForm: React.FC<{ initialOrder: OrderList }> = ({ initialOrder }) 
             order={order}
             setOrder={setOrder}
             onSubmit={handleSubmit}
-            onBack={handleBack}
             title={buttonTitle}
             isEdit={true}
-            isBackLoading={isBackLoading}
             isSubmitLoading={isSubmitting}
           />
         </div>
@@ -74,16 +70,17 @@ const EditOrder: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
-  const { getCustomerById } = useCustomers();
+  const { findCustomerByPhone } = useCustomers();
   
   const { isLoading: reduxLoading } = useSelector((state: RootState) => state.orders);
   const [initialOrder, setInitialOrder] = useState<OrderList | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
+  // Load order data once
   useEffect(() => {
     const loadOrder = async () => {
-      if (!id) {
-        navigate('/admin/orders');
+      if (!id || dataLoaded) {
         return;
       }
 
@@ -95,29 +92,34 @@ const EditOrder: React.FC = () => {
 
       try {
         setIsLoading(true);
-        // Clear previous order data
+        // Clear previous order data to ensure fresh fetch
         dispatch(clearCurrentOrder());
         
-        // Fetch order via Redux
+        // Fetch order via Redux - this will always fetch fresh data from API
         const result = await dispatch(getOrderById(orderId.toString())).unwrap();
         
         if (result) {
-          // Fetch customer data including locations
-          if (result.customer?.id) {
-            const customerResult = await getCustomerById(result.customer.id.toString());
-            const customerData = customerResult.payload as any;
-            if (customerData && customerData.id) {
-              const fullOrderData = {
-                ...result,
-                customer: customerData
-              };
-              setInitialOrder(fullOrderData);
-            } else {
-              setInitialOrder(result);
+          // Fetch complete customer data with locations using phone number
+          let fullOrderData = result;
+          if (result.customer?.phone) {
+            try {
+              const customerResult = await findCustomerByPhone(result.customer.phone);
+              const customerData = customerResult.payload as any;
+              if (customerData && customerData.length > 0) {
+                console.log('Found complete customer data:', customerData[0]);
+                console.log('Customer locations from API:', customerData[0].locations);
+                fullOrderData = {
+                  ...result,
+                  customer: customerData[0]
+                };
+              }
+            } catch (customerError) {
+              console.warn('Could not fetch customer details:', customerError);
             }
-          } else {
-            setInitialOrder(result);
           }
+          
+          setInitialOrder(fullOrderData);
+          setDataLoaded(true);
         } else {
           navigate('/admin/orders');
         }
@@ -130,7 +132,7 @@ const EditOrder: React.FC = () => {
     };
 
     loadOrder();
-  }, [id, navigate, dispatch, getCustomerById]);
+  }, [id, navigate, dispatch, findCustomerByPhone, dataLoaded]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -154,7 +156,7 @@ const EditOrder: React.FC = () => {
 
   return (
     <Layout title="تعديل الطلبية">
-      {initialOrder && <EditOrderForm initialOrder={initialOrder} />}
+      <EditOrderForm initialOrder={initialOrder} />
     </Layout>
   );
 };

@@ -48,7 +48,10 @@ export const getOrderStatusConfig = (status: string) => {
 /**
  * Format currency amount for display
  */
-export const formatCurrency = (amount: number): string => {
+export const formatCurrency = (amount: number | undefined | null): string => {
+  if (amount === null || amount === undefined) {
+    return '-';
+  }
   return amount.toLocaleString('en-US', { style: 'currency', currency: 'ILS' });
 };
 
@@ -107,7 +110,8 @@ export const generateOrderNumber = (): string => {
 };
 
 /**
- * Check if all required order fields are filled
+ * Check if all required order fields are filled for confirmation
+ * This includes cost requirement for confirmed orders
  */
 export const areAllRequiredFieldsFilled = (order: OrderList): boolean => {
   const hasCustomerName = order.customer?.name?.trim();
@@ -119,24 +123,48 @@ export const areAllRequiredFieldsFilled = (order: OrderList): boolean => {
 };
 
 /**
- * Get dynamic button title based on order completion status
+ * Check if basic order fields are filled (for draft orders)
+ * Cost is optional for drafts
+ */
+export const areBasicOrderFieldsFilled = (order: OrderList): boolean => {
+  const hasCustomerName = order.customer?.name?.trim();
+  const hasCustomerPhone = order.customer?.phone?.trim();
+  const hasLocation = order.location?.name?.trim();
+
+  return !!(hasCustomerName && hasCustomerPhone && hasLocation);
+};
+
+/**
+ * Get dynamic button title for distributor orders (save only, no confirmation)
  */
 export const getOrderButtonTitle = (order: OrderList | null, isEdit: boolean = false): string => {
-  if (!order) return isEdit ? 'حفظ التغييرات' : 'تأكيد الطلبية';
+  if (!order) return isEdit ? 'حفظ التغييرات' : 'حفظ الطلب';
   
-  if (isEdit && order.status === 'Confirmed') {
+  if (isEdit) {
     return 'حفظ التغييرات';
   }
   
-  const allFieldsFilled = areAllRequiredFieldsFilled(order);
-  return allFieldsFilled ? 'تأكيد الطلب' : 'حفظ كمسودة';
+  const basicFieldsFilled = areBasicOrderFieldsFilled(order);
+  
+  if (!basicFieldsFilled) {
+    return 'حفظ كمسودة';
+  }
+  
+  return 'حفظ الطلب';
 };
 
 /**
  * Determine target status based on field completion
  */
 export const getTargetOrderStatus = (order: OrderList): 'New' | 'Draft' => {
-  return areAllRequiredFieldsFilled(order) ? 'New' : 'Draft';
+  const basicFieldsFilled = areBasicOrderFieldsFilled(order);
+  const allFieldsFilled = areAllRequiredFieldsFilled(order);
+  
+  if (!basicFieldsFilled) {
+    return 'Draft';
+  }
+  
+  return allFieldsFilled ? 'New' : 'Draft';
 };
 
 /**
