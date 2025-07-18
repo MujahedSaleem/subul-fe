@@ -68,7 +68,7 @@ export const cleanPhoneNumber = (phone: string): string => {
 export const handleDirectCall = (phone: string): void => {
   const cleanedPhone = cleanPhoneNumber(phone);
   if (cleanedPhone) {
-    window.location.href = `tel:+${cleanedPhone}`;
+    window.location.href = `tel:${cleanedPhone}`;
   }
 };
 
