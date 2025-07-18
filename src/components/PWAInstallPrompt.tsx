@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@material-tailwind/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faDownload, faSyncAlt } from '@fortawesome/free-solid-svg-icons';
+import { faDownload, faSyncAlt, faRedo } from '@fortawesome/free-solid-svg-icons';
 import { useAppDispatch } from '../store/hooks';
 import { showSuccess, showError } from '../store/slices/notificationSlice';
+import * as serviceWorkerRegistration from '../serviceWorkerRegistration';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -19,6 +20,7 @@ const PWAInstallPrompt: React.FC = () => {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const dispatch = useAppDispatch();
 
   useEffect(() => {
@@ -27,6 +29,9 @@ const PWAInstallPrompt: React.FC = () => {
         (window.navigator as SafariNavigator).standalone === true) {
       setIsInstalled(true);
     }
+
+    // Check if device is mobile
+    setIsMobile(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
 
     // Listen for the beforeinstallprompt event
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -64,11 +69,13 @@ const PWAInstallPrompt: React.FC = () => {
       });
       
       // Listen for messages from service worker
-      navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
-          setIsUpdateAvailable(true);
-        }
-      });
+      if (navigator.serviceWorker) {
+        navigator.serviceWorker.addEventListener('message', (event) => {
+          if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
+            setIsUpdateAvailable(true);
+          }
+        });
+      }
     }
 
     return () => {
@@ -117,8 +124,22 @@ const PWAInstallPrompt: React.FC = () => {
     }
   };
 
+  const handleForceRefreshClick = () => {
+    dispatch(showSuccess({ message: 'جاري تحديث التطبيق بالكامل...', duration: 3000 }));
+    
+    // Use the global forceClearCache function
+    if (typeof window.forceClearCache === 'function') {
+      window.forceClearCache();
+    } else {
+      // Fallback if the global function is not available
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    }
+  };
+
   // Don't render anything if the app is installed and no updates are available
-  if (isInstalled && !isUpdateAvailable && !installPrompt) return null;
+  if (isInstalled && !isUpdateAvailable && !installPrompt && !isMobile) return null;
 
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
@@ -150,7 +171,21 @@ const PWAInstallPrompt: React.FC = () => {
         </Button>
       )}
       
-      {isInstalled && !isUpdateAvailable && (
+      {isMobile && (
+        <Button
+          size="sm"
+          className="flex items-center gap-2 bg-red-500 shadow-lg"
+          onClick={handleForceRefreshClick}
+          placeholder=""
+          onPointerEnterCapture={null}
+          onPointerLeaveCapture={null}
+        >
+          <FontAwesomeIcon icon={faRedo} className="h-4 w-4" />
+          تحديث كامل
+        </Button>
+      )}
+      
+      {(isInstalled || isMobile) && !isUpdateAvailable && (
         <Button
           size="sm"
           className="flex items-center gap-2 bg-gray-500 shadow-lg opacity-80 hover:opacity-100"

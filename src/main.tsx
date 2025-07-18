@@ -8,10 +8,11 @@ import './index.css';
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 import { showSuccess, showError } from './store/slices/notificationSlice';
 
-// Add type definition for the checkForUpdates function
+// Add type definition for the global functions
 declare global {
   interface Window {
     checkForUpdates: () => void;
+    forceClearCache: () => void;
   }
 }
 
@@ -84,6 +85,19 @@ window.checkForUpdates = () => {
       }));
     }
   });
+};
+
+// Add a force clear cache function for mobile users
+window.forceClearCache = () => {
+  store.dispatch(showSuccess({
+    message: 'جاري تحديث التطبيق بالكامل...',
+    duration: 3000
+  }));
+  
+  // Use the forceClearCacheAndReload function
+  setTimeout(() => {
+    serviceWorkerRegistration.forceClearCacheAndReload();
+  }, 1000);
 };
 
 // Listen for controller change and reload the page

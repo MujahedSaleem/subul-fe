@@ -1,6 +1,7 @@
 // This is a simple service worker that caches the app shell
-const CACHE_NAME = 'subul-cache-v2'; // Increment version to force update
-const APP_VERSION = '2.0.0'; // Track app version for update detection
+const CACHE_NAME = 'subul-cache-v3'; // Increment version again to force update
+const APP_VERSION = '2.0.1'; // Track app version for update detection
+const TIMESTAMP = new Date().toISOString(); // Add timestamp to force cache refresh
 const urlsToCache = [
   '/',
   '/index.html',
@@ -10,9 +11,22 @@ const urlsToCache = [
   '/icons/icon-512x512.svg',
 ];
 
+// Detect if the client is a mobile device
+const isMobileDevice = () => {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+};
+
 // Install event - cache app shell
 self.addEventListener('install', (event) => {
-  console.log('[Service Worker] Installing new version:', APP_VERSION);
+  console.log('[Service Worker] Installing new version:', APP_VERSION, 'at', TIMESTAMP);
+  
+  // Force update for mobile devices
+  if (isMobileDevice()) {
+    console.log('[Service Worker] Mobile device detected, forcing cache refresh');
+    // Skip waiting immediately for mobile devices
+    self.skipWaiting();
+  }
+  
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
@@ -20,8 +34,6 @@ self.addEventListener('install', (event) => {
         return cache.addAll(urlsToCache);
       })
   );
-  // Force the waiting service worker to become active
-  self.skipWaiting();
 });
 
 // Fetch event - serve from cache, fall back to network, then to offline page
@@ -48,26 +60,59 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // For navigation requests, try network first then cache
-  if (event.request.mode === 'navigate') {
+  // For HTML requests, always go to network first (especially for mobile)
+  if (event.request.mode === 'navigate' || 
+      (event.request.method === 'GET' && 
+       event.request.headers.get('accept').includes('text/html'))) {
+    
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          // Cache a copy of the response
+          // Clone the response
           const responseToCache = response.clone();
+          
+          // Update the cache with the new response
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseToCache);
           });
+          
           return response;
         })
         .catch(() => {
+          // If network fails, try cache
           return caches.match(event.request)
-            .then((response) => {
-              if (response) {
-                return response;
+            .then((cachedResponse) => {
+              if (cachedResponse) {
+                return cachedResponse;
               }
               return caches.match('/offline.html');
             });
+        })
+    );
+    return;
+  }
+
+  // For JavaScript and CSS files, use network-first approach on mobile
+  if (isMobileDevice() && 
+      (event.request.url.endsWith('.js') || 
+       event.request.url.endsWith('.css'))) {
+    
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          // Clone the response
+          const responseToCache = response.clone();
+          
+          // Update the cache with the new response
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
+          
+          return response;
+        })
+        .catch(() => {
+          // If network fails, try cache
+          return caches.match(event.request);
         })
     );
     return;
@@ -79,41 +124,78 @@ self.addEventListener('fetch', (event) => {
       .then((response) => {
         // Cache hit - return response
         if (response) {
+          // For mobile devices, check if the cached response is older than 1 hour
+          if (isMobileDevice()) {
+            const cachedTime = response.headers.get('sw-cache-timestamp');
+            if (cachedTime) {
+              const cacheAge = Date.now() - new Date(cachedTime).getTime();
+              // If cache is older than 1 hour (3600000 ms), fetch from network
+              if (cacheAge > 3600000) {
+                return fetchAndCache(event.request);
+              }
+            }
+          }
           return response;
         }
         
-        return fetch(event.request).then(
-          (response) => {
-            // Check if we received a valid response
-            if (!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
-            }
-
-            // Clone the response
-            const responseToCache = response.clone();
-
-            // Add to cache
-            caches.open(CACHE_NAME)
-              .then((cache) => {
-                cache.put(event.request, responseToCache);
-              });
-
-            return response;
-          }
-        ).catch(() => {
-          // If both cache and network fail, show offline page for navigate requests
-          if (event.request.mode === 'navigate') {
-            return caches.match('/offline.html');
-          }
-        });
+        // No cache hit, fetch from network
+        return fetchAndCache(event.request);
       })
   );
 });
+
+// Helper function to fetch and cache
+function fetchAndCache(request) {
+  return fetch(request).then(
+    (response) => {
+      // Check if we received a valid response
+      if (!response || response.status !== 200 || response.type !== 'basic') {
+        return response;
+      }
+
+      // Clone the response
+      const responseToCache = response.clone();
+
+      // Add timestamp header to the cached response
+      const headers = new Headers(responseToCache.headers);
+      headers.append('sw-cache-timestamp', new Date().toISOString());
+      
+      // Create a new response with the timestamp header
+      const timestampedResponse = new Response(
+        responseToCache.body, 
+        {
+          status: responseToCache.status,
+          statusText: responseToCache.statusText,
+          headers: headers
+        }
+      );
+
+      // Add to cache
+      caches.open(CACHE_NAME)
+        .then((cache) => {
+          cache.put(request, timestampedResponse);
+        });
+
+      return response;
+    }
+  ).catch(() => {
+    // If both cache and network fail, show offline page for navigate requests
+    if (request.mode === 'navigate') {
+      return caches.match('/offline.html');
+    }
+  });
+}
 
 // Activate event - clean up old caches and take control immediately
 self.addEventListener('activate', (event) => {
   console.log('[Service Worker] Activating new version:', APP_VERSION);
   const cacheWhitelist = [CACHE_NAME];
+  
+  // For mobile devices, claim clients immediately and clean caches
+  if (isMobileDevice()) {
+    console.log('[Service Worker] Mobile device detected, claiming clients immediately');
+  }
+  
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -145,9 +227,35 @@ self.addEventListener('message', (event) => {
     if (client) {
       client.postMessage({
         type: 'VERSION_INFO',
-        version: APP_VERSION
+        version: APP_VERSION,
+        timestamp: TIMESTAMP,
+        isMobile: isMobileDevice()
       });
     }
+  }
+  
+  // Force refresh cache for mobile
+  if (event.data && event.data.type === 'FORCE_REFRESH_CACHE' && isMobileDevice()) {
+    console.log('[Service Worker] Force refreshing cache for mobile');
+    event.waitUntil(
+      caches.keys().then((cacheNames) => {
+        return Promise.all(
+          cacheNames.map((cacheName) => {
+            console.log('[Service Worker] Deleting cache:', cacheName);
+            return caches.delete(cacheName);
+          })
+        );
+      }).then(() => {
+        // Notify the client that cache has been cleared
+        const client = event.source;
+        if (client) {
+          client.postMessage({
+            type: 'CACHE_CLEARED',
+            timestamp: new Date().toISOString()
+          });
+        }
+      })
+    );
   }
 });
 
@@ -158,7 +266,8 @@ self.addEventListener('updatefound', () => {
     clients.forEach(client => {
       client.postMessage({
         type: 'UPDATE_AVAILABLE',
-        version: APP_VERSION
+        version: APP_VERSION,
+        timestamp: TIMESTAMP
       });
     });
   });
