@@ -109,16 +109,16 @@ const DistributorListOrder: React.FC = () => {
       <Card 
         className="h-full w-full"
         placeholder=""
-        onPointerEnterCapture={() => {}}
-        onPointerLeaveCapture={() => {}}
+        onPointerEnterCapture={null}
+        onPointerLeaveCapture={null}
       >
         <CardHeader 
           floated={false} 
           shadow={false} 
           className="rounded-none"
           placeholder=""
-          onPointerEnterCapture={() => {}}
-          onPointerLeaveCapture={() => {}}
+          onPointerEnterCapture={null}
+          onPointerLeaveCapture={null}
         >
           <div className="mb-4 flex flex-col justify-between gap-8 md:flex-row md:items-center">
             <div>
@@ -126,8 +126,8 @@ const DistributorListOrder: React.FC = () => {
                 variant="h5" 
                 color="blue-gray"
                 placeholder=""
-                onPointerEnterCapture={() => {}}
-                onPointerLeaveCapture={() => {}}
+                onPointerEnterCapture={null}
+                onPointerLeaveCapture={null}
               >
                 الطلبات
               </Typography>
@@ -187,8 +187,8 @@ const DistributorListOrder: React.FC = () => {
         <CardBody 
           className="p-6"
           placeholder=""
-          onPointerEnterCapture={() => {}}
-          onPointerLeaveCapture={() => {}}
+          onPointerEnterCapture={null}
+          onPointerLeaveCapture={null}
         >
           <div className="space-y-6">
           {isLoading ? (
@@ -237,8 +237,8 @@ const DistributorListOrder: React.FC = () => {
                 color="blue-gray" 
                 className="mb-2 font-bold"
                 placeholder=""
-                onPointerEnterCapture={() => {}}
-                onPointerLeaveCapture={() => {}}
+                onPointerEnterCapture={null}
+                onPointerLeaveCapture={null}
               >
                 إنهاء الوردية
               </Typography>
@@ -248,8 +248,8 @@ const DistributorListOrder: React.FC = () => {
                 color="blue-gray" 
                 className="mb-6 text-gray-600"
                 placeholder=""
-                onPointerEnterCapture={() => {}}
-                onPointerLeaveCapture={() => {}}
+                onPointerEnterCapture={null}
+                onPointerLeaveCapture={null}
               >
                 هل أنت متأكد من إنهاء الوردية؟ سيتم تسجيل خروجك من النظام تلقائياً وإنهاء جميع العمليات النشطة.
               </Typography>

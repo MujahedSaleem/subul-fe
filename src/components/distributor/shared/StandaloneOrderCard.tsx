@@ -241,14 +241,14 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
       key={`order-${order.id}`}
       className={`w-full ${statusConfig.bgColor} hover:shadow-lg transition-all duration-300 rounded-xl overflow-hidden border border-gray-100`}
       placeholder=""
-      onPointerEnterCapture={() => {}}
-      onPointerLeaveCapture={() => {}}
+      onPointerEnterCapture={null}
+      onPointerLeaveCapture={null}
     >
       <CardBody 
         className="p-6"
         placeholder=""
-        onPointerEnterCapture={() => {}}
-        onPointerLeaveCapture={() => {}}
+        onPointerEnterCapture={null}
+        onPointerLeaveCapture={null}
       >
         <div className="flex justify-between items-start mb-4">
           <div className="flex gap-2">
@@ -281,8 +281,8 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
               variant="small"
               className={`font-medium ${statusConfig.color}`}
               placeholder=""
-              onPointerEnterCapture={() => {}}
-              onPointerLeaveCapture={() => {}}
+              onPointerEnterCapture={null}
+              onPointerLeaveCapture={null}
             >
               {statusConfig.label}
             </Typography>
@@ -299,8 +299,8 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
                 color="blue-gray"
                 className="font-medium"
                 placeholder=""
-                onPointerEnterCapture={() => {}}
-                onPointerLeaveCapture={() => {}}
+                onPointerEnterCapture={null}
+                onPointerLeaveCapture={null}
               >
                 {order.orderNumber}
               </Typography>
@@ -310,8 +310,8 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
               color="blue-gray"
               className="text-gray-500 font-bold"
               placeholder=""
-              onPointerEnterCapture={() => {}}
-              onPointerLeaveCapture={() => {}}
+              onPointerEnterCapture={null}
+              onPointerLeaveCapture={null}
             >
               {new Date(order.createdAt).toLocaleDateString('en-US', {
                 day: '2-digit',
@@ -329,8 +329,8 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
               color="blue-gray"
               className="font-medium"
               placeholder=""
-              onPointerEnterCapture={() => {}}
-              onPointerLeaveCapture={() => {}}
+              onPointerEnterCapture={null}
+              onPointerLeaveCapture={null}
             >
               {order.customer?.name}
             </Typography>
@@ -362,8 +362,8 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
                   color="blue-gray"
                   className="font-medium"
                   placeholder=""
-                  onPointerEnterCapture={() => {}}
-                  onPointerLeaveCapture={() => {}}
+                  onPointerEnterCapture={null}
+                  onPointerLeaveCapture={null}
                 >
                   {order.location?.name || 'الموقع'}
                 </Typography>
@@ -375,8 +375,8 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
                   order.location?.coordinates ? 'text-green-600' : 'text-red-600'
                 }`}
                 placeholder=""
-                onPointerEnterCapture={() => {}}
-                onPointerLeaveCapture={() => {}}
+                onPointerEnterCapture={null}
+                onPointerLeaveCapture={null}
               >
                 {order.location?.coordinates ? 'محدد (اضغط للخريطة)' : 'غير محدد'}
               </Typography>
@@ -411,8 +411,8 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
                 color="blue-gray"
                 className="font-medium text-xs"
                 placeholder=""
-                onPointerEnterCapture={() => {}}
-                onPointerLeaveCapture={() => {}}
+                onPointerEnterCapture={null}
+                onPointerLeaveCapture={null}
               >
                 التكلفة
               </Typography>
@@ -441,8 +441,8 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
                     color="green"
                     className="font-bold"
                     placeholder=""
-                    onPointerEnterCapture={() => {}}
-                    onPointerLeaveCapture={() => {}}
+                    onPointerEnterCapture={null}
+                    onPointerLeaveCapture={null}
                   >
                     {formatCurrency(order.cost)}
                   </Typography>
