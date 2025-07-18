@@ -55,7 +55,7 @@ const CallModal: React.FC<CallModalProps> = ({ phone, isOpen, onClose, showDialO
             <div className={`flex gap-2 ${showDialOption ? 'flex-row' : 'flex-col'}`}>
                     {showDialOption && (
                       <Button
-                        onClick={() => {handleDirectCall(phone);onClose()}}
+                        onClick={() => {handleDirectCall(phone?.replace(/\D/g, ''));onClose()}}
                         variant="primary"
                         icon={faPhone}
                         size="md"
