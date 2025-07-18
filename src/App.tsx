@@ -20,6 +20,9 @@ import ViewOrder from "./pages/admin/ViewOrder";
 import NotificationContainer from "./components/NotificationContainer";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
 import { saveCurrentRoute, getSavedRoute, clearSavedRoute } from "./utils/routeStateManager";
+import { Provider } from "react-redux";
+import { store } from "./store/store";
+import { AuthProvider } from "./context/AuthContext";
 
 // ✅ Authentication & Role-Based Access
 
@@ -75,69 +78,71 @@ function App() {
   }, [isAuthenticated, navigate, location.pathname]);
 
   return (
-    <>
-      <NotificationContainer />
-      <PWAInstallPrompt />
-      <Routes>
-      {/* Public Route */}
-      <Route path="/login" element={<RoleBasedRedirect />} />
+    <Provider store={store}>
+      <AuthProvider>
+        <NotificationContainer />
+        <PWAInstallPrompt />
+        <Routes>
+          {/* Public Route */}
+          <Route path="/login" element={<RoleBasedRedirect />} />
 
-      {/* Admin Routes - Only accessible to Admin users */}
-      <Route
-        path="/admin"
-        element={<ProtectedRoute allowedRoles={["Admin"]}><AdminDashboard /></ProtectedRoute>}
-      />
-      {/* Distributor Routes */}
-      <Route path="/distributor" element={<ProtectedRoute allowedRoles={["Distributor"]}><Navigate to="/distributor/orders" replace /></ProtectedRoute>} />
-      <Route path="/distributor/orders" element={<ProtectedRoute allowedRoles={["Distributor"]}><DistributorListOrder /></ProtectedRoute>} />
-      <Route path="/distributor/orders/add" element={<ProtectedRoute allowedRoles={["Distributor"]}><DistributorAddOrder /></ProtectedRoute>} />
-      <Route path="/distributor/orders/edit/:id" element={<ProtectedRoute allowedRoles={["Distributor"]}><DistributorEditOrder /></ProtectedRoute>} />
+          {/* Admin Routes - Only accessible to Admin users */}
+          <Route
+            path="/admin"
+            element={<ProtectedRoute allowedRoles={["Admin"]}><AdminDashboard /></ProtectedRoute>}
+          />
+          {/* Distributor Routes */}
+          <Route path="/distributor" element={<ProtectedRoute allowedRoles={["Distributor"]}><Navigate to="/distributor/orders" replace /></ProtectedRoute>} />
+          <Route path="/distributor/orders" element={<ProtectedRoute allowedRoles={["Distributor"]}><DistributorListOrder /></ProtectedRoute>} />
+          <Route path="/distributor/orders/add" element={<ProtectedRoute allowedRoles={["Distributor"]}><DistributorAddOrder /></ProtectedRoute>} />
+          <Route path="/distributor/orders/edit/:id" element={<ProtectedRoute allowedRoles={["Distributor"]}><DistributorEditOrder /></ProtectedRoute>} />
 
-      <Route
-        path="/admin/customers"
-        element={<ProtectedRoute allowedRoles={["Admin"]}><Customers /></ProtectedRoute>}
-      />
-      <Route
-        path="/admin/customers/add"
-        element={<ProtectedRoute allowedRoles={["Admin"]}><AddCustomer /></ProtectedRoute>}
-      />
-      <Route
-        path="/admin/customers/edit/:id"
-        element={<ProtectedRoute allowedRoles={["Admin"]}><EditCustomerPage /></ProtectedRoute>}
-      />
-      <Route
-        path="/admin/orders"
-        element={<ProtectedRoute allowedRoles={["Admin"]}><Orders /></ProtectedRoute>}
-      />
-      <Route
-        path="/admin/orders/add"
-        element={<ProtectedRoute allowedRoles={["Admin"]}><AddOrder /></ProtectedRoute>}
-      />
-      <Route
-        path="/admin/orders/edit/:id"
-        element={<ProtectedRoute allowedRoles={["Admin"]}><EditOrder /></ProtectedRoute>}
-      />
-      <Route
-        path="/admin/orders/view/:id"
-        element={<ProtectedRoute allowedRoles={["Admin"]}><ViewOrder /></ProtectedRoute>}
-      />
-      <Route
-        path="/admin/distributors"
-        element={<ProtectedRoute allowedRoles={["Admin"]}><Distributors /></ProtectedRoute>}
-      />
-      <Route
-        path="/admin/distributors/add"
-        element={<ProtectedRoute allowedRoles={["Admin"]}><AddDistributor /></ProtectedRoute>}
-      />
-      <Route
-        path="/admin/distributors/edit/:id"
-        element={<ProtectedRoute allowedRoles={["Admin"]}><EditDistributor /></ProtectedRoute>}
-      />
+          <Route
+            path="/admin/customers"
+            element={<ProtectedRoute allowedRoles={["Admin"]}><Customers /></ProtectedRoute>}
+          />
+          <Route
+            path="/admin/customers/add"
+            element={<ProtectedRoute allowedRoles={["Admin"]}><AddCustomer /></ProtectedRoute>}
+          />
+          <Route
+            path="/admin/customers/edit/:id"
+            element={<ProtectedRoute allowedRoles={["Admin"]}><EditCustomerPage /></ProtectedRoute>}
+          />
+          <Route
+            path="/admin/orders"
+            element={<ProtectedRoute allowedRoles={["Admin"]}><Orders /></ProtectedRoute>}
+          />
+          <Route
+            path="/admin/orders/add"
+            element={<ProtectedRoute allowedRoles={["Admin"]}><AddOrder /></ProtectedRoute>}
+          />
+          <Route
+            path="/admin/orders/edit/:id"
+            element={<ProtectedRoute allowedRoles={["Admin"]}><EditOrder /></ProtectedRoute>}
+          />
+          <Route
+            path="/admin/orders/view/:id"
+            element={<ProtectedRoute allowedRoles={["Admin"]}><ViewOrder /></ProtectedRoute>}
+          />
+          <Route
+            path="/admin/distributors"
+            element={<ProtectedRoute allowedRoles={["Admin"]}><Distributors /></ProtectedRoute>}
+          />
+          <Route
+            path="/admin/distributors/add"
+            element={<ProtectedRoute allowedRoles={["Admin"]}><AddDistributor /></ProtectedRoute>}
+          />
+          <Route
+            path="/admin/distributors/edit/:id"
+            element={<ProtectedRoute allowedRoles={["Admin"]}><EditDistributor /></ProtectedRoute>}
+          />
 
-      {/* Default Route - Redirect to Login */}
-      <Route path="/" element={<RoleBasedRedirect />} />
-    </Routes>
-    </>
+          {/* Default Route - Redirect to Login */}
+          <Route path="/" element={<RoleBasedRedirect />} />
+        </Routes>
+      </AuthProvider>
+    </Provider>
   );
 }
 
