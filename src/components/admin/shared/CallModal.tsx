@@ -52,15 +52,10 @@ const CallModal: React.FC<CallModalProps> = ({ phone, isOpen, onClose, showDialO
           
           <div className="modal-body">
             <div className="space-y-4">
-              {[phone970, phone972].map((formattedPhone) => (
-                <div key={formattedPhone} className="space-y-2">
-                  <div className="text-sm font-medium text-slate-700">
-                    {formattedPhone}
-                  </div>
-                  <div className={`flex gap-2 ${showDialOption ? 'flex-row' : 'flex-col'}`}>
+            <div className={`flex gap-2 ${showDialOption ? 'flex-row' : 'flex-col'}`}>
                     {showDialOption && (
                       <Button
-                        onClick={() => {handleDirectCall(formattedPhone);onClose()}}
+                        onClick={() => {handleDirectCall(phone);onClose()}}
                         variant="primary"
                         icon={faPhone}
                         size="md"
@@ -69,6 +64,14 @@ const CallModal: React.FC<CallModalProps> = ({ phone, isOpen, onClose, showDialO
                         اتصال مباشر
                       </Button>
                     )}
+            </div>
+              {[phone970, phone972].map((formattedPhone) => (
+                <div key={formattedPhone} className="space-y-2">
+                  <div className="text-sm font-medium text-slate-700">
+                    {formattedPhone}
+                  </div>
+                  <div className={`flex gap-2 ${showDialOption ? 'flex-row' : 'flex-col'}`}>
+          
                     <Button
                       onClick={() => handleWhatsAppCall(formattedPhone.replace('+', ''))}
                       variant="success"
