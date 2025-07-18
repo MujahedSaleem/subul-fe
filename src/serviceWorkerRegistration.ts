@@ -153,7 +153,11 @@ function registerMobileSW(swUrl: string, config?: Config) {
                 // Force cache refresh for mobile
                 registration.active?.postMessage({ type: 'FORCE_REFRESH_CACHE' });
                 
-                if (config && config.onUpdate) {
+                // For standalone mode, activate immediately without user interaction
+                if (isMobileDevice() && window.matchMedia('(display-mode: standalone)').matches) {
+                  console.log('[Main] Standalone mode detected, activating update immediately');
+                  installingWorker.postMessage({ type: 'SKIP_WAITING' });
+                } else if (config && config.onUpdate) {
                   config.onUpdate(registration);
                   promptUserToRefresh(registration);
                 }
@@ -180,7 +184,12 @@ function registerValidSW(swUrl: string, config?: Config) {
       // Immediately check if there's a waiting worker
       if (registration.waiting) {
         console.log('[Main] New service worker waiting');
-        if (config && config.onUpdate) {
+        
+        // For standalone mode, activate immediately without user interaction
+        if (window.matchMedia('(display-mode: standalone)').matches) {
+          console.log('[Main] Standalone mode detected, activating update immediately');
+          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        } else if (config && config.onUpdate) {
           config.onUpdate(registration);
           promptUserToRefresh(registration);
         }
@@ -202,8 +211,12 @@ function registerValidSW(swUrl: string, config?: Config) {
                   'tabs for this page are closed.'
               );
 
-              // Execute callback
-              if (config && config.onUpdate) {
+              // For standalone mode, activate immediately without user interaction
+              if (window.matchMedia('(display-mode: standalone)').matches) {
+                console.log('[Main] Standalone mode detected, activating update immediately');
+                installingWorker.postMessage({ type: 'SKIP_WAITING' });
+              } else if (config && config.onUpdate) {
+                // Execute callback
                 config.onUpdate(registration);
                 promptUserToRefresh(registration);
               }
@@ -228,7 +241,15 @@ function registerValidSW(swUrl: string, config?: Config) {
 }
 
 function promptUserToRefresh(registration: ServiceWorkerRegistration) {
-  // Force update if user confirms
+  // For standalone mode, skip the prompt and apply updates immediately
+  if (window.matchMedia('(display-mode: standalone)').matches) {
+    if (registration.waiting) {
+      registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+    }
+    return;
+  }
+  
+  // For regular mode, prompt the user
   if (confirm('تم تحديث التطبيق! هل ترغب في تحميل النسخة الجديدة؟')) {
     if (registration.waiting) {
       // Send skip waiting message

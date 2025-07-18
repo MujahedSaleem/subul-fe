@@ -143,17 +143,40 @@ const DistributorListOrder: React.FC = () => {
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.ready.then(registration => {
           console.log('[DistributorListOrder] Checking for updates in standalone mode');
-          registration.update();
+          registration.update().then(() => {
+            // If there's a waiting worker, activate it immediately
+            if (registration.waiting) {
+              console.log('[DistributorListOrder] New version found, activating silently');
+              registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+            }
+          });
         });
       }
       
-      // Set up periodic refresh for standalone mode
-      const refreshInterval = setInterval(() => {
+      // Set up periodic refresh for standalone mode (more frequently)
+      const dataRefreshInterval = setInterval(() => {
         console.log('[DistributorListOrder] Periodic data refresh for standalone mode');
         fetchOrdersIfChanged(true); // Force check for changes
-      }, 30 * 1000); // Every 30 seconds
+      }, 15 * 1000); // Every 15 seconds
       
-      return () => clearInterval(refreshInterval);
+      // Set up periodic service worker update checks
+      const swUpdateInterval = setInterval(() => {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.ready.then(registration => {
+            registration.update().then(() => {
+              // If there's a waiting worker, activate it immediately
+              if (registration.waiting) {
+                registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+              }
+            });
+          });
+        }
+      }, 20 * 1000); // Every 20 seconds
+      
+      return () => {
+        clearInterval(dataRefreshInterval);
+        clearInterval(swUpdateInterval);
+      };
     }
   }, [fetchOrdersIfChanged]);
 
