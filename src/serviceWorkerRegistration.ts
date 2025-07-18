@@ -92,6 +92,15 @@ function registerValidSW(swUrl: string, config?: Config) {
               // Execute callback
               if (config && config.onUpdate) {
                 config.onUpdate(registration);
+                if (registration.waiting) {
+                  registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                }
+              
+                // 🔁 Reload when the new SW takes control
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                  window.location.reload();
+                });
+              
               }
             } else {
               // At this point, everything has been precached.

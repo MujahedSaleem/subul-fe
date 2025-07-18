@@ -57,7 +57,7 @@ const DistributorListOrder: React.FC = () => {
   useEffect(() => {
     if (!hasInitiallyFetched.current && !initialized) {
       console.log('Initial fetch of orders...');
-      fetchOrders();
+    fetchOrders();
       hasInitiallyFetched.current = true;
     }
   }, [fetchOrders, initialized]);
@@ -368,7 +368,7 @@ const DistributorListOrder: React.FC = () => {
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
           >
-            {isLoading ? (
+          {isLoading ? (
               <div className="text-center py-8">جاري التحميل...</div>
             ) : error ? (
               <div className="text-center py-8 text-red-500">حدث خطأ أثناء تحميل الطلبات</div>
@@ -377,7 +377,7 @@ const DistributorListOrder: React.FC = () => {
                 {orders && orders.length > 0 ? (
                   orders.map((order) => (
                     <StandaloneOrderCard
-                      key={order.id}
+                        key={order.id}
                       initialOrder={order}
                       onCallCustomer={handleCallCustomer}
                       onOrderChanged={handleOrderChanged}
@@ -387,7 +387,7 @@ const DistributorListOrder: React.FC = () => {
                   <div className="col-span-full text-center py-8 text-slate-500">
                     لا توجد طلبات حالية
                   </div>
-                )}
+          )}
               </div>
             )}
           </div>
@@ -463,7 +463,7 @@ const DistributorListOrder: React.FC = () => {
           </div>
         </div>
       )}
-    </Layout>
+      </Layout>
   );
 };
 
