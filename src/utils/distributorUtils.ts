@@ -59,13 +59,7 @@ export const formatCurrency = (amount: number | undefined | null): string => {
  * Clean phone number for direct calling and add country code
  */
 export const cleanPhoneNumber = (phone: string): string => {
-  const cleaned = phone?.replace(/\D/g, '');
-  const withoutLeadingZeros = cleaned?.replace(/^0+/, '');
-  
-  if (withoutLeadingZeros && (withoutLeadingZeros.startsWith('970') || withoutLeadingZeros.startsWith('972'))) {
-    return `+${withoutLeadingZeros}`;
-  }
-  return `0${withoutLeadingZeros}`;
+  return phone?.replace(/\D/g, '');
 };
 
 /**
