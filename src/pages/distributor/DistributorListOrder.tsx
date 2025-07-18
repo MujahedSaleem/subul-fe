@@ -57,10 +57,29 @@ const DistributorListOrder: React.FC = () => {
   useEffect(() => {
     if (!hasInitiallyFetched.current && !initialized) {
       console.log('Initial fetch of orders...');
-    fetchOrders();
+      fetchOrders();
       hasInitiallyFetched.current = true;
     }
   }, [fetchOrders, initialized]);
+
+  // Check for force reload flag from login
+  useEffect(() => {
+    // Check if we need to force a reload after login
+    const forceReload = sessionStorage.getItem('forceReload');
+    if (forceReload === 'true') {
+      console.log('[DistributorListOrder] Force reload detected after login');
+      sessionStorage.removeItem('forceReload'); // Clear the flag
+      
+      // Force a complete cache refresh and reload
+      if (typeof window.forceClearCache === 'function') {
+        console.log('[DistributorListOrder] Forcing cache clear and reload');
+        window.forceClearCache();
+      } else {
+        console.log('[DistributorListOrder] Fallback to normal reload');
+        window.location.reload();
+      }
+    }
+  }, []);
 
   // Check if orders have changed
   const haveOrdersChanged = (newOrders: OrderList[], oldOrders: OrderList[]): boolean => {

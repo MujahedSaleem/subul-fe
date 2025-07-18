@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faRightToBracket, faUser, faLock } from '@fortawesome/free-solid-svg-icons';
@@ -6,12 +6,38 @@ import Button from '../components/Button';
 import { Input } from '@material-tailwind/react';
 import { useAuth } from '../context/AuthContext';
 
+// Detect if the client is a mobile device
+const isMobileDevice = (): boolean => {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+};
+
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [loginSuccess, setLoginSuccess] = useState(false);
+  
+  // Clear service worker caches on component mount for mobile devices
+  useEffect(() => {
+    const clearCachesForMobile = async () => {
+      if (isMobileDevice() && 'caches' in window) {
+        console.log('[Login] Mobile device detected, clearing caches on login page load');
+        try {
+          const cacheKeys = await caches.keys();
+          await Promise.all(
+            cacheKeys.map(cacheKey => caches.delete(cacheKey))
+          );
+          console.log('[Login] Caches cleared on login page load');
+        } catch (err) {
+          console.error('[Login] Error clearing caches:', err);
+        }
+      }
+    };
+    
+    clearCachesForMobile();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,11 +45,26 @@ const Login: React.FC = () => {
 
     try {
       await login(username, password);
+      setLoginSuccess(true);
+      
       const userType = localStorage.getItem("userType");
-      if (userType === 'Admin') {
-        navigate("/admin");
-      } else if (userType === 'Distributor') {
-        navigate("/distributor");
+      
+      // For distributors on mobile, handle the special reload case
+      if (userType === 'Distributor' && isMobileDevice()) {
+        console.log('[Login] Distributor login on mobile, handling navigation');
+        
+        // Store the destination in session storage
+        sessionStorage.setItem('loginRedirect', '/distributor');
+        
+        // Force a full page reload to ensure fresh content
+        window.location.href = '/distributor';
+      } else {
+        // Normal navigation for other cases
+        if (userType === 'Admin') {
+          navigate("/admin");
+        } else if (userType === 'Distributor') {
+          navigate("/distributor");
+        }
       }
     } catch (error) {
       console.error("Login error:", error);
@@ -69,13 +110,15 @@ const Login: React.FC = () => {
                     required
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                className="block w-full pr-12 border-slate-200 rounded-xl shadow-sm 
-                  focus:ring-primary-500/20 focus:border-primary-500 
-                  bg-white/50 backdrop-blur-sm transition-all duration-200"
-                label="اسم المستخدم"
+                    className="block w-full pr-12 border-slate-200 rounded-xl shadow-sm 
+                      focus:ring-primary-500/20 focus:border-primary-500 
+                      bg-white/50 backdrop-blur-sm transition-all duration-200"
+                    label="اسم المستخدم"
                     placeholder="أدخل اسم المستخدم"
-                autoComplete="username"
-                crossOrigin={undefined}
+                    autoComplete="username"
+                    crossOrigin={undefined}
+                    onPointerEnterCapture={null}
+                    onPointerLeaveCapture={null}
                   />
                 </div>
 
@@ -94,13 +137,15 @@ const Login: React.FC = () => {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                className="block w-full pr-12 border-slate-200 rounded-xl shadow-sm 
-                  focus:ring-primary-500/20 focus:border-primary-500 
-                  bg-white/50 backdrop-blur-sm transition-all duration-200"
-                label="كلمة المرور"
+                    className="block w-full pr-12 border-slate-200 rounded-xl shadow-sm 
+                      focus:ring-primary-500/20 focus:border-primary-500 
+                      bg-white/50 backdrop-blur-sm transition-all duration-200"
+                    label="كلمة المرور"
                     placeholder="أدخل كلمة المرور"
-                autoComplete="current-password"
-                crossOrigin={undefined}
+                    autoComplete="current-password"
+                    crossOrigin={undefined}
+                    onPointerEnterCapture={null}
+                    onPointerLeaveCapture={null}
                   />
               </div>
 
@@ -113,14 +158,14 @@ const Login: React.FC = () => {
                 block
                 icon={faRightToBracket}
                 loading={isLoading}
-                disabled={!username || !password}
+                disabled={!username || !password || loginSuccess}
                 className="relative overflow-hidden group bg-gradient-to-br from-primary-500 to-primary-600 
                   hover:from-primary-600 hover:to-primary-700 transition-all duration-300 
                   rounded-xl py-3 shadow-lg hover:shadow-xl 
                   transform hover:-translate-y-0.5"
               >
                 <span className="relative z-10 text-lg font-semibold tracking-wide">
-                دخول
+                {loginSuccess ? 'جاري التحميل...' : 'دخول'}
                 </span>
                 <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 
                   transform translate-x-[-200%] group-hover:translate-x-[200%] 

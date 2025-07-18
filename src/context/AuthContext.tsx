@@ -3,6 +3,7 @@ import api from '../utils/axiosInstance';
 import { jwtDecode } from 'jwt-decode';
 import { useLocation } from 'react-router-dom';
 import { extractApiData, handleApiError } from '../utils/apiResponseHandler';
+import * as serviceWorkerRegistration from '../serviceWorkerRegistration';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -21,6 +22,11 @@ interface RefreshResponse {
   accessToken: string;
   refreshToken: string;
 }
+
+// Detect if the client is a mobile device
+const isMobileDevice = (): boolean => {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+};
 
 export const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
@@ -117,6 +123,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (username: string, password: string) => {
     try {
+      // First clear any existing caches if this is a mobile device
+      if (isMobileDevice()) {
+        console.log('[Auth] Mobile device detected during login, clearing caches');
+        // Clear application cache
+        if ('caches' in window) {
+          try {
+            const cacheKeys = await caches.keys();
+            await Promise.all(
+              cacheKeys.map(cacheKey => caches.delete(cacheKey))
+            );
+            console.log('[Auth] Application caches cleared during login');
+          } catch (err) {
+            console.error('[Auth] Error clearing caches:', err);
+          }
+        }
+      }
+
+      // Proceed with login
       const response = await api.post('/auth/login', { username, password });
       const { accessToken, refreshToken } = extractApiData<LoginResponse>(response.data);
 
@@ -129,6 +153,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setIsAuthenticated(true);
       setUserType(userType);
+
+      // For distributors on mobile, force service worker update
+      if (userType === 'Distributor' && isMobileDevice() && 'serviceWorker' in navigator) {
+        console.log('[Auth] Distributor login on mobile, forcing service worker update');
+        
+        // Force update service worker
+        try {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          for (const registration of registrations) {
+            await registration.update();
+            if (registration.waiting) {
+              registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+            }
+          }
+          
+          // Set a flag to reload after login redirect
+          sessionStorage.setItem('forceReload', 'true');
+        } catch (err) {
+          console.error('[Auth] Error updating service worker during login:', err);
+        }
+      }
     } catch (error: any) {
       console.error('Login failed:', error);
       const errorMessage = handleApiError(error);
