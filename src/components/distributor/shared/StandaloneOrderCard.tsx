@@ -2,7 +2,7 @@ import React, { useState, memo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardBody, Typography } from '@material-tailwind/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPhone, faLocationDot, faPenToSquare, faEye, faUser, faCalendar, faMoneyBill, faCheckCircle, faMapMarkerAlt } from '@fortawesome/free-solid-svg-icons';
+import { faPhone, faLocationDot, faPenToSquare, faEye, faUser, faCalendar, faMoneyBill, faCheckCircle, faMapMarkerAlt, faSyncAlt } from '@fortawesome/free-solid-svg-icons';
 import { faWhatsapp } from '@fortawesome/free-brands-svg-icons';
 import { OrderList, OrderRequest } from '../../../types/order';
 import { Customer } from '../../../types/customer';
@@ -10,7 +10,7 @@ import Button from '../../../components/Button';
 import IconButton from '../../../components/IconButton';
 import { getOrderStatusConfig, formatCurrency, handleDirectCall, areAllRequiredFieldsFilled } from '../../../utils/distributorUtils';
 import { useAppDispatch } from '../../../store/hooks';
-import { showError, showWarning } from '../../../store/slices/notificationSlice';
+import { showError, showWarning, showSuccess, showInfo } from '../../../store/slices/notificationSlice';
 import axiosInstance from '../../../utils/axiosInstance';
 import { getCurrentLocation } from '../../../services/locationService';
 
@@ -29,6 +29,8 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
   const [isEditingCost, setIsEditingCost] = useState(false);
   const [costInputValue, setCostInputValue] = useState(initialOrder.cost?.toString() || '');
   const [isLocationLoading, setIsLocationLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastRefreshTime, setLastRefreshTime] = useState<number>(0);
   
   // Update local state if initialOrder changes (rarely happens)
   useEffect(() => {
@@ -38,6 +40,60 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
   }, [initialOrder]);
 
   const statusConfig = getOrderStatusConfig(order.status);
+
+  // Helper function to compare orders and check if there are changes
+  const hasOrderChanged = (newOrder: OrderList, oldOrder: OrderList): boolean => {
+    // Compare relevant fields that would require a re-render
+    return (
+      newOrder.status !== oldOrder.status ||
+      newOrder.cost !== oldOrder.cost ||
+      JSON.stringify(newOrder.location) !== JSON.stringify(oldOrder.location) ||
+      JSON.stringify(newOrder.customer) !== JSON.stringify(oldOrder.customer)
+    );
+  };
+
+  // Refresh order data
+  const handleRefreshOrder = useCallback(async () => {
+    if (!order.id) return;
+    
+    if (isRefreshing) return; // Prevent multiple simultaneous refreshes
+    
+    // Throttle refreshes to prevent too many API calls (minimum 2 seconds between refreshes)
+    const now = Date.now();
+    if (now - lastRefreshTime < 2000) {
+      dispatch(showInfo({ message: 'تم التحديث مؤخراً، يرجى الانتظار', duration: 1000 }));
+      return;
+    }
+    
+    setIsRefreshing(true);
+    setLastRefreshTime(now);
+    
+    try {
+      // Fetch the latest order data
+      const response = await axiosInstance.get(`/distributors/orders/${order.id}`);
+      const updatedOrder = response.data.data;
+      
+      // Check if there are actual changes
+      if (hasOrderChanged(updatedOrder, order)) {
+        // Update local state
+        setOrder(updatedOrder);
+        
+        // Notify parent component
+        if (onOrderChanged) {
+          onOrderChanged(order.id);
+        }
+        
+        dispatch(showSuccess({ message: 'تم تحديث الطلب', duration: 2000 }));
+      } else {
+        dispatch(showInfo({ message: 'الطلب محدث بالفعل', duration: 1000 }));
+      }
+    } catch (error) {
+      console.error('Error refreshing order:', error);
+      dispatch(showError({ message: 'فشل في تحديث الطلب' }));
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [order.id, dispatch, onOrderChanged, isRefreshing, lastRefreshTime, order]);
 
   const handleOpenLocation = (e: React.MouseEvent, coordinates: string) => {
     e.preventDefault();
@@ -270,6 +326,15 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
                 title="تعديل الطلب"
               />
             )}
+            <IconButton
+              icon={faSyncAlt}
+              onClick={handleRefreshOrder}
+              color="blue"
+              className={`hover:bg-blue-100 ${isRefreshing ? 'animate-spin' : ''}`}
+              size="md"
+              title="تحديث الطلب"
+              disabled={isRefreshing}
+            />
           </div>
           
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white shadow-sm">
@@ -493,8 +558,17 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
   );
 };
 
-// Use React.memo to prevent unnecessary re-renders
+// Use React.memo with a custom comparison function to prevent unnecessary re-renders
 export default memo(StandaloneOrderCard, (prevProps, nextProps) => {
-  // Only re-render if the initialOrder has changed
-  return JSON.stringify(prevProps.initialOrder) === JSON.stringify(nextProps.initialOrder);
+  // Only re-render if the initialOrder has changed in relevant fields
+  const prevOrder = prevProps.initialOrder;
+  const nextOrder = nextProps.initialOrder;
+  
+  // Compare relevant fields that would require a re-render
+  return (
+    prevOrder.status === nextOrder.status &&
+    prevOrder.cost === nextOrder.cost &&
+    JSON.stringify(prevOrder.location) === JSON.stringify(nextOrder.location) &&
+    JSON.stringify(prevOrder.customer) === JSON.stringify(nextOrder.customer)
+  );
 }); 

@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, memo } from 'react';
+import React, { useState, useEffect, useRef, memo, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { faPlus, faCheckDouble, faRightFromBracket } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faCheckDouble, faRightFromBracket, faSyncAlt } from '@fortawesome/free-solid-svg-icons';
 import { Card, CardBody, CardHeader, Typography } from '@material-tailwind/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheckCircle } from '@fortawesome/free-solid-svg-icons';
@@ -11,10 +11,11 @@ import Button from '../../components/Button';
 import { Customer } from '../../types/customer';
 import axiosInstance from '../../utils/axiosInstance';
 import { useDispatch } from 'react-redux';
-import { showError, showSuccess } from '../../store/slices/notificationSlice';
+import { showError, showSuccess, showInfo } from '../../store/slices/notificationSlice';
 import { AppDispatch } from '../../store/store';
 import { useDistributorOrders } from '../../hooks/useDistributorOrders';
 import StandaloneOrderCard from '../../components/distributor/shared/StandaloneOrderCard';
+import { OrderList } from '../../types/order';
 
 const DistributorListOrder: React.FC = () => {
   const navigate = useNavigate();
@@ -25,6 +26,13 @@ const DistributorListOrder: React.FC = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isClosingShift, setIsClosingShift] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshStartY, setRefreshStartY] = useState(0);
+  const [refreshDistance, setRefreshDistance] = useState(0);
+  const refreshThreshold = 100; // pixels to pull down before triggering refresh
+  const contentRef = useRef<HTMLDivElement>(null);
+  const autoRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const previousOrdersRef = useRef<OrderList[]>([]);
   
   // Flag to track if orders have been fetched
   const hasInitiallyFetched = useRef(false);
@@ -38,6 +46,13 @@ const DistributorListOrder: React.FC = () => {
     initialized
   } = useDistributorOrders();
 
+  // Store previous orders for comparison
+  useEffect(() => {
+    if (orders && orders.length > 0) {
+      previousOrdersRef.current = orders;
+    }
+  }, [orders]);
+
   // Fetch orders only once when the component mounts
   useEffect(() => {
     if (!hasInitiallyFetched.current && !initialized) {
@@ -46,6 +61,71 @@ const DistributorListOrder: React.FC = () => {
       hasInitiallyFetched.current = true;
     }
   }, [fetchOrders, initialized]);
+
+  // Check if orders have changed
+  const haveOrdersChanged = (newOrders: OrderList[], oldOrders: OrderList[]): boolean => {
+    if (newOrders.length !== oldOrders.length) return true;
+    
+    // Create a map of old orders by ID for quick lookup
+    const oldOrdersMap = new Map(oldOrders.map(order => [order.id, order]));
+    
+    // Check if any order has changed
+    for (const newOrder of newOrders) {
+      const oldOrder = oldOrdersMap.get(newOrder.id);
+      if (!oldOrder) return true;
+      
+      // Compare relevant fields that would require a re-render
+      if (
+        newOrder.status !== oldOrder.status ||
+        newOrder.cost !== oldOrder.cost ||
+        JSON.stringify(newOrder.location) !== JSON.stringify(oldOrder.location) ||
+        JSON.stringify(newOrder.customer) !== JSON.stringify(oldOrder.customer)
+      ) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
+
+  // Custom fetch function that only updates state if data has changed
+  const fetchOrdersIfChanged = useCallback(async (forceRefresh = false) => {
+    try {
+      // Direct API call to check for changes without updating state
+      const response = await axiosInstance.get('/distributors/orders');
+      const newOrders = response.data.data;
+      
+      // Compare with previous orders
+      if (forceRefresh || haveOrdersChanged(newOrders, previousOrdersRef.current)) {
+        console.log('Orders have changed, updating state...');
+        // Use the Redux action to update state
+        await fetchOrders(true);
+        return true; // Data changed
+      } else {
+        console.log('No changes in orders, skipping re-render');
+        return false; // No changes
+      }
+    } catch (error) {
+      console.error('Error checking for order changes:', error);
+      return false;
+    }
+  }, [fetchOrders]);
+
+  // Setup auto-refresh interval (every 5 seconds)
+  useEffect(() => {
+    // Start the auto-refresh interval
+    autoRefreshIntervalRef.current = setInterval(async () => {
+      console.log('Auto-refreshing orders...');
+      await fetchOrdersIfChanged();
+    }, 5000);
+    
+    // Clean up interval on component unmount
+    return () => {
+      if (autoRefreshIntervalRef.current) {
+        clearInterval(autoRefreshIntervalRef.current);
+      }
+    };
+  }, [fetchOrdersIfChanged]);
 
   // Handle force refresh when navigating from order creation
   useEffect(() => {
@@ -104,6 +184,59 @@ const DistributorListOrder: React.FC = () => {
     }
   };
 
+  // Handle manual refresh
+  const handleRefresh = useCallback(async () => {
+    if (isRefreshing || isLoading) return;
+    
+    setIsRefreshing(true);
+    try {
+      const hasChanged = await fetchOrdersIfChanged(true);
+      
+      if (hasChanged) {
+        dispatch(showSuccess({ message: 'تم تحديث الطلبات', duration: 2000 }));
+      } else {
+        dispatch(showInfo({ message: 'الطلبات محدثة بالفعل', duration: 2000 }));
+      }
+    } catch (error) {
+      console.error('Error refreshing orders:', error);
+      dispatch(showError({ message: 'حدث خطأ أثناء تحديث الطلبات' }));
+    } finally {
+      setIsRefreshing(false);
+      setRefreshDistance(0);
+    }
+  }, [fetchOrdersIfChanged, dispatch, isRefreshing, isLoading]);
+
+  // Pull-to-refresh handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    // Only enable pull-to-refresh when at the top of the page
+    if (window.scrollY === 0) {
+      setRefreshStartY(e.touches[0].clientY);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (refreshStartY === 0 || isRefreshing || isLoading) return;
+
+    const currentY = e.touches[0].clientY;
+    const distance = currentY - refreshStartY;
+    
+    // Only allow pulling down
+    if (distance > 0) {
+      // Apply resistance to make the pull feel natural
+      const resistance = 0.4;
+      setRefreshDistance(distance * resistance);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (refreshDistance > refreshThreshold && !isRefreshing && !isLoading) {
+      handleRefresh();
+    } else {
+      setRefreshDistance(0);
+    }
+    setRefreshStartY(0);
+  };
+
   return (
     <Layout title='قائمة الطلبيات'>
       <Card 
@@ -121,7 +254,7 @@ const DistributorListOrder: React.FC = () => {
           onPointerLeaveCapture={null}
         >
           <div className="mb-4 flex flex-col justify-between gap-8 md:flex-row md:items-center">
-            <div>
+            <div className="flex items-center gap-3">
               <Typography 
                 variant="h5" 
                 color="blue-gray"
@@ -131,6 +264,19 @@ const DistributorListOrder: React.FC = () => {
               >
                 الطلبات
               </Typography>
+              <Button
+                className="flex items-center justify-center gap-2 font-medium"
+                size="sm"
+                color="blue"
+                onClick={handleRefresh}
+                disabled={isRefreshing || isLoading}
+              >
+                <FontAwesomeIcon 
+                  icon={faSyncAlt} 
+                  className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} 
+                />
+                <span className="hidden sm:inline">تحديث</span>
+              </Button>
             </div>
             <div className="flex flex-col sm:flex-row w-full sm:w-max gap-2">
               {/* Primary Action */}
@@ -190,8 +336,39 @@ const DistributorListOrder: React.FC = () => {
           onPointerEnterCapture={null}
           onPointerLeaveCapture={null}
         >
-          <div className="space-y-6">
-          {isLoading ? (
+          {/* Pull-to-refresh indicator */}
+          {refreshDistance > 0 && (
+            <div 
+              className="flex justify-center items-center"
+              style={{ 
+                height: `${refreshDistance}px`, 
+                marginTop: `-${refreshDistance}px`, 
+                marginBottom: '10px',
+                transition: refreshDistance > refreshThreshold || isRefreshing ? 'none' : 'height 0.2s ease'
+              }}
+            >
+              <FontAwesomeIcon 
+                icon={faSyncAlt} 
+                className={`text-blue-500 ${isRefreshing ? 'animate-spin' : ''}`} 
+                style={{ 
+                  transform: `rotate(${refreshDistance * 2}deg)`,
+                  opacity: Math.min(refreshDistance / refreshThreshold, 1)
+                }} 
+              />
+              <span className="ml-2 text-sm text-blue-500">
+                {refreshDistance > refreshThreshold ? 'حرر للتحديث' : 'اسحب للتحديث'}
+              </span>
+            </div>
+          )}
+          
+          <div 
+            className="space-y-6"
+            ref={contentRef}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
+            {isLoading ? (
               <div className="text-center py-8">جاري التحميل...</div>
             ) : error ? (
               <div className="text-center py-8 text-red-500">حدث خطأ أثناء تحميل الطلبات</div>
@@ -286,7 +463,7 @@ const DistributorListOrder: React.FC = () => {
           </div>
         </div>
       )}
-      </Layout>
+    </Layout>
   );
 };
 
