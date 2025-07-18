@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, memo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { faPlus, faCheckDouble, faRightFromBracket } from '@fortawesome/free-solid-svg-icons';
 import { Card, CardBody, CardHeader, Typography } from '@material-tailwind/react';
@@ -25,19 +25,27 @@ const DistributorListOrder: React.FC = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isClosingShift, setIsClosingShift] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  
+  // Flag to track if orders have been fetched
+  const hasInitiallyFetched = useRef(false);
 
   // Use Redux directly, but the StandaloneOrderCard will handle its own state
   const {
     orders,
     isLoading,
     error,
-    fetchOrders
+    fetchOrders,
+    initialized
   } = useDistributorOrders();
 
+  // Fetch orders only once when the component mounts
   useEffect(() => {
-    console.log('Fetching orders...');
-    fetchOrders();
-  }, [fetchOrders]);
+    if (!hasInitiallyFetched.current && !initialized) {
+      console.log('Initial fetch of orders...');
+      fetchOrders();
+      hasInitiallyFetched.current = true;
+    }
+  }, [fetchOrders, initialized]);
 
   // Handle force refresh when navigating from order creation
   useEffect(() => {
@@ -282,4 +290,5 @@ const DistributorListOrder: React.FC = () => {
   );
 };
 
-export default DistributorListOrder;
+// Use memo to prevent unnecessary re-renders
+export default memo(DistributorListOrder);

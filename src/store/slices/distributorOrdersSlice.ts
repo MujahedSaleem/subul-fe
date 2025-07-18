@@ -153,12 +153,12 @@ const distributorOrdersSlice = createSlice({
     builder
       // Fetch all orders
       .addCase(fetchDistributorOrders.pending, (state) => {
-        console.log('Fetching orders pending...');
+        // Remove console.log
         state.isLoading = true;
         state.error = null;
       })
       .addCase(fetchDistributorOrders.fulfilled, (state, action) => {
-        console.log('Fetching orders fulfilled:', action.payload);
+        // Remove console.log
         state.isLoading = false;
         state.orders = action.payload;
         state.initialized = true;

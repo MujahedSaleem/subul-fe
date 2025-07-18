@@ -238,7 +238,7 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
 
   return (
     <Card
-      key={order.id}
+      key={`order-${order.id}`}
       className={`w-full ${statusConfig.bgColor} hover:shadow-lg transition-all duration-300 rounded-xl overflow-hidden border border-gray-100`}
       placeholder=""
       onPointerEnterCapture={() => {}}

@@ -18,7 +18,8 @@ export const useDistributorOrders = () => {
     orders,
     currentOrder,
     isLoading,
-    error
+    error,
+    initialized
   } = useAppSelector(state => state.distributorOrders);
 
   const fetchOrders = useCallback((forceRefresh = false) => {
@@ -64,6 +65,7 @@ export const useDistributorOrders = () => {
     currentOrder,
     isLoading,
     error,
+    initialized,
     
     // Actions
     fetchOrders,
