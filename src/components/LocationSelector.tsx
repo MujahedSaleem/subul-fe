@@ -4,7 +4,7 @@ import { OrderList } from "../types/order";
 import Modal from "./modal";
 import EditCustomer from "./EditCustomer";
 import IconButton from "./IconButton";
-import { faLocationDot, faPlus, faMapMarkerAlt } from "@fortawesome/free-solid-svg-icons";
+import { faLocationDot, faPlus, faMapMarkerAlt, faPencilAlt, faCheck, faTimes } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useAppDispatch } from "../store/hooks";
 import { showWarning } from "../store/slices/notificationSlice";
@@ -30,6 +30,8 @@ const LocationSelector = forwardRef<HTMLDivElement, LocationSelectorProps>((
   const [selectedLocationName, setSelectedLocationName] = useState("");
   const [newLocationName, setNewLocationName] = useState("");
   const [isAddingLocation, setIsAddingLocation] = useState(false);
+  const [editingLocationId, setEditingLocationId] = useState<number | null>(null);
+  const [editingLocationName, setEditingLocationName] = useState("");
   
   useEffect(() => {
     if (order?.location?.name) {
@@ -98,6 +100,11 @@ const LocationSelector = forwardRef<HTMLDivElement, LocationSelectorProps>((
   const handleLocationSelect = (location: Location) => {
     if (!customer) return;
     
+    // Don't select if we're in edit mode
+    if (editingLocationId !== null) {
+      return;
+    }
+    
     setOrder(prev => {
       if (!prev) return prev;
       return {
@@ -149,6 +156,79 @@ const LocationSelector = forwardRef<HTMLDivElement, LocationSelectorProps>((
       const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
       window.open(url, '_blank');
     }
+  };
+
+  const handleEditLocation = (e: React.MouseEvent, location: Location) => {
+    e.stopPropagation();
+    setEditingLocationId(location.id);
+    setEditingLocationName(location.name);
+  };
+
+  const handleSaveLocationEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!customer || editingLocationId === null || !editingLocationName.trim()) {
+      return;
+    }
+
+    // Find the location to update
+    const locationToUpdate = customer.locations.find(loc => loc.id === editingLocationId);
+    if (!locationToUpdate) {
+      setEditingLocationId(null);
+      return;
+    }
+
+    // Create updated location
+    const updatedLocation = {
+      ...locationToUpdate,
+      name: editingLocationName.trim()
+    };
+
+    // Update locations array
+    const updatedLocations = customer.locations.map(loc => 
+      loc.id === editingLocationId ? updatedLocation : loc
+    );
+
+    // If the edited location was the selected one, update the selected location name
+    if (order?.location?.id === editingLocationId) {
+      setSelectedLocationName(updatedLocation.name);
+      
+      // Update the order with the updated location name and customer locations
+      setOrder(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          location: {
+            ...prev.location!,
+            name: updatedLocation.name
+          },
+          customer: {
+            ...prev.customer!,
+            locations: updatedLocations
+          }
+        };
+      });
+    } else {
+      // Only update the customer's locations array
+      setOrder(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          customer: {
+            ...prev.customer!,
+            locations: updatedLocations
+          }
+        };
+      });
+    }
+    
+    // Reset editing state
+    setEditingLocationId(null);
+  };
+
+  const handleCancelLocationEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingLocationId(null);
   };
 
   return (
@@ -211,21 +291,60 @@ const LocationSelector = forwardRef<HTMLDivElement, LocationSelectorProps>((
                           : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
                       }`}
                     >
-                                             <div className="flex items-center justify-between">
-                         <div className="flex items-center gap-2">
-                           <FontAwesomeIcon icon={faMapMarkerAlt} className="w-4 h-4 text-gray-400" />
-                           <span className="text-gray-800">{location.name}</span>
-                         </div>
-                         {location.coordinates && (
-                           <IconButton
-                             onClick={(e) => handleOpenLocation(e, location.coordinates || '')}
-                             icon={faLocationDot}
-                             variant="primary"
-                             size="sm"
-                             title="فتح الموقع في خريطة جوجل"
-                           />
-                         )}
-                       </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <FontAwesomeIcon icon={faMapMarkerAlt} className="w-4 h-4 text-gray-400" />
+                          {editingLocationId === location.id ? (
+                            <input
+                              type="text"
+                              value={editingLocationName}
+                              onChange={(e) => setEditingLocationName(e.target.value)}
+                              className="px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              autoFocus
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          ) : (
+                            <span className="text-gray-800">{location.name}</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {editingLocationId === location.id ? (
+                            <>
+                              <IconButton
+                                onClick={handleSaveLocationEdit}
+                                icon={faCheck}
+                                variant="success"
+                                size="sm"
+                                title="حفظ"
+                              />
+                              <IconButton
+                                onClick={handleCancelLocationEdit}
+                                icon={faTimes}
+                                variant="danger"
+                                size="sm"
+                                title="إلغاء"
+                              />
+                            </>
+                          ) : (
+                            <IconButton
+                              onClick={(e) => handleEditLocation(e, location)}
+                              icon={faPencilAlt}
+                              variant="secondary"
+                              size="sm"
+                              title="تعديل الموقع"
+                            />
+                          )}
+                          {location.coordinates && !editingLocationId && (
+                            <IconButton
+                              onClick={(e) => handleOpenLocation(e, location.coordinates || '')}
+                              icon={faLocationDot}
+                              variant="primary"
+                              size="sm"
+                              title="فتح الموقع في خريطة جوجل"
+                            />
+                          )}
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -248,25 +367,25 @@ const LocationSelector = forwardRef<HTMLDivElement, LocationSelectorProps>((
                       autoFocus
                     />
                     <div className="flex gap-2">
-                                             <Button
-                         onClick={handleAddNewLocation}
-                         disabled={!newLocationName.trim()}
-                         className="flex-1"
-                         size="sm"
-                       >
-                         إضافة
-                       </Button>
-                       <Button
-                         onClick={() => {
-                           setIsAddingLocation(false);
-                           setNewLocationName("");
-                         }}
-                         variant="outlined"
-                         className="flex-1"
-                         size="sm"
-                       >
-                         إلغاء
-                       </Button>
+                      <Button
+                        onClick={handleAddNewLocation}
+                        disabled={!newLocationName.trim()}
+                        className="flex-1"
+                        size="sm"
+                      >
+                        إضافة
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setIsAddingLocation(false);
+                          setNewLocationName("");
+                        }}
+                        variant="outlined"
+                        className="flex-1"
+                        size="sm"
+                      >
+                        إلغاء
+                      </Button>
                     </div>
                   </div>
                 ) : (
@@ -286,7 +405,7 @@ const LocationSelector = forwardRef<HTMLDivElement, LocationSelectorProps>((
               <div className="flex justify-end gap-2 mt-6">
                 <Button
                   onClick={() => setIsModalOpen(false)}
-                  variant="outline"
+                  variant="outlined"
                   size="sm"
                 >
                   إغلاق
@@ -301,13 +420,13 @@ const LocationSelector = forwardRef<HTMLDivElement, LocationSelectorProps>((
       <Modal
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
-        className="w-full max-w-4xl"
+        title="تعديل العميل"
       >
         {customer && (
           <EditCustomer
-            customer={customer}
-            onSave={handleSaveCustomer}
-            onCancel={() => setIsEditModalOpen(false)}
+            customerId={customer.id}
+            onCustomerUpdated={handleSaveCustomer}
+            onCloseModal={() => setIsEditModalOpen(false)}
           />
         )}
       </Modal>
