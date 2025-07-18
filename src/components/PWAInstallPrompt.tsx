@@ -1,90 +1,168 @@
 import React, { useState, useEffect } from 'react';
+import { Button } from '@material-tailwind/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faDownload, faTimes } from '@fortawesome/free-solid-svg-icons';
-import Button from './Button';
+import { faDownload, faSyncAlt } from '@fortawesome/free-solid-svg-icons';
+import { useAppDispatch } from '../store/hooks';
+import { showSuccess, showError } from '../store/slices/notificationSlice';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
+
+// Add type definition for Safari's standalone property
+interface SafariNavigator extends Navigator {
+  standalone?: boolean;
 }
 
 const PWAInstallPrompt: React.FC = () => {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [showPrompt, setShowPrompt] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
+  const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
+  const dispatch = useAppDispatch();
 
   useEffect(() => {
-    const handler = (e: Event) => {
-      // Prevent Chrome 67 and earlier from automatically showing the prompt
-      e.preventDefault();
-      // Store the event for later use
-      setInstallPrompt(e as BeforeInstallPromptEvent);
-      // Check if the user has already dismissed or installed
-      const hasPrompted = localStorage.getItem('pwaPromptDismissed');
-      if (!hasPrompted) {
-        setShowPrompt(true);
-      }
-    };
-
-    window.addEventListener('beforeinstallprompt', handler);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handler);
-    };
-  }, []);
-
-  const handleInstall = async () => {
-    if (!installPrompt) return;
-
-    // Show the install prompt
-    installPrompt.prompt();
-
-    // Wait for the user to respond to the prompt
-    const choiceResult = await installPrompt.userChoice;
-
-    // User accepted the install
-    if (choiceResult.outcome === 'accepted') {
-      console.log('User accepted the PWA installation');
-    } else {
-      console.log('User dismissed the PWA installation');
+    // Check if app is already installed
+    if (window.matchMedia('(display-mode: standalone)').matches || 
+        (window.navigator as SafariNavigator).standalone === true) {
+      setIsInstalled(true);
     }
 
-    // Clear the saved prompt since it can't be used again
-    setInstallPrompt(null);
-    setShowPrompt(false);
+    // Listen for the beforeinstallprompt event
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e as BeforeInstallPromptEvent);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // Listen for app installed event
+    window.addEventListener('appinstalled', () => {
+      setIsInstalled(true);
+      setInstallPrompt(null);
+      dispatch(showSuccess({ message: 'تم تثبيت التطبيق بنجاح!' }));
+    });
+
+    // Check if service worker has an update waiting
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.ready.then(registration => {
+        if (registration.waiting) {
+          setIsUpdateAvailable(true);
+        }
+        
+        // Listen for new updates
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                setIsUpdateAvailable(true);
+              }
+            });
+          }
+        });
+      });
+      
+      // Listen for messages from service worker
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
+          setIsUpdateAvailable(true);
+        }
+      });
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, [dispatch]);
+
+  const handleInstallClick = async () => {
+    if (!installPrompt) return;
+
+    try {
+      await installPrompt.prompt();
+      const choiceResult = await installPrompt.userChoice;
+      
+      if (choiceResult.outcome === 'accepted') {
+        dispatch(showSuccess({ message: 'شكرًا لتثبيت تطبيقنا!' }));
+      }
+      
+      setInstallPrompt(null);
+    } catch (error) {
+      console.error('Installation error:', error);
+      dispatch(showError({ message: 'حدث خطأ أثناء محاولة التثبيت' }));
+    }
   };
 
-  const handleDismiss = () => {
-    localStorage.setItem('pwaPromptDismissed', 'true');
-    setShowPrompt(false);
+  const handleUpdateClick = () => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready.then(registration => {
+        if (registration.waiting) {
+          // Send message to service worker to skip waiting and activate new version
+          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        } else {
+          // Manually check for updates
+          if (typeof window.checkForUpdates === 'function') {
+            window.checkForUpdates();
+          } else {
+            dispatch(showSuccess({ message: 'جاري التحقق من وجود تحديثات...' }));
+            registration.update().then(() => {
+              if (!registration.waiting) {
+                dispatch(showSuccess({ message: 'أنت تستخدم أحدث إصدار من التطبيق' }));
+              }
+            });
+          }
+        }
+      });
+    }
   };
 
-  if (!showPrompt) return null;
+  // Don't render anything if the app is installed and no updates are available
+  if (isInstalled && !isUpdateAvailable && !installPrompt) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 bg-white rounded-lg shadow-lg p-4 z-50 border border-blue-100">
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <h3 className="font-semibold text-lg mb-1">تثبيت التطبيق</h3>
-          <p className="text-slate-600 mb-3">
-            يمكنك تثبيت سُبل على جهازك للوصول السريع والعمل بدون إنترنت.
-          </p>
-          <div className="flex gap-2">
-            <Button onClick={handleInstall} icon={faDownload} variant="primary">
-              تثبيت
-            </Button>
-            <Button onClick={handleDismiss} variant="tertiary">
-              لاحقًا
-            </Button>
-          </div>
-        </div>
-        <button 
-          onClick={handleDismiss} 
-          className="text-slate-400 hover:text-slate-600 p-1"
-          aria-label="إغلاق"
+    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+      {!isInstalled && installPrompt && (
+        <Button
+          size="sm"
+          className="flex items-center gap-2 bg-blue-500 shadow-lg"
+          onClick={handleInstallClick}
+          placeholder=""
+          onPointerEnterCapture={null}
+          onPointerLeaveCapture={null}
         >
-          <FontAwesomeIcon icon={faTimes} />
-        </button>
-      </div>
+          <FontAwesomeIcon icon={faDownload} className="h-4 w-4" />
+          تثبيت التطبيق
+        </Button>
+      )}
+      
+      {isUpdateAvailable && (
+        <Button
+          size="sm"
+          className="flex items-center gap-2 bg-green-500 shadow-lg animate-pulse"
+          onClick={handleUpdateClick}
+          placeholder=""
+          onPointerEnterCapture={null}
+          onPointerLeaveCapture={null}
+        >
+          <FontAwesomeIcon icon={faSyncAlt} className="h-4 w-4" />
+          تحديث التطبيق
+        </Button>
+      )}
+      
+      {isInstalled && !isUpdateAvailable && (
+        <Button
+          size="sm"
+          className="flex items-center gap-2 bg-gray-500 shadow-lg opacity-80 hover:opacity-100"
+          onClick={handleUpdateClick}
+          placeholder=""
+          onPointerEnterCapture={null}
+          onPointerLeaveCapture={null}
+        >
+          <FontAwesomeIcon icon={faSyncAlt} className="h-4 w-4" />
+          التحقق من التحديثات
+        </Button>
+      )}
     </div>
   );
 };

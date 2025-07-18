@@ -1,5 +1,6 @@
 // This is a simple service worker that caches the app shell
-const CACHE_NAME = 'subul-cache-v1';
+const CACHE_NAME = 'subul-cache-v2'; // Increment version to force update
+const APP_VERSION = '2.0.0'; // Track app version for update detection
 const urlsToCache = [
   '/',
   '/index.html',
@@ -11,10 +12,11 @@ const urlsToCache = [
 
 // Install event - cache app shell
 self.addEventListener('install', (event) => {
+  console.log('[Service Worker] Installing new version:', APP_VERSION);
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('Opened cache');
+        console.log('[Service Worker] Caching app shell');
         return cache.addAll(urlsToCache);
       })
   );
@@ -110,25 +112,54 @@ self.addEventListener('fetch', (event) => {
 
 // Activate event - clean up old caches and take control immediately
 self.addEventListener('activate', (event) => {
+  console.log('[Service Worker] Activating new version:', APP_VERSION);
   const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheWhitelist.indexOf(cacheName) === -1) {
+            console.log('[Service Worker] Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
     }).then(() => {
       // Take control of all clients immediately
+      console.log('[Service Worker] Claiming clients');
       return self.clients.claim();
     })
   );
 }); 
+
+// Handle messages from clients
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
-    console.log('[Service Worker] SKIP_WAITING received');
+    console.log('[Service Worker] Skip waiting and activate now');
     self.skipWaiting();
   }
+  
+  if (event.data && event.data.type === 'CHECK_VERSION') {
+    // Send back the current version to the client
+    const client = event.source;
+    if (client) {
+      client.postMessage({
+        type: 'VERSION_INFO',
+        version: APP_VERSION
+      });
+    }
+  }
+});
+
+// Force clients to update when a new version is available
+self.addEventListener('updatefound', () => {
+  console.log('[Service Worker] Update found, notifying clients');
+  self.clients.matchAll().then(clients => {
+    clients.forEach(client => {
+      client.postMessage({
+        type: 'UPDATE_AVAILABLE',
+        version: APP_VERSION
+      });
+    });
+  });
 });

@@ -66,6 +66,30 @@ export function register(config?: Config): void {
         config.onOffline();
       }
     });
+
+    // Set up listener for service worker messages
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
+        console.log(`[Main] New app version available: ${event.data.version}`);
+        if (config && config.onUpdate && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.ready.then(registration => {
+            config.onUpdate(registration);
+          });
+        }
+      }
+    });
+
+    // Check for updates periodically (every 30 minutes)
+    setInterval(() => {
+      if (typeof navigator.onLine !== 'undefined' && navigator.onLine) {
+        console.log('[Main] Checking for app updates...');
+        navigator.serviceWorker.ready.then(registration => {
+          registration.update().catch(err => {
+            console.error('Error checking for updates:', err);
+          });
+        });
+      }
+    }, 30 * 60 * 1000); // 30 minutes
   }
 }
 
@@ -73,6 +97,15 @@ function registerValidSW(swUrl: string, config?: Config) {
   navigator.serviceWorker
     .register(swUrl)
     .then((registration) => {
+      // Immediately check if there's a waiting worker
+      if (registration.waiting) {
+        console.log('[Main] New service worker waiting');
+        if (config && config.onUpdate) {
+          config.onUpdate(registration);
+          promptUserToRefresh(registration);
+        }
+      }
+
       registration.onupdatefound = () => {
         const installingWorker = registration.installing;
         if (installingWorker == null) {
@@ -85,28 +118,20 @@ function registerValidSW(swUrl: string, config?: Config) {
               // but the previous service worker will still serve the older
               // content until all client tabs are closed.
               console.log(
-                'New content is available and will be used when all ' +
-                  'tabs for this page are closed. See https://cra.link/PWA.'
+                '[Main] New content is available and will be used when all ' +
+                  'tabs for this page are closed.'
               );
 
               // Execute callback
               if (config && config.onUpdate) {
                 config.onUpdate(registration);
-                if (registration.waiting) {
-                  registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-                }
-              
-                // 🔁 Reload when the new SW takes control
-                navigator.serviceWorker.addEventListener('controllerchange', () => {
-                  window.location.reload();
-                });
-              
+                promptUserToRefresh(registration);
               }
             } else {
               // At this point, everything has been precached.
               // It's the perfect time to display a
               // "Content is cached for offline use." message.
-              console.log('Content is cached for offline use.');
+              console.log('[Main] Content is cached for offline use.');
 
               // Execute callback
               if (config && config.onSuccess) {
@@ -120,6 +145,22 @@ function registerValidSW(swUrl: string, config?: Config) {
     .catch((error) => {
       console.error('Error during service worker registration:', error);
     });
+}
+
+function promptUserToRefresh(registration: ServiceWorkerRegistration) {
+  // Force update if user confirms
+  if (confirm('تم تحديث التطبيق! هل ترغب في تحميل النسخة الجديدة؟')) {
+    if (registration.waiting) {
+      // Send skip waiting message
+      registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+    }
+    
+    // Listen for the controller change and reload
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      console.log('[Main] New service worker activated, reloading page');
+      window.location.reload();
+    });
+  }
 }
 
 function checkValidServiceWorker(swUrl: string, config?: Config) {
@@ -151,6 +192,32 @@ function checkValidServiceWorker(swUrl: string, config?: Config) {
         config.onOffline();
       }
     });
+}
+
+// Function to manually check for updates
+export function checkForUpdates(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (!('serviceWorker' in navigator)) {
+      resolve(false);
+      return;
+    }
+
+    navigator.serviceWorker.ready.then((registration) => {
+      registration.update()
+        .then(() => {
+          if (registration.waiting) {
+            // There's an update ready
+            promptUserToRefresh(registration);
+            resolve(true);
+          } else {
+            resolve(false);
+          }
+        })
+        .catch(() => {
+          resolve(false);
+        });
+    });
+  });
 }
 
 export function unregister(): void {
