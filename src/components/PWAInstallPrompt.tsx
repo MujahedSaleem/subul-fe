@@ -21,17 +21,49 @@ const PWAInstallPrompt: React.FC = () => {
   const [isInstalled, setIsInstalled] = useState(false);
   const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
   const dispatch = useAppDispatch();
 
   useEffect(() => {
     // Check if app is already installed
-    if (window.matchMedia('(display-mode: standalone)').matches || 
-        (window.navigator as SafariNavigator).standalone === true) {
-      setIsInstalled(true);
-    }
+    const checkStandaloneMode = () => {
+      const standalone = window.matchMedia('(display-mode: standalone)').matches || 
+                        (window.navigator as SafariNavigator).standalone === true;
+      setIsStandalone(standalone);
+      setIsInstalled(standalone);
+      return standalone;
+    };
+
+    // Initial check
+    const standalone = checkStandaloneMode();
 
     // Check if device is mobile
-    setIsMobile(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+    const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    setIsMobile(mobile);
+
+    // For standalone mode, always show update button and check for updates periodically
+    if (standalone) {
+      console.log('[PWAInstallPrompt] Standalone mode detected, setting up periodic updates');
+      
+      // Force a check for updates immediately
+      if (typeof window.checkForUpdates === 'function') {
+        window.checkForUpdates();
+      }
+      
+      // Set up periodic checks every 2 minutes for standalone mode
+      const updateInterval = setInterval(() => {
+        console.log('[PWAInstallPrompt] Periodic update check for standalone mode');
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.ready.then(registration => {
+            registration.update().catch(err => {
+              console.error('Error checking for updates:', err);
+            });
+          });
+        }
+      }, 2 * 60 * 1000); // 2 minutes
+      
+      return () => clearInterval(updateInterval);
+    }
 
     // Listen for the beforeinstallprompt event
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -46,7 +78,19 @@ const PWAInstallPrompt: React.FC = () => {
       setIsInstalled(true);
       setInstallPrompt(null);
       dispatch(showSuccess({ message: 'تم تثبيت التطبيق بنجاح!' }));
+      
+      // Recheck standalone mode after installation
+      setTimeout(checkStandaloneMode, 1000);
     });
+
+    // Listen for standalone mode changes
+    const standaloneMediaQuery = window.matchMedia('(display-mode: standalone)');
+    const handleStandaloneChange = (e: MediaQueryListEvent) => {
+      setIsStandalone(e.matches);
+      setIsInstalled(e.matches);
+    };
+    
+    standaloneMediaQuery.addEventListener('change', handleStandaloneChange);
 
     // Check if service worker has an update waiting
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
@@ -80,6 +124,7 @@ const PWAInstallPrompt: React.FC = () => {
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      standaloneMediaQuery.removeEventListener('change', handleStandaloneChange);
     };
   }, [dispatch]);
 
@@ -138,6 +183,38 @@ const PWAInstallPrompt: React.FC = () => {
     }
   };
 
+  // For standalone mode, show a fixed banner at the top
+  if (isStandalone) {
+    return (
+      <>
+        {/* Fixed update banner for standalone mode */}
+        <div className="fixed top-0 left-0 right-0 z-50 bg-blue-500 text-white p-2 flex justify-between items-center shadow-lg">
+          <span className="text-sm font-medium">تطبيق سُبل</span>
+          <div className="flex gap-2">
+            <button
+              onClick={handleUpdateClick}
+              className="bg-white text-blue-500 text-xs px-2 py-1 rounded flex items-center gap-1"
+            >
+              <FontAwesomeIcon icon={faSyncAlt} className="h-3 w-3" />
+              <span>تحديث</span>
+            </button>
+            <button
+              onClick={handleForceRefreshClick}
+              className="bg-red-500 text-white text-xs px-2 py-1 rounded flex items-center gap-1"
+            >
+              <FontAwesomeIcon icon={faRedo} className="h-3 w-3" />
+              <span>تحديث كامل</span>
+            </button>
+          </div>
+        </div>
+        
+        {/* Add padding to the top of the page to account for the fixed banner */}
+        <div className="h-10"></div>
+      </>
+    );
+  }
+
+  // Regular floating buttons for non-standalone mode
   // Don't render anything if the app is installed and no updates are available
   if (isInstalled && !isUpdateAvailable && !installPrompt && !isMobile) return null;
 

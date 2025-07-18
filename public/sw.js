@@ -1,6 +1,6 @@
 // This is a simple service worker that caches the app shell
-const CACHE_NAME = 'subul-cache-v3'; // Increment version again to force update
-const APP_VERSION = '2.0.1'; // Track app version for update detection
+const CACHE_NAME = 'subul-cache-v4'; // Increment version again to force update
+const APP_VERSION = '2.0.2'; // Track app version for update detection
 const TIMESTAMP = new Date().toISOString(); // Add timestamp to force cache refresh
 const urlsToCache = [
   '/',
@@ -16,14 +16,20 @@ const isMobileDevice = () => {
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 };
 
+// Detect if the app is running in standalone mode (installed PWA)
+const isStandaloneMode = () => {
+  return window.matchMedia('(display-mode: standalone)').matches || 
+         window.navigator.standalone === true;
+};
+
 // Install event - cache app shell
 self.addEventListener('install', (event) => {
   console.log('[Service Worker] Installing new version:', APP_VERSION, 'at', TIMESTAMP);
   
-  // Force update for mobile devices
-  if (isMobileDevice()) {
-    console.log('[Service Worker] Mobile device detected, forcing cache refresh');
-    // Skip waiting immediately for mobile devices
+  // Force update for mobile devices and standalone mode
+  if (isMobileDevice() || self.isStandalonePWA) {
+    console.log('[Service Worker] Mobile or standalone mode detected, forcing cache refresh');
+    // Skip waiting immediately for mobile devices or standalone mode
     self.skipWaiting();
   }
   
@@ -60,10 +66,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // For HTML requests, always go to network first (especially for mobile)
+  // For HTML requests or standalone mode, always go to network first
   if (event.request.mode === 'navigate' || 
       (event.request.method === 'GET' && 
-       event.request.headers.get('accept').includes('text/html'))) {
+       event.request.headers.get('accept')?.includes('text/html')) ||
+      self.isStandalonePWA) {
     
     event.respondWith(
       fetch(event.request)
@@ -92,8 +99,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // For JavaScript and CSS files, use network-first approach on mobile
-  if (isMobileDevice() && 
+  // For JavaScript and CSS files, use network-first approach on mobile or standalone
+  if ((isMobileDevice() || self.isStandalonePWA) && 
       (event.request.url.endsWith('.js') || 
        event.request.url.endsWith('.css'))) {
     
@@ -124,13 +131,13 @@ self.addEventListener('fetch', (event) => {
       .then((response) => {
         // Cache hit - return response
         if (response) {
-          // For mobile devices, check if the cached response is older than 1 hour
-          if (isMobileDevice()) {
+          // For mobile devices or standalone mode, check if the cached response is older than 15 minutes
+          if (isMobileDevice() || self.isStandalonePWA) {
             const cachedTime = response.headers.get('sw-cache-timestamp');
             if (cachedTime) {
               const cacheAge = Date.now() - new Date(cachedTime).getTime();
-              // If cache is older than 1 hour (3600000 ms), fetch from network
-              if (cacheAge > 3600000) {
+              // If cache is older than 15 minutes (900000 ms), fetch from network
+              if (cacheAge > 900000) {
                 return fetchAndCache(event.request);
               }
             }
@@ -191,9 +198,9 @@ self.addEventListener('activate', (event) => {
   console.log('[Service Worker] Activating new version:', APP_VERSION);
   const cacheWhitelist = [CACHE_NAME];
   
-  // For mobile devices, claim clients immediately and clean caches
-  if (isMobileDevice()) {
-    console.log('[Service Worker] Mobile device detected, claiming clients immediately');
+  // For mobile devices or standalone mode, claim clients immediately and clean caches
+  if (isMobileDevice() || self.isStandalonePWA) {
+    console.log('[Service Worker] Mobile or standalone mode detected, claiming clients immediately');
   }
   
   event.waitUntil(
@@ -234,9 +241,33 @@ self.addEventListener('message', (event) => {
     }
   }
   
-  // Force refresh cache for mobile
-  if (event.data && event.data.type === 'FORCE_REFRESH_CACHE' && isMobileDevice()) {
-    console.log('[Service Worker] Force refreshing cache for mobile');
+  // Set standalone PWA flag
+  if (event.data && event.data.type === 'SET_STANDALONE_MODE') {
+    console.log('[Service Worker] Setting standalone mode flag:', event.data.isStandalone);
+    self.isStandalonePWA = event.data.isStandalone;
+    
+    // If it's standalone mode, force a cache refresh
+    if (event.data.isStandalone) {
+      console.log('[Service Worker] Standalone mode detected, forcing cache refresh');
+      event.waitUntil(
+        caches.keys().then((cacheNames) => {
+          return Promise.all(
+            cacheNames.map((cacheName) => {
+              if (cacheName !== CACHE_NAME) {
+                console.log('[Service Worker] Deleting old cache for standalone mode:', cacheName);
+                return caches.delete(cacheName);
+              }
+            })
+          );
+        })
+      );
+    }
+  }
+  
+  // Force refresh cache for mobile or standalone mode
+  if (event.data && event.data.type === 'FORCE_REFRESH_CACHE' && 
+     (isMobileDevice() || self.isStandalonePWA)) {
+    console.log('[Service Worker] Force refreshing cache for mobile/standalone');
     event.waitUntil(
       caches.keys().then((cacheNames) => {
         return Promise.all(

@@ -130,6 +130,33 @@ const DistributorListOrder: React.FC = () => {
     }
   }, [fetchOrders]);
 
+  // Special handling for standalone mode
+  useEffect(() => {
+    // Check if running in standalone mode (installed PWA)
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                        (window.navigator as any).standalone === true;
+    
+    if (isStandalone) {
+      console.log('[DistributorListOrder] Running in standalone mode');
+      
+      // Force update check on load for standalone mode
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.ready.then(registration => {
+          console.log('[DistributorListOrder] Checking for updates in standalone mode');
+          registration.update();
+        });
+      }
+      
+      // Set up periodic refresh for standalone mode
+      const refreshInterval = setInterval(() => {
+        console.log('[DistributorListOrder] Periodic data refresh for standalone mode');
+        fetchOrdersIfChanged(true); // Force check for changes
+      }, 30 * 1000); // Every 30 seconds
+      
+      return () => clearInterval(refreshInterval);
+    }
+  }, [fetchOrdersIfChanged]);
+
   // Setup auto-refresh interval (every 5 seconds)
   useEffect(() => {
     // Start the auto-refresh interval

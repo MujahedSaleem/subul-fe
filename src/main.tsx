@@ -13,8 +13,27 @@ declare global {
   interface Window {
     checkForUpdates: () => void;
     forceClearCache: () => void;
+    isStandaloneMode: () => boolean;
   }
 }
+
+// Detect if the app is running in standalone mode (installed PWA)
+window.isStandaloneMode = () => {
+  return window.matchMedia('(display-mode: standalone)').matches || 
+         (window.navigator as any).standalone === true;
+};
+
+// Notify service worker about standalone mode
+const notifyServiceWorkerAboutStandaloneMode = () => {
+  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    const isStandalone = window.isStandaloneMode();
+    console.log('[Main] Notifying service worker about standalone mode:', isStandalone);
+    navigator.serviceWorker.controller.postMessage({
+      type: 'SET_STANDALONE_MODE',
+      isStandalone: isStandalone
+    });
+  }
+};
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -30,6 +49,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 serviceWorkerRegistration.register({
   onSuccess: (registration) => {
     console.log('Service Worker registered successfully');
+    // Notify about standalone mode after successful registration
+    notifyServiceWorkerAboutStandaloneMode();
   },
   onUpdate: (registration) => {
     console.log('New app version available');
@@ -56,6 +77,9 @@ serviceWorkerRegistration.register({
         updateNotification.addEventListener('click', handleUpdateClick);
       }
     }, 100);
+
+    // Also notify about standalone mode
+    notifyServiceWorkerAboutStandaloneMode();
   },
   onOffline: () => {
     store.dispatch(showError({
@@ -72,6 +96,12 @@ serviceWorkerRegistration.register({
     // Check for updates when coming back online
     serviceWorkerRegistration.checkForUpdates();
   }
+});
+
+// Check for standalone mode changes
+window.matchMedia('(display-mode: standalone)').addEventListener('change', (event) => {
+  console.log('[Main] Standalone mode changed:', event.matches);
+  notifyServiceWorkerAboutStandaloneMode();
 });
 
 // Add a refresh button to check for updates manually
