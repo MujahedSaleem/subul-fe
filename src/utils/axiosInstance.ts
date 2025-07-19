@@ -1,7 +1,18 @@
 import axios from 'axios';
 import { extractApiData } from './apiResponseHandler';
+import Cookies from 'js-cookie';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
+// Cookie name for refresh token
+const REFRESH_TOKEN_COOKIE = 'subul_refresh_token';
+
+// Cookie configuration
+const COOKIE_OPTIONS = {
+  expires: 30, // 30 days
+  secure: window.location.protocol === 'https:',
+  sameSite: 'strict' as const
+};
 
 // Create an Axios instance
 const axiosInstance = axios.create({
@@ -67,7 +78,20 @@ axiosInstance.interceptors.response.use(
       originalRequest._retry = true;
       isRefreshing = true;
 
-      const refreshToken = localStorage.getItem('refreshToken');
+      // Try to get refresh token from localStorage first, then from cookies
+      let refreshToken = localStorage.getItem('refreshToken');
+      
+      // If not in localStorage, try cookies
+      if (!refreshToken) {
+        refreshToken = Cookies.get(REFRESH_TOKEN_COOKIE) || null;
+        
+        // If found in cookies, save to localStorage for consistency
+        if (refreshToken) {
+          console.log('Found refresh token in cookies during refresh attempt');
+          localStorage.setItem('refreshToken', refreshToken);
+        }
+      }
+      
       if (refreshToken) {
         try {
           const response = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken });
@@ -75,9 +99,13 @@ axiosInstance.interceptors.response.use(
           // Use unified response handling for token refresh
           const { accessToken, refreshToken: newRefreshToken } = extractApiData<{ accessToken: string; refreshToken: string }>(response.data);
           
+          // Store in localStorage
           localStorage.setItem('accessToken', accessToken);
           if (newRefreshToken) {
             localStorage.setItem('refreshToken', newRefreshToken);
+            
+            // Also store in cookies as backup
+            Cookies.set(REFRESH_TOKEN_COOKIE, newRefreshToken, COOKIE_OPTIONS);
           }
           
           // Update the authorization header for the original request
@@ -92,10 +120,11 @@ axiosInstance.interceptors.response.use(
           console.error('Token refresh failed', refreshError);
           processQueue(refreshError, null);
           
-          // Clear tokens and redirect to login
+          // Clear tokens from both localStorage and cookies
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
           localStorage.removeItem('userType');
+          Cookies.remove(REFRESH_TOKEN_COOKIE);
           
           // Dispatch a custom event to notify AuthContext
           window.dispatchEvent(new CustomEvent('auth:logout'));
@@ -115,6 +144,7 @@ axiosInstance.interceptors.response.use(
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('userType');
+        Cookies.remove(REFRESH_TOKEN_COOKIE);
         
         // Dispatch a custom event to notify AuthContext
         window.dispatchEvent(new CustomEvent('auth:logout'));

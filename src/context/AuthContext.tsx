@@ -4,6 +4,7 @@ import { jwtDecode } from 'jwt-decode';
 import { useLocation } from 'react-router-dom';
 import { extractApiData, handleApiError } from '../utils/apiResponseHandler';
 import * as serviceWorkerRegistration from '../serviceWorkerRegistration';
+import Cookies from 'js-cookie';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -22,6 +23,16 @@ interface RefreshResponse {
   accessToken: string;
   refreshToken: string;
 }
+
+// Cookie configuration
+const COOKIE_OPTIONS = {
+  expires: 30, // 30 days
+  secure: window.location.protocol === 'https:',
+  sameSite: 'strict' as const
+};
+
+// Cookie name for refresh token
+const REFRESH_TOKEN_COOKIE = 'subul_refresh_token';
 
 // Detect if the client is a mobile device
 const isMobileDevice = (): boolean => {
@@ -56,7 +67,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const accessToken = localStorage.getItem('accessToken');
-    const refreshToken = localStorage.getItem('refreshToken');
+    let refreshToken = localStorage.getItem('refreshToken');
+
+    // If refresh token is not in localStorage, try to get it from cookies
+    if (!refreshToken) {
+      refreshToken = Cookies.get(REFRESH_TOKEN_COOKIE) || null;
+      // If found in cookies, also save to localStorage for consistency
+      if (refreshToken) {
+        console.log('Found refresh token in cookies, saving to localStorage');
+        localStorage.setItem('refreshToken', refreshToken);
+      }
+    }
 
     if (accessToken && refreshToken) {
       try {
@@ -82,6 +103,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('userType');
+        Cookies.remove(REFRESH_TOKEN_COOKIE);
         setIsAuthenticated(false);
         setUserType(null);
         setLoading(false);
@@ -101,8 +123,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await api.post('/auth/refresh', { refreshToken });
       const { accessToken, refreshToken: newRefreshToken } = extractApiData<RefreshResponse>(response.data);
       
+      // Store in localStorage
       localStorage.setItem('accessToken', accessToken);
       localStorage.setItem('refreshToken', newRefreshToken);
+      
+      // Also store refresh token in cookies as a backup
+      Cookies.set(REFRESH_TOKEN_COOKIE, newRefreshToken, COOKIE_OPTIONS);
 
       const decodedToken: any = jwtDecode(accessToken);
       const userType = decodedToken.role;
@@ -115,6 +141,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('userType');
+      Cookies.remove(REFRESH_TOKEN_COOKIE);
       setIsAuthenticated(false);
       setUserType(null);
       setLoading(false);
@@ -144,8 +171,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await api.post('/auth/login', { username, password });
       const { accessToken, refreshToken } = extractApiData<LoginResponse>(response.data);
 
+      // Store tokens in localStorage
       localStorage.setItem('accessToken', accessToken);
       localStorage.setItem('refreshToken', refreshToken);
+      
+      // Also store refresh token in cookies as a backup
+      Cookies.set(REFRESH_TOKEN_COOKIE, refreshToken, COOKIE_OPTIONS);
 
       const decodedToken: any = jwtDecode(accessToken);
       const userType = decodedToken.role;
@@ -185,6 +216,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('userType');
+    Cookies.remove(REFRESH_TOKEN_COOKIE);
     setIsAuthenticated(false);
     setUserType(null);
   };
