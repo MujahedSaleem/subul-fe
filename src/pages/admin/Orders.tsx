@@ -146,56 +146,55 @@ const Orders = () => {
         const params = new URLSearchParams();
         params.append('page', '1');
         params.append('pageSize', '1');
-        if (currentFilters.distributorId) params.append('distributorId', currentFilters.distributorId);
-        if (currentFilters.status) params.append('status', currentFilters.status);
-        if (currentFilters.dateFrom) params.append('dateFrom', currentFilters.dateFrom);
-        if (currentFilters.dateTo) params.append('dateTo', currentFilters.dateTo);
         
-        // Make a lightweight request just to get the total count
-        console.log('[AUTO-REFRESH] Making API request to check order count...');
+        // Make a lightweight request to get the first item and total count
+        console.log('[AUTO-REFRESH] Making API request to check orders...');
         const response = await axiosInstance.get(`/orders?${params.toString()}`);
         
-        // Log the full response structure to understand it better
-        console.log('[AUTO-REFRESH] API response structure:', JSON.stringify(response.data, null, 2));
+        // Extract data from response
+        const responseData = response.data.data || response.data;
+        const newTotal = responseData.total || responseData.totalCount || 0;
+        const fetchedItems = responseData.orders || responseData.items || [];
+        const fetchedOrder = fetchedItems[0];
         
-        // Safely extract the total count from the response
-        const responseData = response.data;
+        console.log(`[AUTO-REFRESH] Current total: ${totalRef.current}, New total: ${newTotal}`);
         
-        // Try multiple paths to find the total count
-        let newTotal = 0;
-        if (responseData.data && typeof responseData.data.total === 'number') {
-          newTotal = responseData.data.total;
-          console.log('[AUTO-REFRESH] Found total in response.data.data.total:', newTotal);
-        } else if (typeof responseData.total === 'number') {
-          newTotal = responseData.total;
-          console.log('[AUTO-REFRESH] Found total in response.data.total:', newTotal);
-        } else if (responseData.data && responseData.data.totalCount) {
-          newTotal = responseData.data.totalCount;
-          console.log('[AUTO-REFRESH] Found total in response.data.data.totalCount:', newTotal);
-        } else if (responseData.totalCount) {
-          newTotal = responseData.totalCount;
-          console.log('[AUTO-REFRESH] Found total in response.data.totalCount:', newTotal);
-        } else {
-          console.warn('[AUTO-REFRESH] Could not find total count in response, using 0');
-        }
-        
-        console.log(`[AUTO-REFRESH] Check: Current total: ${totalRef.current}, New total: ${newTotal}`);
-        
-        // Only update if the count has changed - fixed condition to trigger update properly
+        // First check: If count has changed, refresh the data
         if (newTotal !== totalRef.current) {
           console.log(`[AUTO-REFRESH] Order count changed from ${totalRef.current} to ${newTotal}, refreshing data`);
-          
-          // Force a refresh by dispatching the fetch action
-          try {
-            console.log('[AUTO-REFRESH] Dispatching fetchOrders action...');
-            await dispatch(fetchOrders(currentFilters)).unwrap();
-            console.log('[AUTO-REFRESH] Fetch completed successfully');
-          } catch (refreshError) {
-            console.error('[AUTO-REFRESH] Error refreshing orders:', refreshError);
-          }
-        } else {
-          console.log('[AUTO-REFRESH] No change in order count, skipping refresh');
+          dispatch(fetchOrders(currentFilters));
+          return;
         }
+        
+        // Second check: If we have an order in the response, compare with our cached version
+        if (fetchedOrder && orders.length > 0) {
+          // Find the corresponding order in our current state
+          const currentOrder = orders.find(o => o.id === fetchedOrder.id);
+          
+          if (currentOrder) {
+            // Compare relevant fields
+            const hasChanged = 
+              fetchedOrder.status !== currentOrder.status || 
+              fetchedOrder.cost !== currentOrder.cost ||
+              new Date(fetchedOrder.createdAt).getTime() !== new Date(currentOrder.createdAt).getTime() ||
+              (fetchedOrder.confirmedAt && currentOrder.confirmedAt && 
+               new Date(fetchedOrder.confirmedAt).getTime() !== new Date(currentOrder.confirmedAt).getTime());
+            
+            if (hasChanged) {
+              console.log('[AUTO-REFRESH] Order data has changed, refreshing list');
+              dispatch(fetchOrders(currentFilters));
+              return;
+            }
+          } else {
+            // If we couldn't find the order in our current state, refresh
+            console.log('[AUTO-REFRESH] New order detected, refreshing list');
+            dispatch(fetchOrders(currentFilters));
+            return;
+          }
+        }
+        
+        console.log('[AUTO-REFRESH] No changes detected, skipping refresh');
+        
       } catch (error) {
         console.error('[AUTO-REFRESH] Error during auto-refresh check:', error);
       } finally {
