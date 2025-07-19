@@ -13,6 +13,7 @@ import { useAppDispatch } from '../../../store/hooks';
 import { showError, showWarning, showSuccess, showInfo } from '../../../store/slices/notificationSlice';
 import axiosInstance from '../../../utils/axiosInstance';
 import { getCurrentLocation } from '../../../services/locationService';
+import { updateDistributorCustomerLocation } from '../../../store/slices/distributorCustomersSlice';
 
 interface StandaloneOrderCardProps {
   initialOrder: OrderList;
@@ -20,6 +21,12 @@ interface StandaloneOrderCardProps {
   onOrderChanged?: (orderId: number) => void;
 }
 
+/**
+ * StandaloneOrderCard - A component for displaying and managing individual orders
+ * 
+ * This component uses Redux actions from distributorCustomersSlice for customer data management
+ * and makes direct API calls for order-specific operations.
+ */
 const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: StandaloneOrderCardProps) => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
@@ -81,6 +88,9 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
       if (hasOrderChanged(updatedOrder, order)) {
         // Update local state
         setOrder(updatedOrder);
+        
+        // Update canConfirmOrder based on the new order data
+        setCanConfirmOrder(areAllRequiredFieldsFilled(updatedOrder));
         
         // Notify parent component
         if (onOrderChanged) {
@@ -242,8 +252,16 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
           coordinates: gpsLocation.coordinates
         };
         
-        // Update the location in the API
-        await axiosInstance.put(`/customers/${order.customer.id}/locations/${order.location.id}`, updatedLocation);
+        // Update the location using Redux action instead of direct API call
+        await dispatch(updateDistributorCustomerLocation({
+          customerId: order.customer.id,
+          locationId: order.location.id,
+          location: {
+            name: order.location.name,
+            coordinates: gpsLocation.coordinates,
+            address: order.location.address || ''
+          }
+        })).unwrap();
       }
 
       // Update order with new location
@@ -276,6 +294,9 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
       }
       
       if (onOrderChanged) onOrderChanged(order.id);
+      
+      // Show success message
+      dispatch(showSuccess({ message: 'تم تحديث الموقع بنجاح' }));
       
     } catch (error) {
       console.error('Error updating location:', error);
