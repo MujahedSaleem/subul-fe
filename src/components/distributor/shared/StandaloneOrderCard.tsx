@@ -32,10 +32,14 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState<number>(0);
   
+  // Add state to track if the order meets requirements for confirmation
+  const [canConfirmOrder, setCanConfirmOrder] = useState<boolean>(areAllRequiredFieldsFilled(initialOrder));
+  
   // Update local state if initialOrder changes (rarely happens)
   useEffect(() => {
     if (JSON.stringify(initialOrder) !== JSON.stringify(order)) {
       setOrder(initialOrder);
+      setCanConfirmOrder(areAllRequiredFieldsFilled(initialOrder));
     }
   }, [initialOrder]);
 
@@ -123,6 +127,24 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
     setCostInputValue(order.cost?.toString() || '');
   };
 
+  const handleCostInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    setCostInputValue(newValue);
+    
+    // Check in real-time if the order can be confirmed
+    const parsedCost = parseFloat(newValue);
+    const validCost = !isNaN(parsedCost) && parsedCost >= 0;
+    
+    // Create a temporary order object with the new cost to check if it can be confirmed
+    const tempOrder = {
+      ...order,
+      cost: validCost ? parsedCost : null
+    };
+    
+    // Update the canConfirmOrder state
+    setCanConfirmOrder(areAllRequiredFieldsFilled(tempOrder));
+  };
+
   const handleSaveCost = async () => {
     try {
       let newCost: number | null = null;
@@ -148,10 +170,15 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
       }
 
       // Optimistically update the local state first
-      setOrder(prev => ({
-        ...prev,
+      const updatedOrder = {
+        ...order,
         cost: newCost
-      }));
+      };
+      
+      setOrder(updatedOrder);
+      
+      // Update canConfirmOrder based on the new order state
+      setCanConfirmOrder(areAllRequiredFieldsFilled(updatedOrder));
       
       // Exit edit mode immediately to show the updated cost
       setIsEditingCost(false);
@@ -232,19 +259,21 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
 
       await axiosInstance.put(`/distributors/orders/${order.id}`, updatedOrderRequest);
       
-      // Update local state with new coordinates
-      setOrder(prev => {
-        if (prev.location) {
-          return {
-            ...prev,
-            location: {
-              ...prev.location,
-              coordinates: gpsLocation.coordinates
-            }
-          };
-        }
-        return prev;
-      });
+      // Update local state with new coordinates - ensure we maintain the correct types
+      if (order.location) {
+        const updatedOrder: OrderList = {
+          ...order,
+          location: {
+            ...order.location,
+            coordinates: gpsLocation.coordinates
+          }
+        };
+        
+        setOrder(updatedOrder);
+        
+        // Update canConfirmOrder based on the updated order
+        setCanConfirmOrder(areAllRequiredFieldsFilled(updatedOrder));
+      }
       
       if (onOrderChanged) onOrderChanged(order.id);
       
@@ -263,8 +292,8 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
         return;
       }
 
-      // Use comprehensive validation logic
-      if (!areAllRequiredFieldsFilled(order)) {
+      // Use the canConfirmOrder state for validation
+      if (!canConfirmOrder) {
         let missingFields = [];
         if (!order.customer?.name?.trim()) missingFields.push('اسم العميل');
         if (!order.customer?.phone?.trim()) missingFields.push('رقم الهاتف');
@@ -279,10 +308,13 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
         await axiosInstance.post(`/distributors/orders/${order.id}/confirm`);
         
         // Update local state
-        setOrder(prev => ({
-          ...prev,
+        const confirmedOrder = {
+          ...order,
           status: 'Confirmed'
-        }));
+        };
+        
+        setOrder(confirmedOrder);
+        setCanConfirmOrder(false); // Can't confirm an already confirmed order
         
         if (onOrderChanged) onOrderChanged(order.id!);
       }
@@ -486,7 +518,7 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
                   <input
                     type="number"
                     value={costInputValue}
-                    onChange={(e) => setCostInputValue(e.target.value)}
+                    onChange={handleCostInputChange}
                     onKeyDown={handleCostKeyPress}
                     onBlur={handleSaveCost}
                     className="w-full px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -542,14 +574,14 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
           <div className="mt-2">
             <Button
               className="w-full flex items-center justify-center gap-2"
-              color={areAllRequiredFieldsFilled(order) && order.status !== 'Confirmed' ? "amber" : "gray"}
+              color={canConfirmOrder && order.status !== 'Confirmed' ? "amber" : "gray"}
               size="sm"
               onClick={handleConfirmOrder}
-              disabled={order.status === 'Confirmed' || !areAllRequiredFieldsFilled(order)}
+              disabled={order.status === 'Confirmed' || !canConfirmOrder}
             >
               <FontAwesomeIcon icon={faCheckCircle} className="w-4 h-4" />
               {order.status === 'Confirmed' ? 'تم التأكيد' : 
-               areAllRequiredFieldsFilled(order) ? 'تأكيد الطلب' : 'بيانات ناقصة'}
+               canConfirmOrder ? 'تأكيد الطلب' : 'بيانات ناقصة'}
             </Button>
           </div>
         </div>
