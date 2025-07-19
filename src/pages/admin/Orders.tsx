@@ -13,11 +13,12 @@ import Pagination from '../../components/Pagination';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchOrders, deleteOrder, confirmOrder } from '../../store/slices/orderSlice';
 import { fetchDistributors, selectDistributors, selectIsLoading as selectDistributorsLoading } from '../../store/slices/distributorSlice';
-import { showSuccess, showError, showWarning } from '../../store/slices/notificationSlice';
+import { showSuccess, showError, showWarning, showInfo } from '../../store/slices/notificationSlice';
 import { RootState } from '../../store/store';
 import Loader from '../../components/admin/shared/Loader';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faSyncAlt } from '@fortawesome/free-solid-svg-icons';
+import axiosInstance from '../../utils/axiosInstance';
 
 interface FilterState {
   distributorId: string | null;
@@ -43,6 +44,7 @@ const Orders = () => {
   const [isCallModalOpen, setIsCallModalOpen] = useState(false);
   const [customerPhone, setCustomerPhone] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   const [filters, setFilters] = useState<FilterState>({
     distributorId: null,
@@ -53,9 +55,6 @@ const Orders = () => {
     pageSize: 10
   });
 
-  // Use ref to track if distributors have been fetched
-  const distributorsFetched = useRef(false);
-  
   // Memoize filter parameters to prevent unnecessary re-renders
   const filterParams = useMemo(() => ({
     page: filters.page,
@@ -65,6 +64,33 @@ const Orders = () => {
     dateFrom: filters.dateFrom || undefined,
     dateTo: filters.dateTo || undefined
   }), [filters.page, filters.pageSize, filters.distributorId, filters.status, filters.dateFrom, filters.dateTo]);
+
+  // Create a stable reference to the filterParams and other state
+  const stableFilterParamsRef = useRef(filterParams);
+  const totalRef = useRef(total);
+  const isLoadingRef = useRef(isLoading);
+  const isRefreshingRef = useRef(isRefreshing);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isFirstMount = useRef(true);
+  const distributorsFetched = useRef(false);
+  const lastRefreshTimeRef = useRef<number>(Date.now());
+  
+  // Update refs when values change
+  useEffect(() => {
+    stableFilterParamsRef.current = filterParams;
+  }, [filterParams]);
+  
+  useEffect(() => {
+    totalRef.current = total;
+  }, [total]);
+  
+  useEffect(() => {
+    isLoadingRef.current = isLoading;
+  }, [isLoading]);
+  
+  useEffect(() => {
+    isRefreshingRef.current = isRefreshing;
+  }, [isRefreshing]);
 
   // Handle force refresh when navigating from order creation
   useEffect(() => {
@@ -90,6 +116,157 @@ const Orders = () => {
     console.log('Fetching orders with filters:', filterParams);
     dispatch(fetchOrders(filterParams));
   }, [dispatch, filterParams]);
+
+  // Auto-refresh setup - only run once on mount
+  useEffect(() => {
+    console.log('[AUTO-REFRESH] Setting up auto-refresh on component mount');
+    
+    // Function to check for new orders without causing re-renders
+    const checkForNewOrders = async () => {
+      if (isLoadingRef.current) {
+        console.log('[AUTO-REFRESH] Already loading data, skipping refresh check');
+        return;
+      }
+      
+      if (isRefreshingRef.current) {
+        console.log('[AUTO-REFRESH] Already refreshing, skipping refresh check');
+        return;
+      }
+      
+      const timestamp = new Date().toLocaleTimeString();
+      console.log(`[AUTO-REFRESH ${timestamp}] Running auto-refresh check...`);
+      
+      try {
+        setIsRefreshing(true);
+        
+        // Use the current filters from the ref
+        const currentFilters = stableFilterParamsRef.current;
+        
+        // Build query params - only request minimal data for efficiency
+        const params = new URLSearchParams();
+        params.append('page', '1');
+        params.append('pageSize', '1');
+        if (currentFilters.distributorId) params.append('distributorId', currentFilters.distributorId);
+        if (currentFilters.status) params.append('status', currentFilters.status);
+        if (currentFilters.dateFrom) params.append('dateFrom', currentFilters.dateFrom);
+        if (currentFilters.dateTo) params.append('dateTo', currentFilters.dateTo);
+        
+        // Make a lightweight request just to get the total count
+        console.log('[AUTO-REFRESH] Making API request to check order count...');
+        const response = await axiosInstance.get(`/orders?${params.toString()}`);
+        
+        // Log the full response structure to understand it better
+        console.log('[AUTO-REFRESH] API response structure:', JSON.stringify(response.data, null, 2));
+        
+        // Safely extract the total count from the response
+        const responseData = response.data;
+        
+        // Try multiple paths to find the total count
+        let newTotal = 0;
+        if (responseData.data && typeof responseData.data.total === 'number') {
+          newTotal = responseData.data.total;
+          console.log('[AUTO-REFRESH] Found total in response.data.data.total:', newTotal);
+        } else if (typeof responseData.total === 'number') {
+          newTotal = responseData.total;
+          console.log('[AUTO-REFRESH] Found total in response.data.total:', newTotal);
+        } else if (responseData.data && responseData.data.totalCount) {
+          newTotal = responseData.data.totalCount;
+          console.log('[AUTO-REFRESH] Found total in response.data.data.totalCount:', newTotal);
+        } else if (responseData.totalCount) {
+          newTotal = responseData.totalCount;
+          console.log('[AUTO-REFRESH] Found total in response.data.totalCount:', newTotal);
+        } else {
+          console.warn('[AUTO-REFRESH] Could not find total count in response, using 0');
+        }
+        
+        console.log(`[AUTO-REFRESH] Check: Current total: ${totalRef.current}, New total: ${newTotal}`);
+        
+        // Only update if the count has changed - fixed condition to trigger update properly
+        if (newTotal !== totalRef.current) {
+          console.log(`[AUTO-REFRESH] Order count changed from ${totalRef.current} to ${newTotal}, refreshing data`);
+          
+          // Force a refresh by dispatching the fetch action
+          try {
+            console.log('[AUTO-REFRESH] Dispatching fetchOrders action...');
+            await dispatch(fetchOrders(currentFilters)).unwrap();
+            console.log('[AUTO-REFRESH] Fetch completed successfully');
+          } catch (refreshError) {
+            console.error('[AUTO-REFRESH] Error refreshing orders:', refreshError);
+          }
+        } else {
+          console.log('[AUTO-REFRESH] No change in order count, skipping refresh');
+        }
+      } catch (error) {
+        console.error('[AUTO-REFRESH] Error during auto-refresh check:', error);
+      } finally {
+        setIsRefreshing(false);
+      }
+    };
+    
+    // Clear any existing interval first
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+    
+    // Run once immediately on first mount
+    if (isFirstMount.current) {
+      console.log('[AUTO-REFRESH] First mount, running initial check');
+      isFirstMount.current = false;
+      checkForNewOrders();
+    }
+    
+    // Set up the interval
+    const checkInterval = 5000; // 5 seconds
+    console.log(`[AUTO-REFRESH] Starting interval (${checkInterval}ms)`);
+    intervalRef.current = setInterval(checkForNewOrders, checkInterval);
+    
+    // Clean up on unmount
+    return () => {
+      console.log('[AUTO-REFRESH] Component unmounting, clearing interval');
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, []); // Empty dependency array - only run once on mount
+
+  // Manual refresh handler
+  const handleManualRefresh = useCallback(async () => {
+    if (isLoading) {
+      console.log('[MANUAL-REFRESH] Already loading data, skipping manual refresh');
+      return;
+    }
+    
+    if (isRefreshing) {
+      console.log('[MANUAL-REFRESH] Already refreshing, skipping manual refresh');
+      return;
+    }
+    
+    // Throttle manual refreshes (minimum 2 seconds between refreshes)
+    const now = Date.now();
+    if (now - lastRefreshTimeRef.current < 2000) {
+      console.log('[MANUAL-REFRESH] Manual refresh throttled (too soon)');
+      dispatch(showInfo({ message: 'يرجى الانتظار قبل التحديث مرة أخرى', duration: 2000 }));
+      return;
+    }
+    
+    console.log(`[MANUAL-REFRESH] Manual refresh triggered at ${new Date().toLocaleTimeString()}`);
+    lastRefreshTimeRef.current = now;
+    setIsRefreshing(true);
+    
+    try {
+      console.log('[MANUAL-REFRESH] Dispatching fetchOrders action...');
+      await dispatch(fetchOrders(filterParams)).unwrap();
+      console.log('[MANUAL-REFRESH] Fetch completed successfully');
+      dispatch(showSuccess({ message: 'تم تحديث الطلبات', duration: 2000 }));
+    } catch (error) {
+      console.error('[MANUAL-REFRESH] Error during manual refresh:', error);
+      dispatch(showError({ message: 'فشل في تحديث الطلبات', duration: 2000 }));
+    } finally {
+      console.log('[MANUAL-REFRESH] Manual refresh completed');
+      setIsRefreshing(false);
+    }
+  }, [dispatch, filterParams, isLoading, isRefreshing]);
 
   const handleDelete = useCallback(async (id: number) => {
     if (window.confirm('Are you sure you want to delete this order?')) {
@@ -250,81 +427,122 @@ const Orders = () => {
               <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
                 الطلبات
               </h1>
-              <p className="text-sm text-gray-600">
-                إدارة الطلبات وإضافة طلبات جديدة
-              </p>
+              <p className="text-gray-500">إدارة وعرض جميع الطلبات</p>
             </div>
-            {/* Add Button Section */}
-            <div className="flex w-full shrink-0 gap-2 md:w-max">
-              <button 
-                onClick={() => navigate('/admin/orders/add')} 
-                className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg transition-colors font-medium whitespace-nowrap"
-              >
-                <FontAwesomeIcon icon={faPlus} />
-                <span className="hidden sm:inline">إضافة طلب</span>
-                <span className="sm:hidden">إضافة</span>
-              </button>
+            
+            {/* Actions Section */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={() => navigate('/admin/orders/add')}
+                >
+                  <FontAwesomeIcon icon={faPlus} className="mr-1" />
+                  إضافة طلب
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="md"
+                  onClick={handleManualRefresh}
+                  disabled={isLoading || isRefreshing}
+                >
+                  <FontAwesomeIcon 
+                    icon={faSyncAlt} 
+                    className={`mr-1 ${isRefreshing ? 'animate-spin' : ''}`} 
+                  />
+                  تحديث
+                </Button>
+              </div>
+              <div>
+                <Button
+                  variant="tertiary"
+                  size="md"
+                  onClick={() => setShowFilters(!showFilters)}
+                >
+                  {showFilters ? 'إخفاء الفلاتر' : 'عرض الفلاتر'}
+                </Button>
+              </div>
             </div>
+            
+            {/* Filters Section */}
+            {showFilters && (
+              <OrderFilter
+                showFilters={showFilters}
+                setShowFilters={setShowFilters}
+                selectedDistributor={filters.distributorId}
+                setSelectedDistributor={handleDistributorChange}
+                selectedStatus={filters.status}
+                setSelectedStatus={handleStatusChange}
+                dateFrom={filters.dateFrom}
+                setDateFrom={handleDateFromChange}
+                dateTo={filters.dateTo}
+                setDateTo={handleDateToChange}
+                resetFilters={resetFilters}
+                activeDistributors={activeDistributors}
+              />
+            )}
           </div>
         </CardHeader>
-
         <CardBody 
-          className="p-6" 
+          className="p-0 overflow-auto"
           placeholder={undefined}
           onPointerEnterCapture={() => {}}
           onPointerLeaveCapture={() => {}}
         >
-          <div className="space-y-6">
-            <OrderFilter
-              showFilters={showFilters}
-              setShowFilters={setShowFilters}
-              selectedDistributor={filters.distributorId}
-              setSelectedDistributor={handleDistributorChange}
-              selectedStatus={filters.status}
-              setSelectedStatus={handleStatusChange}
-              dateFrom={filters.dateFrom}
-              setDateFrom={handleDateFromChange}
-              dateTo={filters.dateTo}
-              setDateTo={handleDateToChange}
-              resetFilters={resetFilters}
-              activeDistributors={activeDistributors}
-              currentPage={filters.page}
-              pageSize={filters.pageSize}
-            />
-
-            {isLoading ? (
-              <div className="text-center py-8">
-                <Loader />
-              </div>
-            ) : error ? (
-              <div className="text-center py-8 text-red-500">
+          {isLoading ? (
+            <div className="flex justify-center items-center h-64">
+              <Loader />
+            </div>
+          ) : error ? (
+            <div className="text-center p-6 text-red-500">
+              <Typography 
+                variant="h6" 
+                color="red"
+                placeholder={undefined}
+                onPointerEnterCapture={() => {}}
+                onPointerLeaveCapture={() => {}}
+              >
                 {error}
-              </div>
-            ) : (
-              <>
-                <OrderTable 
-                  orders={orders}
-                  handleDelete={handleDelete}
-                  handleConfirmOrder={handleConfirmOrder}
-                  handleCallCustomer={handleCallCustomer}
-                  handleOpenLocation={handleOpenLocation}
-                  formatDate={formatDate}
-                  formatCurrency={formatCurrency}
-                />
+              </Typography>
+            </div>
+          ) : orders.length === 0 ? (
+            <div className="text-center p-6">
+              <Typography 
+                variant="h6" 
+                color="blue-gray"
+                placeholder={undefined}
+                onPointerEnterCapture={() => {}}
+                onPointerLeaveCapture={() => {}}
+              >
+                لا توجد طلبات متاحة
+              </Typography>
+            </div>
+          ) : (
+            <>
+              <OrderTable
+                orders={orders}
+                handleDelete={handleDelete}
+                handleConfirmOrder={handleConfirmOrder}
+                handleCallCustomer={handleCallCustomer}
+                handleOpenLocation={handleOpenLocation}
+                formatDate={formatDate}
+                formatCurrency={formatCurrency}
+              />
+              <div className="p-4">
                 <Pagination
                   currentPage={page}
                   totalPages={totalPages}
-                  pageSize={pageSize}
-                  totalItems={total}
                   onPageChange={handlePageChange}
+                  pageSize={pageSize}
                   onPageSizeChange={handlePageSizeChange}
+                  totalItems={total}
                 />
-              </>
-            )}
-          </div>
+              </div>
+            </>
+          )}
         </CardBody>
       </Card>
-
       <CallModal
         isOpen={isCallModalOpen}
         onClose={() => setIsCallModalOpen(false)}
