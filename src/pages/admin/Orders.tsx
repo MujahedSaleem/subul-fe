@@ -35,7 +35,7 @@ const Orders = () => {
   const dispatch = useAppDispatch();
   
   // Orders state
-  const { orders, total, page, pageSize, totalPages, isLoading, error } = useAppSelector((state: RootState) => state.orders);
+  const { orders, total, page: reduxPage, pageSize: reduxPageSize, totalPages, isLoading, error } = useAppSelector((state: RootState) => state.orders);
   
   // Distributors state
   const distributors = useAppSelector(selectDistributors);
@@ -65,32 +65,29 @@ const Orders = () => {
     dateTo: filters.dateTo || undefined
   }), [filters.page, filters.pageSize, filters.distributorId, filters.status, filters.dateFrom, filters.dateTo]);
 
-  // Create a stable reference to the filterParams and other state
+  // Create a stable reference to the filterParams
   const stableFilterParamsRef = useRef(filterParams);
-  const totalRef = useRef(total);
-  const isLoadingRef = useRef(isLoading);
-  const isRefreshingRef = useRef(isRefreshing);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const isFirstMount = useRef(true);
-  const distributorsFetched = useRef(false);
   const lastRefreshTimeRef = useRef<number>(Date.now());
+  const distributorsFetched = useRef(false);
   
   // Update refs when values change
   useEffect(() => {
     stableFilterParamsRef.current = filterParams;
   }, [filterParams]);
   
+  // Debug current state
   useEffect(() => {
-    totalRef.current = total;
-  }, [total]);
-  
-  useEffect(() => {
-    isLoadingRef.current = isLoading;
-  }, [isLoading]);
-  
-  useEffect(() => {
-    isRefreshingRef.current = isRefreshing;
-  }, [isRefreshing]);
+    console.log("Orders.tsx - Current pagination state:", {
+      filterPage: filters.page,
+      reduxPage,
+      totalPages,
+      filterPageSize: filters.pageSize,
+      reduxPageSize,
+      totalItems: total,
+      canGoPrevious: filters.page > 1,
+      canGoNext: filters.page < totalPages
+    });
+  }, [filters.page, reduxPage, totalPages, filters.pageSize, reduxPageSize, total]);
 
   // Handle force refresh when navigating from order creation
   useEffect(() => {
@@ -116,118 +113,6 @@ const Orders = () => {
     console.log('Fetching orders with filters:', filterParams);
     dispatch(fetchOrders(filterParams));
   }, [dispatch, filterParams]);
-
-  // Auto-refresh setup - only run once on mount
-  useEffect(() => {
-    console.log('[AUTO-REFRESH] Setting up auto-refresh on component mount');
-    
-    // Function to check for new orders without causing re-renders
-    const checkForNewOrders = async () => {
-      if (isLoadingRef.current) {
-        console.log('[AUTO-REFRESH] Already loading data, skipping refresh check');
-        return;
-      }
-      
-      if (isRefreshingRef.current) {
-        console.log('[AUTO-REFRESH] Already refreshing, skipping refresh check');
-        return;
-      }
-      
-      const timestamp = new Date().toLocaleTimeString();
-      console.log(`[AUTO-REFRESH ${timestamp}] Running auto-refresh check...`);
-      
-      try {
-        setIsRefreshing(true);
-        
-        // Use the current filters from the ref
-        const currentFilters = stableFilterParamsRef.current;
-        
-        // Build query params - only request minimal data for efficiency
-        const params = new URLSearchParams();
-        params.append('page', '1');
-        params.append('pageSize', '1');
-        
-        // Make a lightweight request to get the first item and total count
-        console.log('[AUTO-REFRESH] Making API request to check orders...');
-        const response = await axiosInstance.get(`/orders?${params.toString()}`);
-        
-        // Extract data from response
-        const responseData = response.data.data || response.data;
-        const newTotal = responseData.total || responseData.totalCount || 0;
-        const fetchedItems = responseData.orders || responseData.items || [];
-        const fetchedOrder = fetchedItems[0];
-        
-        console.log(`[AUTO-REFRESH] Current total: ${totalRef.current}, New total: ${newTotal}`);
-        
-        // First check: If count has changed, refresh the data
-        if (newTotal !== totalRef.current) {
-          console.log(`[AUTO-REFRESH] Order count changed from ${totalRef.current} to ${newTotal}, refreshing data`);
-          dispatch(fetchOrders(currentFilters));
-          return;
-        }
-        
-        // Second check: If we have an order in the response, compare with our cached version
-        if (fetchedOrder && orders.length > 0) {
-          // Find the corresponding order in our current state
-          const currentOrder = orders.find(o => o.id === fetchedOrder.id);
-          
-          if (currentOrder) {
-            // Compare relevant fields
-            const hasChanged = 
-              fetchedOrder.status !== currentOrder.status || 
-              fetchedOrder.cost !== currentOrder.cost ||
-              new Date(fetchedOrder.createdAt).getTime() !== new Date(currentOrder.createdAt).getTime() ||
-              (fetchedOrder.confirmedAt && currentOrder.confirmedAt && 
-               new Date(fetchedOrder.confirmedAt).getTime() !== new Date(currentOrder.confirmedAt).getTime());
-            
-            if (hasChanged) {
-              console.log('[AUTO-REFRESH] Order data has changed, refreshing list');
-              dispatch(fetchOrders(currentFilters));
-              return;
-            }
-          } else {
-            // If we couldn't find the order in our current state, refresh
-            console.log('[AUTO-REFRESH] New order detected, refreshing list');
-            dispatch(fetchOrders(currentFilters));
-            return;
-          }
-        }
-        
-        console.log('[AUTO-REFRESH] No changes detected, skipping refresh');
-        
-      } catch (error) {
-        console.error('[AUTO-REFRESH] Error during auto-refresh check:', error);
-      } finally {
-        setIsRefreshing(false);
-      }
-    };
-    
-    // Clear any existing interval first
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-    }
-    
-    // Run once immediately on first mount
-    if (isFirstMount.current) {
-      console.log('[AUTO-REFRESH] First mount, running initial check');
-      isFirstMount.current = false;
-      checkForNewOrders();
-    }
-    
-    // Set up the interval
-    const checkInterval = 5000; // 5 seconds
-    console.log(`[AUTO-REFRESH] Starting interval (${checkInterval}ms)`);
-    intervalRef.current = setInterval(checkForNewOrders, checkInterval);
-    
-    // Clean up on unmount
-    return () => {
-      console.log('[AUTO-REFRESH] Component unmounting, clearing interval');
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    };
-  }, []); // Empty dependency array - only run once on mount
 
   // Manual refresh handler
   const handleManualRefresh = useCallback(async () => {
@@ -349,19 +234,21 @@ const Orders = () => {
   }, []);
 
   const handlePageChange = useCallback((newPage: number) => {
+    console.log(`Changing page from ${filters.page} to ${newPage}`);
     setFilters(prev => ({
       ...prev,
       page: newPage
     }));
-  }, []);
+  }, [filters.page]);
 
   const handlePageSizeChange = useCallback((newPageSize: number) => {
+    console.log(`Changing page size from ${filters.pageSize} to ${newPageSize}`);
     setFilters(prev => ({
       ...prev,
       pageSize: newPageSize,
       page: 1
     }));
-  }, []);
+  }, [filters.pageSize]);
 
   const handleCallCustomer = useCallback((customer: Customer) => {
     if (customer?.phone) {
@@ -530,10 +417,10 @@ const Orders = () => {
               />
               <div className="p-4">
                 <Pagination
-                  currentPage={page}
+                  currentPage={filters.page}
                   totalPages={totalPages}
                   onPageChange={handlePageChange}
-                  pageSize={pageSize}
+                  pageSize={filters.pageSize}
                   onPageSizeChange={handlePageSizeChange}
                   totalItems={total}
                 />

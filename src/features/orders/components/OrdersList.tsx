@@ -1,12 +1,12 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { faPlus } from '@fortawesome/free-solid-svg-icons';
 import { OrderList } from '../../../types/order';
 import { Customer, Location as CustomerLocation } from '../../../types/customer';
-import { Distributor } from '../../../types/distributor';
 import PageLayout from '../../../components/admin/shared/PageLayout';
 import OrderFilter from '../../../components/OrderFilters';
 import OrderTable from '../../../components/OrderTable';
+import Pagination from '../../../components/Pagination';
 import { useAppDispatch, useAppSelector } from '../../../store/hooks';
 import { fetchOrders, deleteOrder, confirmOrder } from '../../../store/slices/orderSlice';
 import { fetchActiveDistributors, selectActiveDistributors, selectIsLoading as selectDistributorsLoading } from '../../../store/slices/distributorSlice';
@@ -16,22 +16,58 @@ import { RootState } from '../../../store/store';
 const OrdersList: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
-  const [showFilters, setShowFilters] = React.useState(false);
-  const [selectedDistributor, setSelectedDistributor] = React.useState<string | null>(null);
-  const [selectedStatus, setSelectedStatus] = React.useState<string | null>(null);
-  const [dateFrom, setDateFrom] = React.useState('');
-  const [dateTo, setDateTo] = React.useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedDistributor, setSelectedDistributor] = useState<string | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Redux selectors
-  const orders = useAppSelector((state: RootState) => state.orders.orders);
-  const isLoading = useAppSelector((state: RootState) => state.orders.isLoading);
-  const error = useAppSelector((state: RootState) => state.orders.error);
+  const { orders, total, page: reduxPage, pageSize: reduxPageSize, totalPages, isLoading, error } = useAppSelector((state: RootState) => state.orders);
   const activeDistributors = useAppSelector(selectActiveDistributors);
   const distributorsLoading = useAppSelector(selectDistributorsLoading);
 
-  React.useEffect(() => {
-    // Fetch orders and active distributors
-    dispatch(fetchOrders({}));
+  // Sync local state with Redux state when Redux state changes
+  useEffect(() => {
+    console.log('reduxPage', reduxPage);
+    console.log('page', page);
+    if (reduxPage !== page) {
+      setPage(reduxPage);
+    }
+    if (reduxPageSize !== pageSize) {
+      setPageSize(reduxPageSize);
+    }
+  }, [reduxPage, reduxPageSize]);
+
+  useEffect(() => {
+    // Log the current pagination state for debugging
+    console.log('OrdersList pagination state:', {
+      localPage: page,
+      reduxPage,
+      totalPages,
+      localPageSize: pageSize,
+      reduxPageSize,
+      totalItems: total,
+    });
+
+    // Create filters object from state
+    const filters = {
+      page,
+      pageSize,
+      distributorId: selectedDistributor,
+      status: selectedStatus,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined
+    };
+
+    // Fetch orders with filters
+    dispatch(fetchOrders(filters));
+  }, [dispatch, page, pageSize, selectedDistributor, selectedStatus, dateFrom, dateTo]);
+
+  // Fetch distributors only once on component mount
+  useEffect(() => {
     dispatch(fetchActiveDistributors());
   }, [dispatch]);
 
@@ -44,7 +80,14 @@ const OrdersList: React.FC = () => {
       try {
         await dispatch(deleteOrder(id.toString())).unwrap();
         // Refresh orders after deletion
-        dispatch(fetchOrders({}));
+        dispatch(fetchOrders({
+          page,
+          pageSize,
+          distributorId: selectedDistributor,
+          status: selectedStatus,
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined
+        }));
         dispatch(showSuccess({ message: 'تم حذف الطلب بنجاح' }));
       } catch (error: any) {
         console.error('Failed to delete order:', error);
@@ -69,7 +112,14 @@ const OrdersList: React.FC = () => {
       try {
         await dispatch(confirmOrder(order.id)).unwrap();
         // Refresh orders after confirmation
-        dispatch(fetchOrders({}));
+        dispatch(fetchOrders({
+          page,
+          pageSize,
+          distributorId: selectedDistributor,
+          status: selectedStatus,
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined
+        }));
         dispatch(showSuccess({ message: 'تم تأكيد الطلب بنجاح' }));
       } catch (error: any) {
         console.error('Failed to confirm order:', error);
@@ -124,6 +174,18 @@ const OrdersList: React.FC = () => {
     setSelectedStatus(null);
     setDateFrom('');
     setDateTo('');
+    setPage(1);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    console.log(`Changing page from ${page} to ${newPage}`);
+    setPage(newPage);
+  };
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    console.log(`Changing page size from ${pageSize} to ${newPageSize}`);
+    setPageSize(newPageSize);
+    setPage(1);
   };
 
   const actions = [
@@ -159,16 +221,33 @@ const OrdersList: React.FC = () => {
           <div className="text-center py-8 text-red-500">
             حدث خطأ أثناء تحميل البيانات: {error}
           </div>
+        ) : orders.length === 0 ? (
+          <div className="text-center py-8">
+            لا توجد طلبات متاحة
+          </div>
         ) : (
-          <OrderTable 
-            orders={orders || []}
-            handleDelete={handleDelete}
-            handleConfirmOrder={handleConfirmOrder}
-            handleCallCustomer={handleCallCustomer}
-            handleOpenLocation={handleOpenLocation}
-            formatDate={formatDate}
-            formatCurrency={formatCurrency}
-          />
+          <>
+            <OrderTable 
+              orders={orders || []}
+              handleDelete={handleDelete}
+              handleConfirmOrder={handleConfirmOrder}
+              handleCallCustomer={handleCallCustomer}
+              handleOpenLocation={handleOpenLocation}
+              formatDate={formatDate}
+              formatCurrency={formatCurrency}
+            />
+            
+            <div className="p-4">
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                pageSize={pageSize}
+                onPageSizeChange={handlePageSizeChange}
+                totalItems={total}
+              />
+            </div>
+          </>
         )}
       </div>
     </PageLayout>
