@@ -4,7 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faDownload, faSyncAlt, faRedo } from '@fortawesome/free-solid-svg-icons';
 import { useAppDispatch } from '../store/hooks';
 import { showSuccess, showError } from '../store/slices/notificationSlice';
-import * as serviceWorkerRegistration from '../serviceWorkerRegistration';
+import { useRegisterSW, setUpdateFunction } from '../serviceWorkerRegistration';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -19,7 +19,6 @@ interface SafariNavigator extends Navigator {
 const PWAInstallPrompt: React.FC = () => {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
-  const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
   const dispatch = useAppDispatch();
@@ -30,6 +29,40 @@ const PWAInstallPrompt: React.FC = () => {
                       (window.navigator as SafariNavigator).standalone === true;
     return standalone;
   };
+
+  // Use the React hook from Vite PWA
+  const {
+    offlineReady: [offlineReady, setOfflineReady],
+    needRefresh: [needRefresh, setNeedRefresh],
+    updateServiceWorker
+  } = useRegisterSW({
+    immediate: true,
+    onRegistered(registration) {
+      console.log('[PWA] Service worker registered');
+    },
+    onRegisteredSW(swUrl) {
+      console.log(`[PWA] Service worker registered at: ${swUrl}`);
+    },
+    onOfflineReady() {
+      // App ready to work offline
+      dispatch(showSuccess({ 
+        message: 'التطبيق جاهز للعمل بدون اتصال بالإنترنت',
+        duration: 3000
+      }));
+    },
+    onNeedRefresh() {
+      // New content available
+      console.log('[PWA] New content available');
+    },
+    onRegisterError(error) {
+      console.error('[PWA] Error registering service worker:', error);
+    }
+  });
+
+  // Make the update function available globally for non-React components
+  useEffect(() => {
+    setUpdateFunction(updateServiceWorker);
+  }, [updateServiceWorker]);
 
   useEffect(() => {
     // Set initial states
@@ -66,19 +99,16 @@ const PWAInstallPrompt: React.FC = () => {
     
     standaloneMediaQuery.addEventListener('change', handleStandaloneChange);
 
-    // Listen for update event from Vite PWA plugin
-    const refreshCallback = () => {
-      setIsUpdateAvailable(true);
-    };
-    
-    document.addEventListener('vite-pwa:update-available', refreshCallback);
+    // Auto-update for mobile/standalone without prompting
+    if (needRefresh && (isMobile || standalone)) {
+      updateServiceWorker(true);
+    }
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       standaloneMediaQuery.removeEventListener('change', handleStandaloneChange);
-      document.removeEventListener('vite-pwa:update-available', refreshCallback);
     };
-  }, [dispatch]);
+  }, [dispatch, needRefresh, isMobile, updateServiceWorker]);
 
   const handleInstallClick = async () => {
     if (!installPrompt) return;
@@ -100,26 +130,20 @@ const PWAInstallPrompt: React.FC = () => {
 
   const handleUpdateClick = () => {
     dispatch(showSuccess({ message: 'جاري تحديث التطبيق...', duration: 3000 }));
-    setTimeout(() => {
-      serviceWorkerRegistration.forceClearCacheAndReload();
-    }, 1000);
+    // Use the updateServiceWorker from the hook
+    updateServiceWorker(true);
+    setNeedRefresh(false);
+  };
+
+  const handleClosePrompt = () => {
+    setOfflineReady(false);
+    setNeedRefresh(false);
   };
 
   const handleForceRefreshClick = () => {
     dispatch(showSuccess({ message: 'جاري تحديث التطبيق بالكامل...', duration: 3000 }));
-    serviceWorkerRegistration.forceClearCacheAndReload();
-  };
-
-  const handleCheckUpdatesClick = async () => {
-    dispatch(showSuccess({ message: 'جاري التحقق من وجود تحديثات...', duration: 3000 }));
-    const hasUpdate = await serviceWorkerRegistration.checkForUpdates();
-    
-    if (!hasUpdate) {
-      dispatch(showSuccess({ 
-        message: 'أنت تستخدم أحدث إصدار من التطبيق', 
-        duration: 3000 
-      }));
-    }
+    updateServiceWorker(true);
+    setNeedRefresh(false);
   };
 
   // For standalone mode, don't show any UI
@@ -127,13 +151,9 @@ const PWAInstallPrompt: React.FC = () => {
     return null;
   }
 
-  // Don't render anything if the app is installed and no updates are available
-  if (isInstalled && !isUpdateAvailable && !installPrompt && !isMobile) {
-    return null;
-  }
-
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+      {/* PWA Install Button */}
       {!isInstalled && installPrompt && (
         <Button
           size="sm"
@@ -148,7 +168,8 @@ const PWAInstallPrompt: React.FC = () => {
         </Button>
       )}
       
-      {isUpdateAvailable && (
+      {/* Update Available Button */}
+      {needRefresh && !isStandalone && (
         <Button
           size="sm"
           className="flex items-center gap-2 bg-green-500 shadow-lg animate-pulse"
@@ -162,6 +183,7 @@ const PWAInstallPrompt: React.FC = () => {
         </Button>
       )}
       
+      {/* Force Refresh Button (Mobile Only) */}
       {isMobile && !isStandalone && (
         <Button
           size="sm"
@@ -176,18 +198,21 @@ const PWAInstallPrompt: React.FC = () => {
         </Button>
       )}
       
-      {(isInstalled || isMobile) && !isUpdateAvailable && !isStandalone && (
-        <Button
-          size="sm"
-          className="flex items-center gap-2 bg-gray-500 shadow-lg opacity-80 hover:opacity-100"
-          onClick={handleCheckUpdatesClick}
-          placeholder=""
-          onPointerEnterCapture={null}
-          onPointerLeaveCapture={null}
-        >
-          <FontAwesomeIcon icon={faSyncAlt} className="h-4 w-4" />
-          التحقق من التحديثات
-        </Button>
+      {/* Offline Ready Toast */}
+      {offlineReady && (
+        <div className="fixed bottom-4 right-4 bg-white p-4 rounded shadow-lg border border-gray-200">
+          <div className="mb-2">التطبيق جاهز للعمل بدون اتصال بالإنترنت</div>
+          <Button
+            size="sm"
+            className="bg-gray-500"
+            onClick={handleClosePrompt}
+            placeholder=""
+            onPointerEnterCapture={null}
+            onPointerLeaveCapture={null}
+          >
+            إغلاق
+          </Button>
+        </div>
       )}
     </div>
   );
