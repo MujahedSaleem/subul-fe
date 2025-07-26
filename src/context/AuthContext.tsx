@@ -183,59 +183,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const userType = decodedToken.role;
       localStorage.setItem('userType', userType);
 
-      // Radical approach - completely unregister the service worker on login
+      // Simple approach: unregister service worker on login
       if ('serviceWorker' in navigator) {
-        console.log('[Auth] Unregistering service workers after login');
-        
-        // Force a clean load by disabling the service worker completely
-        try {
-          const registrations = await navigator.serviceWorker.getRegistrations();
+        console.log('[Auth] Unregistering service workers on login');
+        navigator.serviceWorker.getRegistrations().then(async (registrations) => {
+          // If we have any service workers, unregister them
           if (registrations.length > 0) {
             for (const registration of registrations) {
               await registration.unregister();
-              console.log('[Auth] Service worker unregistered');
             }
+            console.log('[Auth] Service workers unregistered');
             
-            // Clear all caches
+            // Clear caches after login
             if ('caches' in window) {
-              const cacheKeys = await caches.keys();
-              await Promise.all(
-                cacheKeys.map(key => caches.delete(key))
-              );
-              console.log('[Auth] All caches cleared');
+              try {
+                const keys = await caches.keys();
+                await Promise.all(keys.map(key => caches.delete(key)));
+                console.log('[Auth] All caches cleared');
+              } catch (err) {
+                console.error('[Auth] Error clearing caches:', err);
+              }
             }
             
-            // Flag for a reload after authentication redirects
+            // Set flag to reload after redirect
             sessionStorage.setItem('forceReloadAfterAuth', 'true');
           }
-        } catch (err) {
-          console.error('[Auth] Error handling service worker:', err);
-        }
+        }).catch(err => {
+          console.error('[Auth] Error unregistering service worker:', err);
+        });
       }
 
-      // Update the authentication state
+      // Update authentication state
       setIsAuthenticated(true);
       setUserType(userType);
-
-      // Set navigation target path
-      const targetPath = userType === 'Admin' ? '/admin' : '/distributor/orders';
-      
-      // Remove any saved route to start fresh
-      localStorage.removeItem('subul-current-route');
-      
-      // Pre-fetch the target route to warm the cache (especially for mobile)
-      try {
-        await fetch(targetPath, { 
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`
-          },
-          cache: 'no-store'
-        });
-        console.log('[Auth] Target route pre-fetched:', targetPath);
-      } catch (err) {
-        console.error('[Auth] Error pre-fetching route:', err);
-      }
 
     } catch (error: any) {
       console.error('Login failed:', error);

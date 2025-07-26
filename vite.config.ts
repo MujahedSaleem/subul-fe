@@ -40,15 +40,16 @@ export default defineConfig(({ mode }) => {
           ]
         },
         workbox: {
-          // Never cache the API calls
-          navigateFallbackDenylist: [/^\/api\//],
+          // Never cache the API calls or authenticated routes
+          navigateFallbackDenylist: [/^\/api\//, /^\/admin\//, /^\/distributor\//],
           
-          // Don't precache authenticated routes
-          globIgnores: ['**/admin/**/*', '**/distributor/**/*'],
+          // Skip service worker registration after login
+          skipWaiting: true,
+          clientsClaim: true,
           
-          // Don't allow runtime caching for authenticated routes
+          // Disable runtime caching for authenticated routes
           runtimeCaching: [
-            // Only cache the root index.html and non-authenticated pages
+            // Only cache the root and login pages
             {
               urlPattern: /\/$/,
               handler: 'NetworkFirst',
@@ -119,12 +120,6 @@ export default defineConfig(({ mode }) => {
             }
           ]
         },
-        // Don't try to cache authenticated pages
-        strategies: 'injectManifest',
-        srcDir: 'src',
-        filename: 'sw.js',
-        minify: true,
-        injectRegister: 'auto',
         // Disable service worker in development
         devOptions: {
           enabled: false,
