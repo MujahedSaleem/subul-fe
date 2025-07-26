@@ -37,6 +37,9 @@ if ('serviceWorker' in navigator) {
   // Detect login-related page loads
   if (window.location.pathname === '/login') {
     console.log('[Main] Login page detected, ensuring clean state');
+    localStorage.clear();
+    sessionStorage.clear();
+
     // Unregister any service workers on the login page to ensure clean state
     navigator.serviceWorker.getRegistrations().then(registrations => {
       if (registrations.length > 0) {
