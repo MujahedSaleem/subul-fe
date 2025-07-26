@@ -24,6 +24,11 @@ import { Provider } from "react-redux";
 import { store } from "./store/store";
 import { AuthProvider } from "./context/AuthContext";
 
+// Detect if the client is a mobile device
+const isMobileDevice = (): boolean => {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+};
+
 // ✅ Authentication & Role-Based Access
 
 // ✅ Protected Route Component
@@ -76,6 +81,24 @@ function App() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [isAuthenticated, navigate, location.pathname]);
+
+  // Special handling for mobile devices after login
+  useEffect(() => {
+    // If this is a mobile device and we just logged in
+    if (isMobileDevice() && isAuthenticated && location.pathname !== '/login') {
+      const needsReload = sessionStorage.getItem('postLoginReload');
+      
+      if (needsReload === 'true') {
+        console.log('[App] Post-login navigation on mobile, reloading for fresh state');
+        sessionStorage.removeItem('postLoginReload');
+        
+        // Small delay to ensure the route is properly set before reload
+        setTimeout(() => {
+          window.location.reload();
+        }, 200);
+      }
+    }
+  }, [location.pathname, isAuthenticated]);
 
   return (
     <Provider store={store}>

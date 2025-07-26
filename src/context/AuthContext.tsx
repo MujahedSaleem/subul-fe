@@ -155,23 +155,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (username: string, password: string) => {
     try {
-      // First clear any existing caches if this is a mobile device
-      if (isMobileDevice()) {
-        console.log('[Auth] Mobile device detected during login, clearing caches');
-        // Clear application cache
-        if ('caches' in window) {
-          try {
-            const cacheKeys = await caches.keys();
-            await Promise.all(
-              cacheKeys.map(cacheKey => caches.delete(cacheKey))
-            );
-            console.log('[Auth] Application caches cleared during login');
-          } catch (err) {
-            console.error('[Auth] Error clearing caches:', err);
-          }
-        }
-      }
-
       // Proceed with login
       const response = await api.post('/auth/login', { username, password });
       const { accessToken, refreshToken } = extractApiData<LoginResponse>(response.data);
@@ -190,24 +173,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsAuthenticated(true);
       setUserType(userType);
 
-      // For distributors on mobile, force service worker update
-      if (userType === 'Distributor' && isMobileDevice() && 'serviceWorker' in navigator) {
-        console.log('[Auth] Distributor login on mobile, forcing service worker update');
+      // Handle special mobile case - clear caches and inform service worker
+      if (isMobileDevice() && 'serviceWorker' in navigator) {
+        console.log('[Auth] Mobile device login detected, preparing service worker');
+
+        // Flag to check if we need to reload after login redirect
+        sessionStorage.setItem('postLoginReload', 'true');
         
-        // Force update service worker
         try {
-          const registrations = await navigator.serviceWorker.getRegistrations();
-          for (const registration of registrations) {
-            await registration.update();
-            if (registration.waiting) {
-              registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-            }
+          // First, notify service worker to clear caches
+          const serviceWorkerController = navigator.serviceWorker.controller;
+          if (serviceWorkerController) {
+            return new Promise<void>((resolve) => {
+              const messageChannel = new MessageChannel();
+              
+              messageChannel.port1.onmessage = (event) => {
+                if (event.data.type === 'POST_LOGIN_CACHE_READY') {
+                  console.log('[Auth] Service worker prepared for post-login navigation');
+                  resolve();
+                }
+              };
+              
+              serviceWorkerController.postMessage(
+                { type: 'POST_LOGIN_CACHE_CLEAR' },
+                [messageChannel.port2]
+              );
+              
+              // Set a timeout in case the service worker doesn't respond
+              setTimeout(resolve, 2000);
+            });
           }
           
-          // Set a flag to reload after login redirect
-          sessionStorage.setItem('forceReload', 'true');
+          // Try to register for periodic background sync
+          navigator.serviceWorker.ready.then(async (registration) => {
+            if ('sync' in registration) {
+              try {
+                // @ts-ignore - TypeScript might not recognize the sync API
+                await registration.sync.register('keepalive');
+              } catch (syncErr) {
+                console.error('[Auth] Error registering background sync:', syncErr);
+              }
+            }
+          });
         } catch (err) {
-          console.error('[Auth] Error updating service worker during login:', err);
+          console.error('[Auth] Error preparing service worker for post-login:', err);
         }
       }
     } catch (error: any) {

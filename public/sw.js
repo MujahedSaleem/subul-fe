@@ -1,6 +1,6 @@
 // Simple and efficient service worker for the Subul PWA
-const CACHE_NAME = 'subul-cache-v5';
-const APP_VERSION = '2.1.0';
+const CACHE_NAME = 'subul-cache-v6'; // Increment cache version
+const APP_VERSION = '2.1.1';
 const TIMESTAMP = new Date().toISOString();
 const STATIC_ASSETS = [
   '/',
@@ -9,6 +9,13 @@ const STATIC_ASSETS = [
   '/offline.html',
   '/icons/icon-192x192.svg',
   '/icons/icon-512x512.svg',
+];
+
+// Routes that should be available immediately after login
+const CRITICAL_ROUTES = [
+  '/admin',
+  '/distributor',
+  '/distributor/orders',
 ];
 
 // Detect if the client is a mobile device
@@ -66,10 +73,23 @@ self.addEventListener('activate', (event) => {
 // Helper function to determine cache strategy based on request type
 const getCacheStrategy = (request) => {
   const url = new URL(request.url);
+  const pathname = url.pathname;
   
   // For API requests, use network-only
-  if (url.pathname.includes('/api/')) {
+  if (pathname.includes('/api/')) {
     return 'network-only';
+  }
+  
+  // For login-related paths, always use network-first
+  if (pathname === '/login' || pathname.includes('/auth/')) {
+    return 'network-first';
+  }
+  
+  // Special handling for critical routes (post-login)
+  for (const route of CRITICAL_ROUTES) {
+    if (pathname === route || pathname.startsWith(`${route}/`)) {
+      return 'network-first';
+    }
   }
   
   // For HTML requests or navigation, use network-first
@@ -81,7 +101,7 @@ const getCacheStrategy = (request) => {
   
   // For JS/CSS in mobile or standalone mode, use network-first
   if ((isMobileDevice() || isStandaloneMode()) && 
-      (url.pathname.endsWith('.js') || url.pathname.endsWith('.css'))) {
+      (pathname.endsWith('.js') || pathname.endsWith('.css'))) {
     return 'network-first';
   }
   
@@ -98,25 +118,47 @@ self.addEventListener('fetch', (event) => {
 
   const strategy = getCacheStrategy(event.request);
   
-  if (strategy === 'network-only') {
+  // Special handling for mobile navigation post-login
+  const isMobileNavigate = isMobileDevice() && 
+                         event.request.mode === 'navigate' && 
+                         event.request.method === 'GET';
+  
+  if (strategy === 'network-only' || isMobileNavigate) {
     event.respondWith(
-      fetch(event.request).catch(() => {
-        return new Response(
-          JSON.stringify({ error: 'You are offline' }),
-          {
-            status: 503,
-            headers: { 'Content-Type': 'application/json' }
+      fetch(event.request, { cache: 'no-store' })
+        .catch(() => {
+          // For API requests, return a JSON error
+          if (event.request.url.includes('/api/')) {
+            return new Response(
+              JSON.stringify({ error: 'You are offline' }),
+              {
+                status: 503,
+                headers: { 'Content-Type': 'application/json' }
+              }
+            );
           }
-        );
-      })
+          
+          // For navigation, try cache or show offline page
+          if (event.request.mode === 'navigate') {
+            return caches.match(event.request)
+              .then(cachedResponse => cachedResponse || caches.match('/offline.html'));
+          }
+          
+          return null;
+        })
     );
     return;
   }
   
   if (strategy === 'network-first') {
     event.respondWith(
-      fetch(event.request)
+      fetch(event.request, { cache: 'no-store' }) // Bypass browser cache for critical routes
         .then((response) => {
+          // Don't cache error responses
+          if (!response.ok) {
+            return response;
+          }
+          
           // Clone and cache the response
           const responseToCache = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
@@ -211,6 +253,35 @@ self.addEventListener('message', (event) => {
       })
     );
   }
+  
+  // Handle post-login cache clear for mobile
+  if (event.data?.type === 'POST_LOGIN_CACHE_CLEAR') {
+    console.log('[SW] Clearing cache after successful login');
+    event.waitUntil(
+      caches.keys().then((cacheNames) => {
+        return Promise.all(
+          cacheNames.map((cacheName) => {
+            console.log('[SW] Deleting post-login cache:', cacheName);
+            return caches.delete(cacheName);
+          })
+        ).then(() => {
+          // Pre-cache critical routes to ensure they're available after login
+          return caches.open(CACHE_NAME).then(cache => {
+            console.log('[SW] Pre-caching critical routes');
+            const criticalUrls = CRITICAL_ROUTES.map(route => self.location.origin + route);
+            return cache.addAll(criticalUrls);
+          });
+        }).then(() => {
+          if (event.source) {
+            event.source.postMessage({
+              type: 'POST_LOGIN_CACHE_READY',
+              timestamp: new Date().toISOString()
+            });
+          }
+        });
+      })
+    );
+  }
 });
 
 // Notify clients about updates
@@ -225,4 +296,12 @@ self.addEventListener('updatefound', () => {
       });
     });
   });
+});
+
+// Listen for the periodic beacon from clients
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'keepalive') {
+    console.log('[SW] Received keepalive sync event');
+    // You could use this to ensure the service worker stays active
+  }
 });
