@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect } from 'react';
 import api from '../utils/axiosInstance';
 import { jwtDecode } from 'jwt-decode';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { extractApiData, handleApiError } from '../utils/apiResponseHandler';
 import Cookies from 'js-cookie';
 
@@ -50,7 +50,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userType, setUserType] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const location = useLocation(); // Access current location
+  const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Listen for logout events from axiosInstance
@@ -65,6 +66,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
+    // Handle post-login forced reload
+    const needsReload = sessionStorage.getItem('forceReloadAfterAuth');
+    if (needsReload === 'true' && isAuthenticated) {
+      console.log('[Auth] Executing forced reload after auth');
+      sessionStorage.removeItem('forceReloadAfterAuth');
+      
+      // Use a small timeout to ensure the router has had a chance to update
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
+      return;
+    }
+
     const accessToken = localStorage.getItem('accessToken');
     let refreshToken = localStorage.getItem('refreshToken');
 
@@ -120,7 +134,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsAuthenticated(false);
       setLoading(false);
     }
-  }, [location.pathname]);
+  }, [location.pathname, isAuthenticated, navigate]);
 
   const refreshTokens = async (refreshToken: string) => {
     try {
@@ -169,21 +183,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const userType = decodedToken.role;
       localStorage.setItem('userType', userType);
 
+      // Radical approach - completely unregister the service worker on login
+      if ('serviceWorker' in navigator) {
+        console.log('[Auth] Unregistering service workers after login');
+        
+        // Force a clean load by disabling the service worker completely
+        try {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          if (registrations.length > 0) {
+            for (const registration of registrations) {
+              await registration.unregister();
+              console.log('[Auth] Service worker unregistered');
+            }
+            
+            // Clear all caches
+            if ('caches' in window) {
+              const cacheKeys = await caches.keys();
+              await Promise.all(
+                cacheKeys.map(key => caches.delete(key))
+              );
+              console.log('[Auth] All caches cleared');
+            }
+            
+            // Flag for a reload after authentication redirects
+            sessionStorage.setItem('forceReloadAfterAuth', 'true');
+          }
+        } catch (err) {
+          console.error('[Auth] Error handling service worker:', err);
+        }
+      }
+
+      // Update the authentication state
       setIsAuthenticated(true);
       setUserType(userType);
 
-      // Handle special mobile case - clear caches to avoid stale data
-      if (isMobileDevice()) {
-        console.log('[Auth] Mobile device login detected');
-        
-        // Flag to check if we need to reload after login redirect
-        sessionStorage.setItem('postLoginReload', 'true');
-        
-        // Clear caches after login on mobile
-        if (typeof window.clearCacheAfterLogin === 'function') {
-          await window.clearCacheAfterLogin();
-        }
+      // Set navigation target path
+      const targetPath = userType === 'Admin' ? '/admin' : '/distributor/orders';
+      
+      // Remove any saved route to start fresh
+      localStorage.removeItem('subul-current-route');
+      
+      // Pre-fetch the target route to warm the cache (especially for mobile)
+      try {
+        await fetch(targetPath, { 
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          },
+          cache: 'no-store'
+        });
+        console.log('[Auth] Target route pre-fetched:', targetPath);
+      } catch (err) {
+        console.error('[Auth] Error pre-fetching route:', err);
       }
+
     } catch (error: any) {
       console.error('Login failed:', error);
       const errorMessage = handleApiError(error);

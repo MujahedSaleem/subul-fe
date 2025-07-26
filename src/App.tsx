@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import Login from "./pages/Login";
 import AdminDashboard from "./pages/admin/Dashboard";
@@ -46,6 +46,7 @@ function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  const [routeReady, setRouteReady] = useState(false);
 
   // Save current route when location changes
   useEffect(() => {
@@ -54,15 +55,25 @@ function App() {
     }
   }, [location.pathname, isAuthenticated]);
 
-  // Restore saved route on app load
+  // Handle application bootstrap and route restoration
   useEffect(() => {
-    if (isAuthenticated) {
+    if (!routeReady && isAuthenticated) {
+      // Check for fresh login (forceReloadAfterAuth flag)
+      const needsReload = sessionStorage.getItem('forceReloadAfterAuth');
+      if (needsReload === 'true') {
+        // We'll let AuthContext handle the reload
+        return;
+      }
+
+      // Restore saved route on app load (normal case)
       const savedRoute = getSavedRoute();
       if (savedRoute && savedRoute !== '/login' && savedRoute !== location.pathname) {
         navigate(savedRoute);
       }
+      
+      setRouteReady(true);
     }
-  }, [isAuthenticated, navigate, location.pathname]);
+  }, [isAuthenticated, navigate, location.pathname, routeReady]);
 
   // Listen for visibility change events
   useEffect(() => {
@@ -81,24 +92,6 @@ function App() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [isAuthenticated, navigate, location.pathname]);
-
-  // Special handling for mobile devices after login
-  useEffect(() => {
-    // If this is a mobile device and we just logged in
-    if (isMobileDevice() && isAuthenticated && location.pathname !== '/login') {
-      const needsReload = sessionStorage.getItem('postLoginReload');
-      
-      if (needsReload === 'true') {
-        console.log('[App] Post-login navigation on mobile, reloading for fresh state');
-        sessionStorage.removeItem('postLoginReload');
-        
-        // Small delay to ensure the route is properly set before reload
-        setTimeout(() => {
-          window.location.reload();
-        }, 200);
-      }
-    }
-  }, [location.pathname, isAuthenticated]);
 
   return (
     <Provider store={store}>

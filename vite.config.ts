@@ -40,84 +40,95 @@ export default defineConfig(({ mode }) => {
           ]
         },
         workbox: {
-          // Workbox options
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,json}'],
-          navigateFallback: 'index.html',
+          // Never cache the API calls
           navigateFallbackDenylist: [/^\/api\//],
+          
+          // Don't precache authenticated routes
+          globIgnores: ['**/admin/**/*', '**/distributor/**/*'],
+          
+          // Don't allow runtime caching for authenticated routes
           runtimeCaching: [
+            // Only cache the root index.html and non-authenticated pages
             {
-              // Cache API responses
-              urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
+              urlPattern: /\/$/,
               handler: 'NetworkFirst',
               options: {
-                cacheName: 'api-cache',
+                cacheName: 'start-url',
+                expiration: {
+                  maxEntries: 1,
+                  maxAgeSeconds: 60 * 5 // 5 minutes
+                }
+              }
+            },
+            {
+              urlPattern: /^\/login\/?$/,
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'login-page',
+                expiration: {
+                  maxEntries: 1,
+                  maxAgeSeconds: 60 * 5 // 5 minutes
+                }
+              }
+            },
+            // Cache assets but with a short expiration
+            {
+              urlPattern: /\.(?:js|css)$/,
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'js-css',
                 expiration: {
                   maxEntries: 50,
-                  maxAgeSeconds: 60 * 5 // 5 minutes
-                },
-                networkTimeoutSeconds: 10
-              }
-            },
-            {
-              // Cache font files
-              urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-              handler: 'CacheFirst',
-              options: {
-                cacheName: 'google-fonts-cache',
-                expiration: {
-                  maxEntries: 10,
-                  maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
+                  maxAgeSeconds: 60 * 60 // 1 hour
                 }
               }
             },
             {
-              urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+              urlPattern: /\.(?:png|jpg|jpeg|svg|gif)$/,
               handler: 'CacheFirst',
               options: {
-                cacheName: 'gstatic-fonts-cache',
+                cacheName: 'images',
                 expiration: {
-                  maxEntries: 10,
-                  maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
+                  maxEntries: 50,
+                  maxAgeSeconds: 60 * 60 * 24 // 24 hours
                 }
               }
             },
+            // Cache font files
             {
-              // Special handling for HTML navigation
-              urlPattern: /.*\/$/,
-              handler: 'NetworkFirst',
-              options: {
-                cacheName: 'html-cache',
-                expiration: {
-                  maxEntries: 10,
-                  maxAgeSeconds: 60 * 5 // 5 minutes
-                }
-              }
-            },
-            {
-              // Cache image files
-              urlPattern: /\.(?:png|jpg|jpeg|svg|gif|ico)$/,
+              urlPattern: /^https:\/\/fonts\.googleapis\.com/i,
               handler: 'CacheFirst',
               options: {
-                cacheName: 'images-cache',
+                cacheName: 'google-fonts',
                 expiration: {
-                  maxEntries: 60,
+                  maxEntries: 10,
                   maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
                 }
               }
             },
             {
-              // Cache JS and CSS files
-              urlPattern: /\.(?:js|css)$/,
-              handler: 'StaleWhileRevalidate',
+              urlPattern: /^https:\/\/fonts\.gstatic\.com/i,
+              handler: 'CacheFirst',
               options: {
-                cacheName: 'static-resources',
+                cacheName: 'gstatic-fonts',
                 expiration: {
-                  maxEntries: 60,
-                  maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
+                  maxEntries: 10,
+                  maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
                 }
               }
             }
           ]
+        },
+        // Don't try to cache authenticated pages
+        strategies: 'injectManifest',
+        srcDir: 'src',
+        filename: 'sw.js',
+        minify: true,
+        injectRegister: 'auto',
+        // Disable service worker in development
+        devOptions: {
+          enabled: false,
+          type: 'module'
         }
       })
     ],
