@@ -204,9 +204,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 console.error('[Auth] Error clearing caches:', err);
               }
             }
-            
-            // Set flag to reload after redirect
-            sessionStorage.setItem('forceReloadAfterAuth', 'true');
           }
         }).catch(err => {
           console.error('[Auth] Error unregistering service worker:', err);
@@ -216,6 +213,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Update authentication state
       setIsAuthenticated(true);
       setUserType(userType);
+      
+      // Use a hard navigation to the target page after login for a cleaner state
+      // This bypasses the React Router navigation which might have caching issues
+      const targetPath = userType === "Admin" ? '/admin' : '/distributor/orders';
+      
+      // Small delay to ensure auth state is properly set
+      setTimeout(() => {
+        // Use window.location for a clean navigation that bypasses service worker cache
+        window.location.href = targetPath;
+      }, 50);
 
     } catch (error: any) {
       console.error('Login failed:', error);
@@ -231,6 +238,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     Cookies.remove(REFRESH_TOKEN_COOKIE);
     setIsAuthenticated(false);
     setUserType(null);
+    
+    // Force reload on logout for a clean state
+    setTimeout(() => {
+      window.location.href = '/login';
+    }, 50);
   };
 
   return (

@@ -26,6 +26,31 @@ const isStandaloneMode = () => {
 // Expose functions globally
 window.isStandaloneMode = isStandaloneMode;
 
+// Handle common service worker events
+if ('serviceWorker' in navigator) {
+  // Listen for controller change and reload the page
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    console.log('[Main] New service worker controller, reloading page');
+    window.location.reload();
+  });
+  
+  // Detect login-related page loads
+  if (window.location.pathname === '/login') {
+    console.log('[Main] Login page detected, ensuring clean state');
+    // Unregister any service workers on the login page to ensure clean state
+    navigator.serviceWorker.getRegistrations().then(registrations => {
+      if (registrations.length > 0) {
+        for (const registration of registrations) {
+          registration.unregister();
+        }
+        console.log('[Main] Service workers unregistered on login page');
+      }
+    }).catch(err => {
+      console.error('[Main] Error checking service worker on login:', err);
+    });
+  }
+}
+
 // Listen for online/offline events and show notifications
 window.addEventListener('online', () => {
   store.dispatch(showSuccess({
@@ -40,14 +65,6 @@ window.addEventListener('offline', () => {
     duration: 5000
   }));
 });
-
-// Listen for controller change and reload the page
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    console.log('[Main] New service worker controller, reloading page');
-    window.location.reload();
-  });
-}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
