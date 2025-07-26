@@ -24,70 +24,37 @@ const PWAInstallPrompt: React.FC = () => {
   const [isStandalone, setIsStandalone] = useState(false);
   const dispatch = useAppDispatch();
 
+  // Check if the app is running in standalone mode
+  const checkStandaloneMode = (): boolean => {
+    const standalone = window.matchMedia('(display-mode: standalone)').matches || 
+                      (window.navigator as SafariNavigator).standalone === true;
+    return standalone;
+  };
+
   useEffect(() => {
-    // Check if app is already installed
-    const checkStandaloneMode = () => {
-      const standalone = window.matchMedia('(display-mode: standalone)').matches || 
-                        (window.navigator as SafariNavigator).standalone === true;
-      setIsStandalone(standalone);
-      setIsInstalled(standalone);
-      return standalone;
-    };
-
-    // Initial check
+    // Set initial states
     const standalone = checkStandaloneMode();
-
+    setIsStandalone(standalone);
+    setIsInstalled(standalone);
+    
     // Check if device is mobile
     const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     setIsMobile(mobile);
 
-    // For standalone mode, set up silent background updates
-    if (standalone) {
-      console.log('[PWAInstallPrompt] Standalone mode detected, setting up silent background updates');
-      
-      // Force a check for updates immediately
-      if (typeof window.checkForUpdates === 'function') {
-        window.checkForUpdates();
-      }
-      
-      // Set up frequent checks for standalone mode (every 30 seconds)
-      const updateInterval = setInterval(() => {
-        console.log('[PWAInstallPrompt] Silent update check for standalone mode');
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.ready.then(registration => {
-            // Check for updates silently
-            registration.update().then(() => {
-              // If there's a waiting worker, activate it immediately
-              if (registration.waiting) {
-                console.log('[PWAInstallPrompt] New version found, activating silently');
-                registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-              }
-            }).catch(err => {
-              console.error('Error checking for updates:', err);
-            });
-          });
-        }
-      }, 30 * 1000); // 30 seconds
-      
-      return () => clearInterval(updateInterval);
-    }
-
-    // Listen for the beforeinstallprompt event
+    // Handle "Add to Home Screen" prompt
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setInstallPrompt(e as BeforeInstallPromptEvent);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
+    
     // Listen for app installed event
     window.addEventListener('appinstalled', () => {
       setIsInstalled(true);
       setInstallPrompt(null);
       dispatch(showSuccess({ message: 'تم تثبيت التطبيق بنجاح!' }));
-      
-      // Recheck standalone mode after installation
-      setTimeout(checkStandaloneMode, 1000);
+      setIsStandalone(true);
     });
 
     // Listen for standalone mode changes
@@ -99,17 +66,12 @@ const PWAInstallPrompt: React.FC = () => {
     
     standaloneMediaQuery.addEventListener('change', handleStandaloneChange);
 
-    // Check if service worker has an update waiting
+    // Check for service worker updates
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
       navigator.serviceWorker.ready.then(registration => {
+        // Check for waiting service worker
         if (registration.waiting) {
           setIsUpdateAvailable(true);
-          
-          // For standalone mode, apply updates immediately
-          if (standalone) {
-            console.log('[PWAInstallPrompt] Update waiting, applying immediately in standalone mode');
-            registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-          }
         }
         
         // Listen for new updates
@@ -119,12 +81,6 @@ const PWAInstallPrompt: React.FC = () => {
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                 setIsUpdateAvailable(true);
-                
-                // For standalone mode, apply updates immediately
-                if (standalone) {
-                  console.log('[PWAInstallPrompt] New update installed, applying immediately in standalone mode');
-                  newWorker.postMessage({ type: 'SKIP_WAITING' });
-                }
               }
             });
           }
@@ -132,26 +88,11 @@ const PWAInstallPrompt: React.FC = () => {
       });
       
       // Listen for messages from service worker
-      if (navigator.serviceWorker) {
-        navigator.serviceWorker.addEventListener('message', (event) => {
-          if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
-            setIsUpdateAvailable(true);
-            
-            // For standalone mode, force refresh cache silently
-            if (standalone && typeof window.forceClearCache === 'function') {
-              console.log('[PWAInstallPrompt] Update available message received, refreshing cache in standalone mode');
-              // Use a gentler approach to avoid disrupting the user
-              setTimeout(() => {
-                navigator.serviceWorker.ready.then(registration => {
-                  if (registration.waiting) {
-                    registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-                  }
-                });
-              }, 1000);
-            }
-          }
-        });
-      }
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
+          setIsUpdateAvailable(true);
+        }
+      });
     }
 
     return () => {
@@ -186,16 +127,13 @@ const PWAInstallPrompt: React.FC = () => {
           registration.waiting.postMessage({ type: 'SKIP_WAITING' });
         } else {
           // Manually check for updates
-          if (typeof window.checkForUpdates === 'function') {
-            window.checkForUpdates();
-          } else {
-            dispatch(showSuccess({ message: 'جاري التحقق من وجود تحديثات...' }));
-            registration.update().then(() => {
-              if (!registration.waiting) {
+          dispatch(showSuccess({ message: 'جاري التحقق من وجود تحديثات...' }));
+          serviceWorkerRegistration.checkForUpdates()
+            .then(hasUpdates => {
+              if (!hasUpdates) {
                 dispatch(showSuccess({ message: 'أنت تستخدم أحدث إصدار من التطبيق' }));
               }
             });
-          }
         }
       });
     }
@@ -203,27 +141,18 @@ const PWAInstallPrompt: React.FC = () => {
 
   const handleForceRefreshClick = () => {
     dispatch(showSuccess({ message: 'جاري تحديث التطبيق بالكامل...', duration: 3000 }));
-    
-    // Use the global forceClearCache function
-    if (typeof window.forceClearCache === 'function') {
-      window.forceClearCache();
-    } else {
-      // Fallback if the global function is not available
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-    }
+    serviceWorkerRegistration.forceClearCacheAndReload();
   };
 
-  // For standalone mode, don't show any UI elements
-  // Instead, handle updates silently in the background
+  // For standalone mode, don't show any UI
   if (isStandalone) {
     return null;
   }
 
-  // Regular floating buttons for non-standalone mode
   // Don't render anything if the app is installed and no updates are available
-  if (isInstalled && !isUpdateAvailable && !installPrompt && !isMobile) return null;
+  if (isInstalled && !isUpdateAvailable && !installPrompt && !isMobile) {
+    return null;
+  }
 
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
@@ -241,7 +170,7 @@ const PWAInstallPrompt: React.FC = () => {
         </Button>
       )}
       
-      {isUpdateAvailable && !isStandalone && (
+      {isUpdateAvailable && (
         <Button
           size="sm"
           className="flex items-center gap-2 bg-green-500 shadow-lg animate-pulse"

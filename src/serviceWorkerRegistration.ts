@@ -20,6 +20,12 @@ const isMobileDevice = (): boolean => {
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 };
 
+// Detect if the app is running in standalone mode
+const isStandaloneMode = (): boolean => {
+  return window.matchMedia('(display-mode: standalone)').matches || 
+         (window.navigator as any).standalone === true;
+};
+
 type Config = {
   onSuccess?: (registration: ServiceWorkerRegistration) => void;
   onUpdate?: (registration: ServiceWorkerRegistration) => void;
@@ -34,23 +40,18 @@ export function register(config?: Config): void {
     if (publicUrl.origin !== window.location.origin) {
       // Our service worker won't work if BASE_URL is on a different origin
       // from what our page is served on. This might happen if a CDN is used to
-      // serve assets; see https://github.com/facebook/create-react-app/issues/2374
+      // serve assets
       return;
     }
 
     window.addEventListener('load', () => {
       const swUrl = `${import.meta.env.BASE_URL}sw.js`;
 
-      // Special handling for mobile devices
-      if (isMobileDevice()) {
-        console.log('[Main] Mobile device detected, using special registration');
-        registerMobileSW(swUrl, config);
-      } else if (isLocalhost) {
+      if (isLocalhost) {
         // This is running on localhost. Let's check if a service worker still exists or not.
         checkValidServiceWorker(swUrl, config);
 
-        // Add some additional logging to localhost, pointing developers to the
-        // service worker/PWA documentation.
+        // Add some additional logging to localhost
         navigator.serviceWorker.ready.then(() => {
           console.log(
             'This web app is being served cache-first by a service ' +
@@ -79,120 +80,46 @@ export function register(config?: Config): void {
     // Set up listener for service worker messages
     if (navigator.serviceWorker) {
       navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
-          console.log(`[Main] New app version available: ${event.data.version}`);
-          if (config && config.onUpdate && navigator.serviceWorker.controller) {
-            navigator.serviceWorker.ready.then(registration => {
-              config.onUpdate(registration);
-            });
-          }
+        if (event.data && event.data.type === 'UPDATE_AVAILABLE' && config?.onUpdate && navigator.serviceWorker.controller) {
+          console.log(`[SW] New app version available: ${event.data.version}`);
+          navigator.serviceWorker.ready.then(registration => {
+            config.onUpdate(registration);
+          });
         }
         
         if (event.data && event.data.type === 'CACHE_CLEARED') {
-          console.log('[Main] Cache cleared, reloading page');
+          console.log('[SW] Cache cleared, reloading page');
           window.location.reload();
         }
       });
     }
 
-    // Check for updates more frequently on mobile devices
-    const updateInterval = isMobileDevice() ? 5 * 60 * 1000 : 30 * 60 * 1000; // 5 minutes for mobile, 30 minutes for desktop
+    // Check for updates periodically
+    const updateInterval = isMobileDevice() || isStandaloneMode() 
+      ? 5 * 60 * 1000  // 5 minutes for mobile or standalone
+      : 30 * 60 * 1000; // 30 minutes for desktop
     
     setInterval(() => {
-      if (typeof navigator.onLine !== 'undefined' && navigator.onLine) {
-        console.log('[Main] Checking for app updates...');
-        navigator.serviceWorker.ready.then(registration => {
-          registration.update().catch(err => {
-            console.error('Error checking for updates:', err);
-          });
-        });
+      // Check if navigator.onLine is true and not undefined
+      const isOnline = typeof navigator.onLine === 'boolean' && navigator.onLine;
+      if (isOnline) {
+        console.log('[SW] Checking for app updates...');
+        navigator.serviceWorker.ready
+          .then(registration => registration.update())
+          .catch(err => console.error('Error checking for updates:', err));
       }
     }, updateInterval);
   }
-}
-
-// Special registration for mobile devices
-function registerMobileSW(swUrl: string, config?: Config) {
-  // First, try to unregister any existing service workers
-  navigator.serviceWorker.getRegistrations().then(registrations => {
-    for (let registration of registrations) {
-      console.log('[Main] Unregistering existing service worker');
-      registration.unregister();
-    }
-    
-    // Now register a new service worker
-    navigator.serviceWorker
-      .register(swUrl, { updateViaCache: 'none' }) // Disable cache for updates
-      .then(registration => {
-        console.log('[Main] Mobile service worker registered');
-        
-        // Force update check immediately
-        registration.update();
-        
-        // If there's a waiting worker, activate it immediately
-        if (registration.waiting) {
-          console.log('[Main] Found waiting worker, activating immediately');
-          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-          
-          if (config && config.onUpdate) {
-            config.onUpdate(registration);
-          }
-        }
-        
-        registration.onupdatefound = () => {
-          const installingWorker = registration.installing;
-          if (installingWorker == null) {
-            return;
-          }
-          
-          installingWorker.onstatechange = () => {
-            if (installingWorker.state === 'installed') {
-              if (navigator.serviceWorker.controller) {
-                console.log('[Main] New content available on mobile');
-                
-                // Force cache refresh for mobile
-                registration.active?.postMessage({ type: 'FORCE_REFRESH_CACHE' });
-                
-                // For standalone mode, activate immediately without user interaction
-                if (isMobileDevice() && window.matchMedia('(display-mode: standalone)').matches) {
-                  console.log('[Main] Standalone mode detected, activating update immediately');
-                  installingWorker.postMessage({ type: 'SKIP_WAITING' });
-                } else if (config && config.onUpdate) {
-                  config.onUpdate(registration);
-                  promptUserToRefresh(registration);
-                }
-              } else {
-                console.log('[Main] Content cached for offline use on mobile');
-                if (config && config.onSuccess) {
-                  config.onSuccess(registration);
-                }
-              }
-            }
-          };
-        };
-      })
-      .catch(error => {
-        console.error('[Main] Error during mobile service worker registration:', error);
-      });
-  });
 }
 
 function registerValidSW(swUrl: string, config?: Config) {
   navigator.serviceWorker
     .register(swUrl)
     .then((registration) => {
-      // Immediately check if there's a waiting worker
+      // Handle waiting worker if present
       if (registration.waiting) {
-        console.log('[Main] New service worker waiting');
-        
-        // For standalone mode, activate immediately without user interaction
-        if (window.matchMedia('(display-mode: standalone)').matches) {
-          console.log('[Main] Standalone mode detected, activating update immediately');
-          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-        } else if (config && config.onUpdate) {
-          config.onUpdate(registration);
-          promptUserToRefresh(registration);
-        }
+        console.log('[SW] New service worker waiting');
+        handleWaitingServiceWorker(registration, config);
       }
 
       registration.onupdatefound = () => {
@@ -206,28 +133,12 @@ function registerValidSW(swUrl: string, config?: Config) {
               // At this point, the updated precached content has been fetched,
               // but the previous service worker will still serve the older
               // content until all client tabs are closed.
-              console.log(
-                '[Main] New content is available and will be used when all ' +
-                  'tabs for this page are closed.'
-              );
-
-              // For standalone mode, activate immediately without user interaction
-              if (window.matchMedia('(display-mode: standalone)').matches) {
-                console.log('[Main] Standalone mode detected, activating update immediately');
-                installingWorker.postMessage({ type: 'SKIP_WAITING' });
-              } else if (config && config.onUpdate) {
-                // Execute callback
-                config.onUpdate(registration);
-                promptUserToRefresh(registration);
-              }
+              console.log('[SW] New content is available');
+              handleWaitingServiceWorker(registration, config);
             } else {
               // At this point, everything has been precached.
-              // It's the perfect time to display a
-              // "Content is cached for offline use." message.
-              console.log('[Main] Content is cached for offline use.');
-
-              // Execute callback
-              if (config && config.onSuccess) {
+              console.log('[SW] Content is cached for offline use.');
+              if (config?.onSuccess) {
                 config.onSuccess(registration);
               }
             }
@@ -240,27 +151,28 @@ function registerValidSW(swUrl: string, config?: Config) {
     });
 }
 
-function promptUserToRefresh(registration: ServiceWorkerRegistration) {
-  // For standalone mode, skip the prompt and apply updates immediately
-  if (window.matchMedia('(display-mode: standalone)').matches) {
+function handleWaitingServiceWorker(registration: ServiceWorkerRegistration, config?: Config) {
+  // For standalone mode, activate immediately without user interaction
+  if (isStandaloneMode()) {
+    console.log('[SW] Standalone mode detected, activating update immediately');
     if (registration.waiting) {
       registration.waiting.postMessage({ type: 'SKIP_WAITING' });
     }
     return;
   }
   
-  // For regular mode, prompt the user
-  if (confirm('تم تحديث التطبيق! هل ترغب في تحميل النسخة الجديدة؟')) {
+  // For mobile devices, also activate immediately
+  if (isMobileDevice()) {
+    console.log('[SW] Mobile device detected, activating update immediately');
     if (registration.waiting) {
-      // Send skip waiting message
       registration.waiting.postMessage({ type: 'SKIP_WAITING' });
     }
-    
-    // Listen for the controller change and reload
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      console.log('[Main] New service worker activated, reloading page');
-      window.location.reload();
-    });
+    return;
+  }
+
+  // For regular desktop users, notify them about the update
+  if (config?.onUpdate) {
+    config.onUpdate(registration);
   }
 }
 
@@ -290,7 +202,7 @@ function checkValidServiceWorker(swUrl: string, config?: Config) {
     })
     .catch(() => {
       console.log('No internet connection found. App is running in offline mode.');
-      if (config && config.onOffline) {
+      if (config?.onOffline) {
         config.onOffline();
       }
     });
@@ -304,75 +216,50 @@ export function checkForUpdates(): Promise<boolean> {
       return;
     }
 
-    // Special handling for mobile devices
-    if (isMobileDevice()) {
-      console.log('[Main] Forcing update check on mobile');
-      
-      navigator.serviceWorker.ready.then((registration) => {
-        // Force cache refresh for mobile
-        if (registration.active) {
-          registration.active.postMessage({ type: 'FORCE_REFRESH_CACHE' });
-        }
-        
-        // Also perform a regular update check
-        registration.update()
-          .then(() => {
-            if (registration.waiting) {
-              promptUserToRefresh(registration);
-              resolve(true);
-            } else {
-              resolve(false);
+    navigator.serviceWorker.ready.then((registration) => {
+      registration.update()
+        .then(() => {
+          if (registration.waiting) {
+            // For standalone mode or mobile, apply immediately
+            if (isStandaloneMode() || isMobileDevice()) {
+              registration.waiting.postMessage({ type: 'SKIP_WAITING' });
             }
-          })
-          .catch(() => {
+            resolve(true);
+          } else {
             resolve(false);
-          });
-      });
-    } else {
-      // Normal update check for desktop
-      navigator.serviceWorker.ready.then((registration) => {
-        registration.update()
-          .then(() => {
-            if (registration.waiting) {
-              promptUserToRefresh(registration);
-              resolve(true);
-            } else {
-              resolve(false);
-            }
-          })
-          .catch(() => {
-            resolve(false);
-          });
-      });
-    }
+          }
+        })
+        .catch(() => {
+          resolve(false);
+        });
+    });
   });
 }
 
-// Function to force clear cache and reload (especially for mobile)
+// Function to force clear cache and reload
 export function forceClearCacheAndReload(): void {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.ready.then((registration) => {
       if (registration.active) {
         registration.active.postMessage({ type: 'FORCE_REFRESH_CACHE' });
         
-        // Also unregister and re-register the service worker
-        registration.unregister().then(() => {
-          // Clear browser caches
-          if ('caches' in window) {
-            caches.keys().then((cacheNames) => {
-              cacheNames.forEach((cacheName) => {
-                caches.delete(cacheName);
-              });
-              
+        // Clear browser caches
+        if ('caches' in window) {
+          caches.keys().then((cacheNames) => {
+            const deletePromises = cacheNames.map(cacheName => {
+              return caches.delete(cacheName);
+            });
+            
+            Promise.all(deletePromises).then(() => {
               // Reload after a short delay
               setTimeout(() => {
                 window.location.reload();
-              }, 1000);
+              }, 500);
             });
-          } else {
-            window.location.reload();
-          }
-        });
+          });
+        } else {
+          window.location.reload();
+        }
       } else {
         window.location.reload();
       }
