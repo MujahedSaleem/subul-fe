@@ -98,15 +98,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setLoading(false);
         }
       } catch (error) {
-        console.error('Error decoding token:', error);
-        // Invalid token format
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('userType');
-        Cookies.remove(REFRESH_TOKEN_COOKIE);
-        setIsAuthenticated(false);
-        setUserType(null);
-        setLoading(false);
+        try {
+          refreshTokens(refreshToken);
+        } catch (error) {
+          console.error('Error decoding token:', error);
+          // Invalid token format
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('userType');
+          Cookies.remove(REFRESH_TOKEN_COOKIE);
+          setIsAuthenticated(false);
+          setUserType(null);
+          setLoading(false);
+        }
+     
       }
     } else if (refreshToken) {
       // Only refresh token exists, try to refresh
