@@ -3,25 +3,17 @@
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import type { RegisterSWOptions } from 'virtual:pwa-register/react';
 
-// Detect if the client is a mobile device
+// Check if the device is a mobile device
 const isMobileDevice = (): boolean => {
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 };
 
-// Detect if the app is running in standalone mode
+// Check if the app is in standalone mode (installed PWA)
 const isStandaloneMode = (): boolean => {
   return window.matchMedia('(display-mode: standalone)').matches || 
          (window.navigator as any).standalone === true;
 };
 
-// Set update interval based on device type
-const getUpdateInterval = (): number => {
-  return isMobileDevice() || isStandaloneMode() 
-    ? 5 * 60 * 1000    // 5 minutes for mobile or standalone
-    : 30 * 60 * 1000;  // 30 minutes for desktop
-};
-
-// Legacy type for backward compatibility
 type Config = {
   onSuccess?: () => void;
   onUpdate?: () => void;
@@ -29,99 +21,134 @@ type Config = {
   onOnline?: () => void;
 };
 
-// Export the hook for React components
 export { useRegisterSW };
 
-// For backward compatibility
+// Global variable to store the update function from useRegisterSW
 let updateSWFn: ((reloadPage?: boolean) => Promise<void>) | null = null;
 
-// Register service worker - legacy function for backward compatibility
+// Helper to force reload the page and bypass cache
+const forceReload = () => {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(async (registrations) => {
+      for (const registration of registrations) {
+        await registration.unregister();
+      }
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(key => caches.delete(key)));
+      }
+      window.location.reload();
+    });
+  } else {
+    window.location.reload();
+  }
+};
+
 export function register(config?: Config): void {
   if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-    // Set up listeners for online/offline events
+    // Handle online/offline events
     window.addEventListener('online', () => {
-      if (config?.onOnline) {
-        config.onOnline();
-      }
+      console.log('Online event detected');
+      config?.onOnline && config.onOnline();
     });
 
     window.addEventListener('offline', () => {
-      if (config?.onOffline) {
-        config.onOffline();
-      }
+      console.log('Offline event detected');
+      config?.onOffline && config.onOffline();
     });
 
-    // Initialize the update function for global access
+    // Define global functions for PWA updates and cache management
     window.checkForUpdates = async () => {
-      console.log('[SW] Manually checking for updates');
+      console.log('Manual update check triggered');
       if (updateSWFn) {
-        await updateSWFn(false);
-        return true;
+        try {
+          await updateSWFn(false);
+          return true;
+        } catch (err) {
+          console.error('Error checking for updates:', err);
+          return false;
+        }
       }
       return false;
     };
 
-    // Initialize force refresh function for global access
     window.forceClearCache = () => {
-      console.log('[SW] Forcing cache refresh and update');
-      if (updateSWFn) {
-        updateSWFn(true);
+      console.log('Force clear cache triggered');
+      if ('caches' in window) {
+        caches.keys().then(cacheNames => {
+          return Promise.all(
+            cacheNames.map(cacheName => {
+              console.log(`Deleting cache ${cacheName}`);
+              return caches.delete(cacheName);
+            })
+          );
+        }).then(() => {
+          console.log('Caches cleared, reloading...');
+          forceReload();
+        });
       } else {
-        window.location.reload();
+        forceReload();
       }
     };
 
-    // Initialize cache clearing function for mobile login
     window.clearCacheAfterLogin = async () => {
-      console.log('[SW] Clearing cache after login');
+      console.log('Clear cache after login triggered');
       if ('caches' in window) {
         try {
-          const cacheKeys = await caches.keys();
-          await Promise.all(cacheKeys.map(key => caches.delete(key)));
-          console.log('[SW] Caches cleared after login');
+          const keys = await caches.keys();
+          await Promise.all(keys.map(key => caches.delete(key)));
+          console.log('All caches cleared after login');
+          return true;
         } catch (err) {
-          console.error('[SW] Error clearing caches:', err);
+          console.error('Error clearing caches after login:', err);
+          return false;
         }
       }
-      return true;
+      return false;
     };
   }
 }
 
-// This function allows non-React parts of the app to capture the update function
 export function setUpdateFunction(fn: (reloadPage?: boolean) => Promise<void>): void {
   updateSWFn = fn;
 }
 
-// Compatibility with legacy code
+/**
+ * Check for service worker updates
+ */
 export function checkForUpdates(): Promise<boolean> {
-  if (typeof window.checkForUpdates === 'function') {
-    return window.checkForUpdates();
-  }
-  return Promise.resolve(false);
+  return new Promise((resolve) => {
+    if (updateSWFn) {
+      updateSWFn(false)
+        .then(() => resolve(true))
+        .catch(() => resolve(false));
+    } else {
+      resolve(false);
+    }
+  });
 }
 
+/**
+ * Force clear all caches and reload the page
+ */
 export function forceClearCacheAndReload(): void {
-  if (typeof window.forceClearCache === 'function') {
-    window.forceClearCache();
-  } else {
-    window.location.reload();
-  }
+  window.forceClearCache();
 }
 
+/**
+ * Unregister all service workers
+ */
 export function unregister(): void {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.ready
-      .then((registration) => {
+    navigator.serviceWorker.getRegistrations().then(registrations => {
+      for (const registration of registrations) {
         registration.unregister();
-      })
-      .catch((error) => {
-        console.error(error.message);
-      });
+      }
+    });
   }
 }
 
-// Add types for our global functions
+// Global type definitions
 declare global {
   interface Window {
     checkForUpdates: () => Promise<boolean>;

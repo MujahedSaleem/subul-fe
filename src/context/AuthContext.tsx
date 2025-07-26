@@ -232,6 +232,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    // Clear all auth tokens and state
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('userType');
@@ -239,10 +240,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsAuthenticated(false);
     setUserType(null);
     
-    // Force reload on logout for a clean state
-    setTimeout(() => {
+    // Handle service worker cleanup on logout
+    if ('serviceWorker' in navigator) {
+      console.log('[Auth] Unregistering service workers on logout');
+      navigator.serviceWorker.getRegistrations()
+        .then(async (registrations) => {
+          // Unregister all service workers
+          for (const registration of registrations) {
+            await registration.unregister();
+          }
+          console.log('[Auth] Service workers unregistered on logout');
+          
+          // Clear all caches
+          if ('caches' in window) {
+            try {
+              const keys = await caches.keys();
+              await Promise.all(keys.map(key => caches.delete(key)));
+              console.log('[Auth] All caches cleared on logout');
+            } catch (err) {
+              console.error('[Auth] Error clearing caches on logout:', err);
+            }
+          }
+          
+          // Force reload to login page after cleanup is complete
+          window.location.href = '/login';
+        })
+        .catch(err => {
+          console.error('[Auth] Error during logout cleanup:', err);
+          // If there's an error in the cleanup, still redirect to login
+          window.location.href = '/login';
+        });
+    } else {
+      // If service worker isn't available, just redirect
       window.location.href = '/login';
-    }, 50);
+    }
   };
 
   return (

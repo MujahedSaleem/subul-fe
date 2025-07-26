@@ -12,30 +12,20 @@ export default defineConfig(({ mode }) => {
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'robots.txt', 'apple-touch-icon.png', 'offline.html'],
         manifest: {
-          name: 'سُبل | نظام إدارة الطلبات',
-          short_name: 'سُبل',
-          description: 'نظام إدارة الطلبات والتوزيع',
-          theme_color: '#3b82f6',
-          start_url: '/',
-          scope: '/',
-          display: 'standalone',
-          background_color: '#ffffff',
+          name: 'Subul - Gas Distribution System',
+          short_name: 'Subul',
+          description: 'Gas distribution and delivery management system',
+          theme_color: '#ffffff',
           icons: [
             {
-              src: '/icons/icon-192x192.png',
+              src: '/icons/icon-192x192.svg',
               sizes: '192x192',
-              type: 'image/png'
+              type: 'image/svg+xml'
             },
             {
-              src: '/icons/icon-512x512.png',
+              src: '/icons/icon-512x512.svg',
               sizes: '512x512',
-              type: 'image/png'
-            },
-            {
-              src: '/icons/icon-512x512.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'any maskable'
+              type: 'image/svg+xml'
             }
           ]
         },
@@ -47,9 +37,12 @@ export default defineConfig(({ mode }) => {
           skipWaiting: true,
           clientsClaim: true,
           
+          // Improved cache management
+          cleanupOutdatedCaches: true,
+          
           // Disable runtime caching for authenticated routes
           runtimeCaching: [
-            // Only cache the root and login pages
+            // Root page - network first with short cache
             {
               urlPattern: /\/$/,
               handler: 'NetworkFirst',
@@ -61,18 +54,17 @@ export default defineConfig(({ mode }) => {
                 }
               }
             },
+            
+            // Login page - ALWAYS use network only (never cache)
             {
               urlPattern: /^\/login\/?$/,
-              handler: 'NetworkFirst',
+              handler: 'NetworkOnly',
               options: {
-                cacheName: 'login-page',
-                expiration: {
-                  maxEntries: 1,
-                  maxAgeSeconds: 60 * 5 // 5 minutes
-                }
+                cacheName: 'login-page'
               }
             },
-            // Cache assets but with a short expiration
+            
+            // JavaScript and CSS files - network first with medium cache
             {
               urlPattern: /\.(?:js|css)$/,
               handler: 'NetworkFirst',
@@ -84,6 +76,8 @@ export default defineConfig(({ mode }) => {
                 }
               }
             },
+            
+            // Images - cache first with long cache
             {
               urlPattern: /\.(?:png|jpg|jpeg|svg|gif)$/,
               handler: 'CacheFirst',
@@ -95,7 +89,8 @@ export default defineConfig(({ mode }) => {
                 }
               }
             },
-            // Cache font files
+            
+            // Google Fonts stylesheets
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com/i,
               handler: 'CacheFirst',
@@ -107,6 +102,8 @@ export default defineConfig(({ mode }) => {
                 }
               }
             },
+            
+            // Google Fonts webfonts
             {
               urlPattern: /^https:\/\/fonts\.gstatic\.com/i,
               handler: 'CacheFirst',
@@ -120,23 +117,21 @@ export default defineConfig(({ mode }) => {
             }
           ]
         },
-        // Disable service worker in development
         devOptions: {
-          enabled: false,
-          type: 'module'
+          enabled: false
         }
       })
     ],
     define: {
-      'import.meta.env': env, // Ensure env variables are available
+      'import.meta.env': env
     },
     optimizeDeps: {
-      exclude: ['lucide-react'],
+      exclude: ['lucide-react']
     },
     test: {
       globals: true,
       environment: 'jsdom',
-      setupFiles: ['./src/test/setup.ts'],
+      setupFiles: ['./src/test/setup.ts']
     }
   };
 });
