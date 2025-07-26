@@ -13,6 +13,7 @@ declare global {
   interface Window {
     checkForUpdates: () => Promise<boolean>;
     forceClearCache: () => void;
+    clearCacheAfterLogin: () => Promise<boolean>;
     isStandaloneMode: () => boolean;
   }
 }
@@ -23,21 +24,8 @@ const isStandaloneMode = () => {
          (window.navigator as any).standalone === true;
 };
 
-// Expose functions for PWA management
+// Expose functions globally
 window.isStandaloneMode = isStandaloneMode;
-window.checkForUpdates = serviceWorkerRegistration.checkForUpdates;
-window.forceClearCache = serviceWorkerRegistration.forceClearCacheAndReload;
-
-// Notify service worker about standalone mode
-const notifyServiceWorkerAboutStandaloneMode = () => {
-  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-    console.log('[Main] Notifying service worker about standalone mode:', isStandaloneMode());
-    navigator.serviceWorker.controller.postMessage({
-      type: 'SET_STANDALONE_MODE',
-      isStandalone: isStandaloneMode()
-    });
-  }
-};
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -53,9 +41,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 serviceWorkerRegistration.register({
   onSuccess: () => {
     console.log('[Main] Service Worker registered successfully');
-    notifyServiceWorkerAboutStandaloneMode();
   },
-  onUpdate: (registration) => {
+  onUpdate: () => {
     console.log('[Main] New app version available');
     
     // Show update notification to the user
@@ -65,16 +52,10 @@ serviceWorkerRegistration.register({
       title: 'تحديث الآن'
     }));
 
-    // Set up handler for update activation
-    const waitingWorker = registration.waiting;
-    if (waitingWorker) {
-      // Send skip waiting message to activate the new service worker
-      setTimeout(() => {
-        waitingWorker.postMessage({ type: 'SKIP_WAITING' });
-      }, 3000);
-    }
-
-    notifyServiceWorkerAboutStandaloneMode();
+    // Auto-update in background after a delay
+    setTimeout(() => {
+      serviceWorkerRegistration.forceClearCacheAndReload();
+    }, 3000);
   },
   onOffline: () => {
     store.dispatch(showError({
@@ -93,14 +74,10 @@ serviceWorkerRegistration.register({
   }
 });
 
-// Listen for standalone mode changes
-window.matchMedia('(display-mode: standalone)').addEventListener('change', () => {
-  console.log('[Main] Standalone mode changed:', isStandaloneMode());
-  notifyServiceWorkerAboutStandaloneMode();
-});
-
 // Listen for controller change and reload the page
-navigator.serviceWorker?.addEventListener('controllerchange', () => {
-  console.log('[Main] New service worker controller, reloading page');
-  window.location.reload();
-});
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    console.log('[Main] New service worker controller, reloading page');
+    window.location.reload();
+  });
+}

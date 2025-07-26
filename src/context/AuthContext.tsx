@@ -3,7 +3,6 @@ import api from '../utils/axiosInstance';
 import { jwtDecode } from 'jwt-decode';
 import { useLocation } from 'react-router-dom';
 import { extractApiData, handleApiError } from '../utils/apiResponseHandler';
-import * as serviceWorkerRegistration from '../serviceWorkerRegistration';
 import Cookies from 'js-cookie';
 
 interface AuthContextType {
@@ -173,50 +172,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsAuthenticated(true);
       setUserType(userType);
 
-      // Handle special mobile case - clear caches and inform service worker
-      if (isMobileDevice() && 'serviceWorker' in navigator) {
-        console.log('[Auth] Mobile device login detected, preparing service worker');
-
+      // Handle special mobile case - clear caches to avoid stale data
+      if (isMobileDevice()) {
+        console.log('[Auth] Mobile device login detected');
+        
         // Flag to check if we need to reload after login redirect
         sessionStorage.setItem('postLoginReload', 'true');
         
-        try {
-          // First, notify service worker to clear caches
-          const serviceWorkerController = navigator.serviceWorker.controller;
-          if (serviceWorkerController) {
-            return new Promise<void>((resolve) => {
-              const messageChannel = new MessageChannel();
-              
-              messageChannel.port1.onmessage = (event) => {
-                if (event.data.type === 'POST_LOGIN_CACHE_READY') {
-                  console.log('[Auth] Service worker prepared for post-login navigation');
-                  resolve();
-                }
-              };
-              
-              serviceWorkerController.postMessage(
-                { type: 'POST_LOGIN_CACHE_CLEAR' },
-                [messageChannel.port2]
-              );
-              
-              // Set a timeout in case the service worker doesn't respond
-              setTimeout(resolve, 2000);
-            });
-          }
-          
-          // Try to register for periodic background sync
-          navigator.serviceWorker.ready.then(async (registration) => {
-            if ('sync' in registration) {
-              try {
-                // @ts-ignore - TypeScript might not recognize the sync API
-                await registration.sync.register('keepalive');
-              } catch (syncErr) {
-                console.error('[Auth] Error registering background sync:', syncErr);
-              }
-            }
-          });
-        } catch (err) {
-          console.error('[Auth] Error preparing service worker for post-login:', err);
+        // Clear caches after login on mobile
+        if (typeof window.clearCacheAfterLogin === 'function') {
+          await window.clearCacheAfterLogin();
         }
       }
     } catch (error: any) {

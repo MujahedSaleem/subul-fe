@@ -66,38 +66,17 @@ const PWAInstallPrompt: React.FC = () => {
     
     standaloneMediaQuery.addEventListener('change', handleStandaloneChange);
 
-    // Check for service worker updates
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-      navigator.serviceWorker.ready.then(registration => {
-        // Check for waiting service worker
-        if (registration.waiting) {
-          setIsUpdateAvailable(true);
-        }
-        
-        // Listen for new updates
-        registration.addEventListener('updatefound', () => {
-          const newWorker = registration.installing;
-          if (newWorker) {
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                setIsUpdateAvailable(true);
-              }
-            });
-          }
-        });
-      });
-      
-      // Listen for messages from service worker
-      navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
-          setIsUpdateAvailable(true);
-        }
-      });
-    }
+    // Listen for update event from Vite PWA plugin
+    const refreshCallback = () => {
+      setIsUpdateAvailable(true);
+    };
+    
+    document.addEventListener('vite-pwa:update-available', refreshCallback);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       standaloneMediaQuery.removeEventListener('change', handleStandaloneChange);
+      document.removeEventListener('vite-pwa:update-available', refreshCallback);
     };
   }, [dispatch]);
 
@@ -120,28 +99,27 @@ const PWAInstallPrompt: React.FC = () => {
   };
 
   const handleUpdateClick = () => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.ready.then(registration => {
-        if (registration.waiting) {
-          // Send message to service worker to skip waiting and activate new version
-          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-        } else {
-          // Manually check for updates
-          dispatch(showSuccess({ message: 'جاري التحقق من وجود تحديثات...' }));
-          serviceWorkerRegistration.checkForUpdates()
-            .then(hasUpdates => {
-              if (!hasUpdates) {
-                dispatch(showSuccess({ message: 'أنت تستخدم أحدث إصدار من التطبيق' }));
-              }
-            });
-        }
-      });
-    }
+    dispatch(showSuccess({ message: 'جاري تحديث التطبيق...', duration: 3000 }));
+    setTimeout(() => {
+      serviceWorkerRegistration.forceClearCacheAndReload();
+    }, 1000);
   };
 
   const handleForceRefreshClick = () => {
     dispatch(showSuccess({ message: 'جاري تحديث التطبيق بالكامل...', duration: 3000 }));
     serviceWorkerRegistration.forceClearCacheAndReload();
+  };
+
+  const handleCheckUpdatesClick = async () => {
+    dispatch(showSuccess({ message: 'جاري التحقق من وجود تحديثات...', duration: 3000 }));
+    const hasUpdate = await serviceWorkerRegistration.checkForUpdates();
+    
+    if (!hasUpdate) {
+      dispatch(showSuccess({ 
+        message: 'أنت تستخدم أحدث إصدار من التطبيق', 
+        duration: 3000 
+      }));
+    }
   };
 
   // For standalone mode, don't show any UI
@@ -202,7 +180,7 @@ const PWAInstallPrompt: React.FC = () => {
         <Button
           size="sm"
           className="flex items-center gap-2 bg-gray-500 shadow-lg opacity-80 hover:opacity-100"
-          onClick={handleUpdateClick}
+          onClick={handleCheckUpdatesClick}
           placeholder=""
           onPointerEnterCapture={null}
           onPointerLeaveCapture={null}
