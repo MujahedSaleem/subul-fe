@@ -10,6 +10,8 @@
   <body>
     <div id="root"></div>
     <noscript>يجب تفعيل JavaScript لتشغيل هذا التطبيق.</noscript>
+    <!-- Clean up old service workers before loading the app -->
+    <script src="/sw-cleanup.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
