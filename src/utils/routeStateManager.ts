@@ -1,7 +1,7 @@
 /**
  * Route State Manager
  * 
- * Utilities to save and restore the current route when the PWA is backgrounded and resumed
+ * Utilities to save and restore the current route when the app is restored
  */
 
 const ROUTE_STATE_KEY = 'subul-current-route';

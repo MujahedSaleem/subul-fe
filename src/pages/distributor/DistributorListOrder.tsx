@@ -70,14 +70,9 @@ const DistributorListOrder: React.FC = () => {
       console.log('[DistributorListOrder] Force reload detected after login');
       sessionStorage.removeItem('forceReload'); // Clear the flag
       
-      // Force a complete cache refresh and reload
-      if (typeof window.forceClearCache === 'function') {
-        console.log('[DistributorListOrder] Forcing cache clear and reload');
-        window.forceClearCache();
-      } else {
-        console.log('[DistributorListOrder] Fallback to normal reload');
-        window.location.reload();
-      }
+      // Force a page reload
+      console.log('[DistributorListOrder] Forcing page reload');
+      window.location.reload();
     }
   }, []);
 
@@ -129,56 +124,6 @@ const DistributorListOrder: React.FC = () => {
       return false;
     }
   }, [fetchOrders]);
-
-  // Special handling for standalone mode
-  useEffect(() => {
-    // Check if running in standalone mode (installed PWA)
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
-                        (window.navigator as any).standalone === true;
-    
-    if (isStandalone) {
-      console.log('[DistributorListOrder] Running in standalone mode');
-      
-      // Force update check on load for standalone mode
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.ready.then(registration => {
-          console.log('[DistributorListOrder] Checking for updates in standalone mode');
-          registration.update().then(() => {
-            // If there's a waiting worker, activate it immediately
-            if (registration.waiting) {
-              console.log('[DistributorListOrder] New version found, activating silently');
-              registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-            }
-          });
-        });
-      }
-      
-      // Set up periodic refresh for standalone mode (more frequently)
-      const dataRefreshInterval = setInterval(() => {
-        console.log('[DistributorListOrder] Periodic data refresh for standalone mode');
-        fetchOrdersIfChanged(true); // Force check for changes
-      }, 15 * 1000); // Every 15 seconds
-      
-      // Set up periodic service worker update checks
-      const swUpdateInterval = setInterval(() => {
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.ready.then(registration => {
-            registration.update().then(() => {
-              // If there's a waiting worker, activate it immediately
-              if (registration.waiting) {
-                registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-              }
-            });
-          });
-        }
-      }, 20 * 1000); // Every 20 seconds
-      
-      return () => {
-        clearInterval(dataRefreshInterval);
-        clearInterval(swUpdateInterval);
-      };
-    }
-  }, [fetchOrdersIfChanged]);
 
   // Setup auto-refresh interval (every 5 seconds)
   useEffect(() => {

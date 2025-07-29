@@ -1,129 +1,49 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
-import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
 
   return {
     plugins: [
-      react(),
-      VitePWA({
-        registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'robots.txt', 'apple-touch-icon.png', 'offline.html'],
-        manifest: {
-          name: 'Subul - Gas Distribution System',
-          short_name: 'Subul',
-          description: 'Gas distribution and delivery management system',
-          theme_color: '#ffffff',
-          icons: [
-            {
-              src: '/icons/icon-192x192.svg',
-              sizes: '192x192',
-              type: 'image/svg+xml'
-            },
-            {
-              src: '/icons/icon-512x512.svg',
-              sizes: '512x512',
-              type: 'image/svg+xml'
-            }
-          ]
-        },
-        workbox: {
-          // Never cache the API calls or authenticated routes
-          navigateFallbackDenylist: [/^\/api\//, /^\/admin\//, /^\/distributor\//],
-          
-          // Skip service worker registration after login
-          skipWaiting: true,
-          clientsClaim: true,
-          
-          // Improved cache management
-          cleanupOutdatedCaches: true,
-          
-          // Disable runtime caching for authenticated routes
-          runtimeCaching: [
-            // Root page - network first with short cache
-            {
-              urlPattern: /\/$/,
-              handler: 'NetworkFirst',
-              options: {
-                cacheName: 'start-url',
-                expiration: {
-                  maxEntries: 1,
-                  maxAgeSeconds: 60 * 5 // 5 minutes
-                }
-              }
-            },
-            
-            // Login page - ALWAYS use network only (never cache)
-            {
-              urlPattern: /^\/login\/?$/,
-              handler: 'NetworkOnly',
-              options: {
-                cacheName: 'login-page'
-              }
-            },
-            
-            // JavaScript and CSS files - network first with medium cache
-            {
-              urlPattern: /\.(?:js|css)$/,
-              handler: 'NetworkFirst',
-              options: {
-                cacheName: 'js-css',
-                expiration: {
-                  maxEntries: 50,
-                  maxAgeSeconds: 60 * 60 // 1 hour
-                }
-              }
-            },
-            
-            // Images - cache first with long cache
-            {
-              urlPattern: /\.(?:png|jpg|jpeg|svg|gif)$/,
-              handler: 'CacheFirst',
-              options: {
-                cacheName: 'images',
-                expiration: {
-                  maxEntries: 50,
-                  maxAgeSeconds: 60 * 60 * 24 // 24 hours
-                }
-              }
-            },
-            
-            // Google Fonts stylesheets
-            {
-              urlPattern: /^https:\/\/fonts\.googleapis\.com/i,
-              handler: 'CacheFirst',
-              options: {
-                cacheName: 'google-fonts',
-                expiration: {
-                  maxEntries: 10,
-                  maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
-                }
-              }
-            },
-            
-            // Google Fonts webfonts
-            {
-              urlPattern: /^https:\/\/fonts\.gstatic\.com/i,
-              handler: 'CacheFirst',
-              options: {
-                cacheName: 'gstatic-fonts',
-                expiration: {
-                  maxEntries: 10,
-                  maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
-                }
-              }
-            }
-          ]
-        },
-        devOptions: {
-          enabled: false
-        }
-      })
+      react()
     ],
     define: {
-      'import.meta.env': env
+      __APP_ENV__: JSON.stringify(env.APP_ENV),
+    },
+    server: {
+      port: 3000,
+      host: true,
+      proxy: {
+        '/api': {
+          target: env.VITE_API_BASE_URL || 'http://localhost:8000',
+          changeOrigin: true,
+          secure: false,
+          configure: (proxy, _options) => {
+            proxy.on('error', (err, _req, _res) => {
+              console.log('proxy error', err);
+            });
+            proxy.on('proxyReq', (proxyReq, req, _res) => {
+              console.log('Sending Request to the Target:', req.method, req.url);
+            });
+            proxy.on('proxyRes', (proxyRes, req, _res) => {
+              console.log('Received Response from the Target:', proxyRes.statusCode, req.url);
+            });
+          },
+        }
+      }
+    },
+    build: {
+      outDir: 'dist',
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            vendor: ['react', 'react-dom'],
+            router: ['react-router-dom'],
+            ui: ['@headlessui/react'],
+          },
+        },
+      },
     },
     optimizeDeps: {
       exclude: ['lucide-react']

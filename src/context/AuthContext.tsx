@@ -183,46 +183,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const userType = decodedToken.role;
       localStorage.setItem('userType', userType);
 
-      // Simple approach: unregister service worker on login
-      if ('serviceWorker' in navigator) {
-        console.log('[Auth] Unregistering service workers on login');
-        navigator.serviceWorker.getRegistrations().then(async (registrations) => {
-          // If we have any service workers, unregister them
-          if (registrations.length > 0) {
-            for (const registration of registrations) {
-              await registration.unregister();
-            }
-            console.log('[Auth] Service workers unregistered');
-            
-            // Clear caches after login
-            if ('caches' in window) {
-              try {
-                const keys = await caches.keys();
-                await Promise.all(keys.map(key => caches.delete(key)));
-                console.log('[Auth] All caches cleared');
-              } catch (err) {
-                console.error('[Auth] Error clearing caches:', err);
-              }
-            }
-          }
-        }).catch(err => {
-          console.error('[Auth] Error unregistering service worker:', err);
-        });
-      }
-
       // Update authentication state
       setIsAuthenticated(true);
       setUserType(userType);
       
-      // Use a hard navigation to the target page after login for a cleaner state
-      // This bypasses the React Router navigation which might have caching issues
+      // Navigate to the appropriate dashboard
       const targetPath = userType === "Admin" ? '/admin' : '/distributor/orders';
-      
-      // Small delay to ensure auth state is properly set
-      setTimeout(() => {
-        // Use window.location for a clean navigation that bypasses service worker cache
-        window.location.href = targetPath;
-      }, 50);
+      window.location.href = targetPath;
 
     } catch (error: any) {
       console.error('Login failed:', error);
@@ -240,40 +207,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsAuthenticated(false);
     setUserType(null);
     
-    // Handle service worker cleanup on logout
-    if ('serviceWorker' in navigator) {
-      console.log('[Auth] Unregistering service workers on logout');
-      navigator.serviceWorker.getRegistrations()
-        .then(async (registrations) => {
-          // Unregister all service workers
-          for (const registration of registrations) {
-            await registration.unregister();
-          }
-          console.log('[Auth] Service workers unregistered on logout');
-          
-          // Clear all caches
-          if ('caches' in window) {
-            try {
-              const keys = await caches.keys();
-              await Promise.all(keys.map(key => caches.delete(key)));
-              console.log('[Auth] All caches cleared on logout');
-            } catch (err) {
-              console.error('[Auth] Error clearing caches on logout:', err);
-            }
-          }
-          
-          // Force reload to login page after cleanup is complete
-          window.location.href = '/login';
-        })
-        .catch(err => {
-          console.error('[Auth] Error during logout cleanup:', err);
-          // If there's an error in the cleanup, still redirect to login
-          window.location.href = '/login';
-        });
-    } else {
-      // If service worker isn't available, just redirect
-      window.location.href = '/login';
-    }
+    // Redirect to login page
+    window.location.href = '/login';
   };
 
   return (
