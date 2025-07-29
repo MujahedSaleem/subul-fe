@@ -67,13 +67,40 @@ jobs:
           # Navigate to frontend directory and pull latest code
           cd ${{ vars.FRONTEND_DEPLOY_PATH || '/home/deployer/subul-fe' }}
           echo "📥 Pulling latest frontend code..."
-          git fetch origin
           
           # Determine which branch to checkout
           FRONTEND_BRANCH="${{ github.event.client_payload.ref || github.event.inputs.frontend_ref || github.ref_name || 'main' }}"
-          echo "🔀 Checking out branch: $FRONTEND_BRANCH"
-          git checkout $FRONTEND_BRANCH
-          git pull origin $FRONTEND_BRANCH
+          echo "🔀 Preparing to checkout branch: $FRONTEND_BRANCH"
+          
+          # Save current status
+          git status --porcelain > /tmp/git_status.txt
+          
+          # Stash any local changes
+          if [ -s /tmp/git_status.txt ]; then
+            echo "⚠️ Found local changes, stashing them..."
+            git stash push -m "Auto-stash before deployment $(date)"
+          fi
+          
+          # Fetch all branches and tags
+          git fetch --all --prune
+          
+          # Force checkout to the target branch (discard local changes)
+          echo "🔀 Force checking out branch: $FRONTEND_BRANCH"
+          git checkout -f $FRONTEND_BRANCH
+          
+          # Handle divergent branches with merge strategy
+          echo "🔄 Syncing with remote origin/$FRONTEND_BRANCH"
+          
+          # Try to pull with merge strategy first
+          if git pull origin $FRONTEND_BRANCH --no-rebase 2>/dev/null; then
+            echo "✅ Successfully merged with remote"
+          else
+            echo "⚠️ Merge failed, forcing reset to remote state"
+            git reset --hard origin/$FRONTEND_BRANCH
+            git clean -fd
+          fi
+          
+          echo "✅ Repository is now clean and up to date with origin/$FRONTEND_BRANCH"
           
           # Navigate to backend directory for docker compose
           cd /home/deployer/subul-be
