@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { extractApiData } from './apiResponseHandler';
+import { getStoredTokens, storeTokens, clearTokens } from './tokenUtils';
 import Cookies from 'js-cookie';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -24,6 +25,7 @@ const axiosInstance = axios.create({
 
 // Flag to prevent multiple refresh requests
 let isRefreshing = false;
+let refreshPromise: Promise<string> | null = null;
 let failedQueue: Array<{
   resolve: (value?: any) => void;
   reject: (error?: any) => void;
@@ -39,6 +41,7 @@ const processQueue = (error: any, token: string | null = null) => {
   });
   
   failedQueue = [];
+  refreshPromise = null;
 };
 
 // Request interceptor
@@ -64,94 +67,99 @@ axiosInstance.interceptors.response.use(
     // If the error is due to an expired token
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {
-        // If we're already refreshing, queue this request
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        }).then(token => {
-          originalRequest.headers['Authorization'] = `Bearer ${token}`;
-          return axios(originalRequest);
-        }).catch(err => {
-          return Promise.reject(err);
-        });
+        // If we're already refreshing, wait for the existing refresh to complete
+        if (refreshPromise) {
+          try {
+            const newToken = await refreshPromise;
+            originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+            return axios(originalRequest);
+          } catch (refreshError) {
+            return Promise.reject(refreshError);
+          }
+        } else {
+          // Fallback to queueing if no promise is available
+          return new Promise((resolve, reject) => {
+            failedQueue.push({ resolve, reject });
+          }).then(token => {
+            originalRequest.headers['Authorization'] = `Bearer ${token}`;
+            return axios(originalRequest);
+          }).catch(err => {
+            return Promise.reject(err);
+          });
+        }
       }
 
       originalRequest._retry = true;
       isRefreshing = true;
 
-      // Try to get refresh token from localStorage first, then from cookies
-      let refreshToken = localStorage.getItem('refreshToken');
-      
-      // If not in localStorage, try cookies
-      if (!refreshToken) {
-        refreshToken = Cookies.get(REFRESH_TOKEN_COOKIE) || null;
-        
-        // If found in cookies, save to localStorage for consistency
-        if (refreshToken) {
-          console.log('Found refresh token in cookies during refresh attempt');
-          localStorage.setItem('refreshToken', refreshToken);
-        }
-      }
-      
-      if (refreshToken) {
+      // Create a refresh promise that other requests can wait for
+      refreshPromise = new Promise(async (resolve, reject) => {
         try {
+          // Get the most current refresh token (important for rotation)
+          const { refreshToken } = getStoredTokens();
+          
+          if (!refreshToken) {
+            throw new Error('No refresh token available');
+          }
+
           const response = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken });
 
           // Use unified response handling for token refresh
           const { accessToken, refreshToken: newRefreshToken } = extractApiData<{ accessToken: string; refreshToken: string }>(response.data);
           
-          // Store in localStorage
-          localStorage.setItem('accessToken', accessToken);
+          // Store tokens using utility function (handles rotation)
           if (newRefreshToken) {
-            localStorage.setItem('refreshToken', newRefreshToken);
-            
-            // Also store in cookies as backup
-            Cookies.set(REFRESH_TOKEN_COOKIE, newRefreshToken, COOKIE_OPTIONS);
+            storeTokens(accessToken, newRefreshToken);
+          } else {
+            localStorage.setItem('accessToken', accessToken);
           }
           
-          // Update the authorization header for the original request
-          originalRequest.headers['Authorization'] = `Bearer ${accessToken}`;
-          
-          // Process the queue with the new token
-          processQueue(null, accessToken);
-          
-          return axios(originalRequest);
-        } catch (refreshError) {
-          // Handle refresh token failure
+          resolve(accessToken);
+        } catch (refreshError: any) {
           console.error('Token refresh failed', refreshError);
-          processQueue(refreshError, null);
           
-          // Clear tokens from both localStorage and cookies
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('userType');
-          Cookies.remove(REFRESH_TOKEN_COOKIE);
+          // Only logout if it's actually an authentication error
+          const isAuthError = refreshError.response?.status === 401 || 
+                             refreshError.response?.status === 403 ||
+                             refreshError.response?.data?.message?.includes('token') ||
+                             refreshError.response?.data?.message?.includes('expired') ||
+                             refreshError.response?.data?.message?.includes('invalid');
           
-          // Dispatch a custom event to notify AuthContext
-          window.dispatchEvent(new CustomEvent('auth:logout'));
-          
-          // Only redirect if not already on login page
-          if (!window.location.pathname.includes('/login')) {
-            window.location.href = '/login';
+          if (isAuthError) {
+            console.log('[Auth] Authentication error, logging out user');
+            clearTokens();
+            
+            // Dispatch a custom event to notify AuthContext
+            window.dispatchEvent(new CustomEvent('auth:logout'));
+            
+            // Only redirect if not already on login page
+            if (!window.location.pathname.includes('/login')) {
+              window.location.href = '/login';
+            }
+          } else {
+            console.log('[Auth] Refresh failed due to network/server error, keeping user logged in');
           }
           
-          return Promise.reject(refreshError);
-        } finally {
-          isRefreshing = false;
+          reject(refreshError);
         }
-      } else {
-        // No refresh token available
+      });
+      
+      try {
+        const newToken = await refreshPromise;
+        
+        // Update the authorization header for the original request
+        originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+        
+        // Process the queue with the new token
+        processQueue(null, newToken);
+        
+        return axios(originalRequest);
+      } catch (refreshError) {
+        // Handle refresh failure
+        processQueue(refreshError, null);
+        return Promise.reject(refreshError);
+      } finally {
         isRefreshing = false;
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('userType');
-        Cookies.remove(REFRESH_TOKEN_COOKIE);
-        
-        // Dispatch a custom event to notify AuthContext
-        window.dispatchEvent(new CustomEvent('auth:logout'));
-        
-        if (!window.location.pathname.includes('/login')) {
-          window.location.href = '/login';
-        }
       }
     }
 

@@ -1,3 +1,6 @@
+/* Add Noto Sans Arabic font */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -14,14 +17,12 @@
     @apply disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-200;
   }
 }
+
 /* RTL Support */
 *[dir="rtl"] {
   direction: rtl;
   text-align: right;
 }
-
-/* Add Noto Sans Arabic font */
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap');
 
 body {
   font-family: 'Noto Sans Arabic', sans-serif;

@@ -3,6 +3,8 @@ import api from '../utils/axiosInstance';
 import { jwtDecode } from 'jwt-decode';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { extractApiData, handleApiError } from '../utils/apiResponseHandler';
+import { checkTokenValidity, shouldRefreshToken, getStoredTokens, storeTokens, clearTokens } from '../utils/tokenUtils';
+import { initTokenSync, cleanupTokenSync, addTokenSyncListener, removeTokenSyncListener } from '../utils/tokenSync';
 import Cookies from 'js-cookie';
 
 interface AuthContextType {
@@ -53,7 +55,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const location = useLocation();
   const navigate = useNavigate();
 
-  useEffect(() => {
+    useEffect(() => {
     // Listen for logout events from axiosInstance
     const handleLogout = () => {
       setIsAuthenticated(false);
@@ -61,9 +63,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     };
 
+    // Handle token sync from other tabs
+    const handleTokenSync = () => {
+      console.log('[Auth] Token change detected from another tab, refreshing auth state');
+      const { accessToken, refreshToken } = getStoredTokens();
+      
+      if (accessToken && refreshToken) {
+        const tokenInfo = checkTokenValidity(accessToken);
+        if (tokenInfo.isValid && !tokenInfo.isExpired) {
+          setIsAuthenticated(true);
+          setUserType(tokenInfo.userType!);
+        }
+      } else {
+        // Tokens were cleared in another tab
+        setIsAuthenticated(false);
+        setUserType(null);
+      }
+    };
+
+    // Initialize token synchronization
+    initTokenSync();
+    addTokenSyncListener(handleTokenSync);
     window.addEventListener('auth:logout', handleLogout);
-    return () => window.removeEventListener('auth:logout', handleLogout);
-  }, []);
+    
+    // Set up periodic token check (every 5 minutes)
+    const tokenCheckInterval = setInterval(() => {
+      const { accessToken, refreshToken } = getStoredTokens();
+      
+      if (accessToken && refreshToken && isAuthenticated) {
+        if (shouldRefreshToken(accessToken, 5)) {
+          console.log('[Auth] Proactively refreshing token that expires soon');
+          refreshTokens(refreshToken);
+        }
+      }
+    }, 5 * 60 * 1000); // Check every 5 minutes
+    
+    return () => {
+      window.removeEventListener('auth:logout', handleLogout);
+      removeTokenSyncListener(handleTokenSync);
+      cleanupTokenSync();
+      clearInterval(tokenCheckInterval);
+    };
+  }, [isAuthenticated]);
 
   useEffect(() => {
     // Handle post-login forced reload
@@ -79,74 +120,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    const accessToken = localStorage.getItem('accessToken');
-    let refreshToken = localStorage.getItem('refreshToken');
-
-    // If refresh token is not in localStorage, try to get it from cookies
-    if (!refreshToken) {
-      refreshToken = Cookies.get(REFRESH_TOKEN_COOKIE) || null;
-      // If found in cookies, also save to localStorage for consistency
-      if (refreshToken) {
-        console.log('Found refresh token in cookies, saving to localStorage');
-        localStorage.setItem('refreshToken', refreshToken);
-      }
-    }
+    const { accessToken, refreshToken } = getStoredTokens();
 
     if (accessToken && refreshToken) {
-      try {
-        const decodedToken: any = jwtDecode(accessToken);
-        const currentTime = Date.now() / 1000;
-        
-        // Check if token is expired
-        if (decodedToken.exp < currentTime) {
-          // Token is expired, but let axiosInstance handle refresh on first API call
-          // Just set the user type from the expired token for now
-          setUserType(decodedToken.role);
-          setIsAuthenticated(true);
-          setLoading(false);
-        } else {
-          // Token is valid
-          setIsAuthenticated(true);
-          setUserType(decodedToken.role);
-          setLoading(false);
-        }
-      } catch (error) {
-        try {
-          refreshTokens(refreshToken);
-        } catch (error) {
-          console.error('Error decoding token:', error);
-          // Invalid token format
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('userType');
-          Cookies.remove(REFRESH_TOKEN_COOKIE);
-          setIsAuthenticated(false);
-          setUserType(null);
-          setLoading(false);
-        }
-     
+      const tokenInfo = checkTokenValidity(accessToken);
+      
+      if (!tokenInfo.isValid) {
+        console.log('[Auth] Invalid access token format, attempting refresh');
+        refreshTokens(refreshToken);
+      } else if (tokenInfo.isExpired) {
+        console.log('[Auth] Access token expired, attempting refresh');
+        refreshTokens(refreshToken);
+      } else if (shouldRefreshToken(accessToken, 5)) {
+        console.log('[Auth] Access token expires soon, will refresh on next API call');
+        setIsAuthenticated(true);
+        setUserType(tokenInfo.userType!);
+        setLoading(false);
+      } else {
+        console.log('[Auth] Access token is valid');
+        setIsAuthenticated(true);
+        setUserType(tokenInfo.userType!);
+        setLoading(false);
       }
     } else if (refreshToken) {
       // Only refresh token exists, try to refresh
+      console.log('[Auth] Only refresh token found, attempting to get new access token');
       refreshTokens(refreshToken);
     } else {
       // No tokens
+      console.log('[Auth] No tokens found');
       setIsAuthenticated(false);
       setLoading(false);
     }
-  }, [location.pathname, isAuthenticated, navigate]);
+  }, []);
 
   const refreshTokens = async (refreshToken: string) => {
     try {
       const response = await api.post('/auth/refresh', { refreshToken });
       const { accessToken, refreshToken: newRefreshToken } = extractApiData<RefreshResponse>(response.data);
       
-      // Store in localStorage
-      localStorage.setItem('accessToken', accessToken);
-      localStorage.setItem('refreshToken', newRefreshToken);
-      
-      // Also store refresh token in cookies as a backup
-      Cookies.set(REFRESH_TOKEN_COOKIE, newRefreshToken, COOKIE_OPTIONS);
+      // Store tokens using utility function
+      storeTokens(accessToken, newRefreshToken);
 
       const decodedToken: any = jwtDecode(accessToken);
       const userType = decodedToken.role;
@@ -155,11 +169,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     } catch (error) {
       console.error('Token refresh failed:', error);
-      // Clear tokens
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('userType');
-      Cookies.remove(REFRESH_TOKEN_COOKIE);
+      // Clear all tokens
+      clearTokens();
       setIsAuthenticated(false);
       setUserType(null);
       setLoading(false);
@@ -173,11 +184,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { accessToken, refreshToken } = extractApiData<LoginResponse>(response.data);
 
       // Store tokens in localStorage
-      localStorage.setItem('accessToken', accessToken);
-      localStorage.setItem('refreshToken', refreshToken);
-      
-      // Also store refresh token in cookies as a backup
-      Cookies.set(REFRESH_TOKEN_COOKIE, refreshToken, COOKIE_OPTIONS);
+      // Store tokens using utility function
+      storeTokens(accessToken, refreshToken);
 
       const decodedToken: any = jwtDecode(accessToken);
       const userType = decodedToken.role;
@@ -200,10 +208,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     // Clear all auth tokens and state
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('userType');
-    Cookies.remove(REFRESH_TOKEN_COOKIE);
+    clearTokens();
     setIsAuthenticated(false);
     setUserType(null);
     
