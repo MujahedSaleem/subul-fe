@@ -103,9 +103,9 @@ const Orders = () => {
   // Only fetch distributors once when component mounts
   useEffect(() => {
     if (!distributorsFetched.current && distributors.length === 0 && !distributorsLoading) {
-      console.log('Fetching distributors...');
+      console.log('Fetching active distributors...');
       distributorsFetched.current = true;
-      dispatch(fetchDistributors());
+      dispatch(fetchDistributors({ activeOnly: true }));
     }
   }, [dispatch, distributors.length, distributorsLoading]);
 

@@ -23,9 +23,10 @@ const initialState: DistributorState = {
 // Track pending requests to prevent duplicates
 const pendingRequests = new Map<string, Promise<Distributor[]>>();
 
-export const fetchDistributors = createAsyncThunk<Distributor[], boolean | void, { state: RootState }>(
+export const fetchDistributors = createAsyncThunk<Distributor[], { force?: boolean; activeOnly?: boolean } | void, { state: RootState }>(
   'distributors/fetchDistributors',
-  async (force = false, { rejectWithValue, getState }) => {
+  async (options = {}, { rejectWithValue, getState }) => {
+    const { force = false, activeOnly = false } = options;
     const state = getState();
     
     // If distributors are already loaded and not loading, return cached data unless force=true
@@ -34,13 +35,14 @@ export const fetchDistributors = createAsyncThunk<Distributor[], boolean | void,
     }
     
     // Check if there's already a pending request
-    const requestKey = 'fetchDistributors';
+    const requestKey = `fetchDistributors_${activeOnly}`;
     if (!force && pendingRequests.has(requestKey)) {
       return await pendingRequests.get(requestKey)!;
     }
     
     try {
-      const requestPromise = axiosInstance.get('/distributors').then(response => {
+      const params = activeOnly ? { IsActive: true } : {};
+      const requestPromise = axiosInstance.get('/distributors', { params }).then(response => {
         const data = extractApiData<Distributor[]>(response.data);
         pendingRequests.delete(requestKey);
         return data;
