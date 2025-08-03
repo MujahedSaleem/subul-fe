@@ -19,6 +19,7 @@ import Loader from '../../components/admin/shared/Loader';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faSyncAlt } from '@fortawesome/free-solid-svg-icons';
 import axiosInstance from '../../utils/axiosInstance';
+import { openGoogleMapsApp } from '../../utils/geo_utils';
 
 interface FilterState {
   distributorId: string | null;
@@ -266,17 +267,13 @@ const Orders = () => {
       dispatch(showWarning({ message: 'لا توجد إحداثيات متوفرة لهذا الموقع' }));
       return;
     }
-    const [latitude, longitude] = location.coordinates.split(',').map(Number);
-
-    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
-    if (isMobileDevice) {
-      const googleMapsUrl = `geo:${latitude},${longitude}?q=${latitude},${longitude}`;
-      window.location.href = googleMapsUrl;
-    } else {
-      const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
-      window.open(url, '_blank');
+    const [latitude, longitude] = location.coordinates.split(',').map(coord => coord.trim());
+    if (!latitude || !longitude) {
+      dispatch(showError({message: 'تنسيق الإحداثيات غير صحيح. يجب أن يكون بالشكل: خط العرض، خط الطول'}));
+      return;
     }
+
+    openGoogleMapsApp(Number(latitude), Number(longitude));
   }, [dispatch]);
 
   // Memoize active distributors to prevent unnecessary re-renders

@@ -3,12 +3,11 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import { faPlus, faPenToSquare, faTrash, faSearch, faLocationDot, faPhone } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import Button from '../../components/Button';
 import IconButton from '../../components/IconButton';
 import { useCustomers } from '../../hooks/useCustomers';
 import { useAppDispatch } from '../../store/hooks';
 import { showSuccess, showError } from '../../store/slices/notificationSlice';
-import { Card, CardHeader, CardBody, Typography, Input } from '@material-tailwind/react';
+import { Card, CardHeader, CardBody, Typography } from '@material-tailwind/react';
 import Loader from '../../components/admin/shared/Loader';
 
 const Customers: React.FC = () => {

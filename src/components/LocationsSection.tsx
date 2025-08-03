@@ -5,6 +5,7 @@ import IconButton from "./IconButton";
 import { Input } from "@material-tailwind/react";
 import { showError } from "../store/slices/notificationSlice";
 import { useAppDispatch } from "../store/hooks";
+import { openGoogleMapsApp } from "../utils/geo_utils";
 
 interface Location {
   id: number;
@@ -39,17 +40,7 @@ const LocationsSection: React.FC<LocationsSectionProps> = ({
       return;
     }
 
-    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
-    if (isMobileDevice) {
-      // For mobile, use geo: protocol for better app integration
-      const googleMapsUrl = `geo:${latitude},${longitude}?q=${latitude},${longitude}`;
-      window.location.href = googleMapsUrl;
-    } else {
-      // For desktop, open in navigation/driving mode
-      const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
-      window.open(url, '_blank');
-    }
+    openGoogleMapsApp(Number(latitude), Number(longitude));
   };
 
   return (

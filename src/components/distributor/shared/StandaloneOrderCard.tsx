@@ -14,6 +14,7 @@ import { showError, showWarning, showSuccess, showInfo } from '../../../store/sl
 import axiosInstance from '../../../utils/axiosInstance';
 import { getCurrentLocation } from '../../../services/locationService';
 import { updateDistributorCustomerLocation } from '../../../store/slices/distributorCustomersSlice';
+import { openGoogleMapsApp } from '../../../utils/geo_utils';
 
 interface StandaloneOrderCardProps {
   initialOrder: OrderList;
@@ -119,17 +120,7 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
     }
 
     const [latitude, longitude] = coordinates.split(',').map(Number);
-    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
-    if (isMobileDevice) {
-      // For mobile, use geo: protocol for better app integration
-      const googleMapsUrl = `geo:${latitude},${longitude}?q=${latitude},${longitude}`;
-      window.location.href = googleMapsUrl;
-    } else {
-      // For desktop, open in navigation/driving mode
-      const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
-      window.open(url, '_blank');
-    }
+    openGoogleMapsApp(Number(latitude), Number(longitude));
   };
 
   const handleStartCostEdit = () => {

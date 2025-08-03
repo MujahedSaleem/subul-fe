@@ -1,6 +1,7 @@
 import { faCheckCircle, faHourglassHalf, faCircleCheck, faPencil } from '@fortawesome/free-solid-svg-icons';
 import { Customer, Location } from '../types/customer';
 import { OrderList } from '../types/order';
+import { openGoogleMapsApp } from './geo_utils';
 
 /**
  * Status configuration for order status badges and display
@@ -80,18 +81,12 @@ export const handleOpenLocation = (location: Location): void => {
     return;
   }
   
-  const [latitude, longitude] = location.coordinates.split(',').map(Number);
-  const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  
-  if (isMobileDevice) {
-    // For mobile, use geo: protocol for better app integration
-    const googleMapsUrl = `geo:${latitude},${longitude}?q=${latitude},${longitude}`;
-    window.location.href = googleMapsUrl;
-  } else {
-    // For desktop, open in navigation/driving mode
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
-    window.open(url, '_blank');
+  const [latitude, longitude] = location.coordinates.split(',').map(coord => coord.trim());
+  if (!latitude || !longitude) {
+    return;
   }
+
+  openGoogleMapsApp(Number(latitude), Number(longitude));
 };
 
 /**

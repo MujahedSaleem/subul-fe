@@ -12,6 +12,7 @@ import { fetchOrders, deleteOrder, confirmOrder } from '../../../store/slices/or
 import { fetchActiveDistributors, selectActiveDistributors, selectIsLoading as selectDistributorsLoading } from '../../../store/slices/distributorSlice';
 import { showSuccess, showError, showWarning } from '../../../store/slices/notificationSlice';
 import { RootState } from '../../../store/store';
+import { openGoogleMapsApp } from '../../../utils/geo_utils';
 
 const OrdersList: React.FC = () => {
   const navigate = useNavigate();
@@ -142,13 +143,7 @@ const OrdersList: React.FC = () => {
   const handleOpenLocation = (location: CustomerLocation) => {
     if (location?.coordinates) {
       const [latitude, longitude] = location.coordinates.split(',').map(coord => coord.trim());
-      if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-        const googleMapsUrl = `geo:0,0?q=${encodeURIComponent(latitude)},${encodeURIComponent(longitude)}`;
-        window.location.href = googleMapsUrl;
-      } else {
-        const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(latitude)},${encodeURIComponent(longitude)}`;
-        window.open(url, '_blank');
-      }
+      openGoogleMapsApp(Number(latitude), Number(longitude));
     } else {
       dispatch(showWarning({ message: 'لا توجد إحداثيات متوفرة لهذا الموقع' }));
     }

@@ -9,7 +9,8 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useAppDispatch } from "../store/hooks";
 import { showWarning } from "../store/slices/notificationSlice";
 import Button from "./Button";
-
+import { openGoogleMapsApp } from "../utils/geo_utils";
+  
 interface LocationSelectorProps {
   order: OrderList | undefined;
   setOrder: React.Dispatch<React.SetStateAction<OrderList | undefined>>;
@@ -145,17 +146,7 @@ const LocationSelector = forwardRef<HTMLDivElement, LocationSelectorProps>((
     }
 
     const [latitude, longitude] = coordinates.split(',').map(Number);
-    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
-    if (isMobileDevice) {
-      // For mobile, use geo: protocol for better app integration
-      const googleMapsUrl = `geo:${latitude},${longitude}?q=${latitude},${longitude}`;
-      window.location.href = googleMapsUrl;
-    } else {
-      // For desktop, open in navigation/driving mode
-      const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
-      window.open(url, '_blank');
-    }
+    openGoogleMapsApp(latitude, longitude);
   };
 
   const handleEditLocation = (e: React.MouseEvent, location: Location) => {
