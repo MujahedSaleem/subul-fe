@@ -109,7 +109,6 @@ const OrdersList: React.FC = () => {
       }));
       return;
     }
-    if (window.confirm('هل أنت متأكد من تأكيد هذا الطلب؟')) {
       try {
         await dispatch(confirmOrder(order.id)).unwrap();
         // Refresh orders after confirmation
@@ -129,7 +128,7 @@ const OrdersList: React.FC = () => {
           title: 'خطأ في التأكيد'
         }));
       }
-    }
+    
   };
 
   const handleCallCustomer = (customer: Customer) => {

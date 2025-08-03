@@ -316,7 +316,6 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
         return;
       }
 
-      if (window.confirm('هل أنت متأكد من تأكيد هذا الطلب؟')) {
         await axiosInstance.post(`/distributors/orders/${order.id}/confirm`);
         
         // Update local state
@@ -329,7 +328,7 @@ const StandaloneOrderCard = ({ initialOrder, onCallCustomer, onOrderChanged }: S
         setCanConfirmOrder(false); // Can't confirm an already confirmed order
         
         if (onOrderChanged) onOrderChanged(order.id!);
-      }
+      
     } catch (error) {
       console.error('Failed to confirm order:', error);
       dispatch(showError({ message: 'حدث خطأ أثناء تأكيد الطلب. يرجى المحاولة مرة أخرى.' }));
