@@ -5,27 +5,15 @@ export function openGoogleMapsApp(lat: number, lng: number) {
     const webUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
     
     if (isAndroid) {
-        // Android: Use geo: URI scheme which works better than comgooglemaps://
+        // Android: Use geo: URI scheme to open app picker
         const androidAppUrl = `geo:${lat},${lng}?q=${lat},${lng}`;
         
         try {
-            // Create a hidden iframe to test if the app opens
-            const iframe = document.createElement('iframe');
-            iframe.style.display = 'none';
-            iframe.src = androidAppUrl;
-            document.body.appendChild(iframe);
-            
-            // Clean up iframe after a short delay
-            setTimeout(() => {
-                document.body.removeChild(iframe);
-            }, 100);
-            
-            // Fallback to web version after 1.5 seconds if app doesn't open
-            setTimeout(() => {
-                window.open(webUrl, '_blank');
-            }, 1500);
+            // Open the app picker directly
+            window.location.href = androidAppUrl;
         } catch (error) {
-            // If iframe method fails, fallback to web
+            // Only fallback to web if there's an actual error
+            console.error('Error opening map app:', error);
             window.open(webUrl, '_blank');
         }
     } else if (isIOS) {
