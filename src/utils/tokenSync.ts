@@ -27,7 +27,7 @@ export const removeTokenSyncListener = (callback: TokenSyncCallback) => {
 const handleStorageChange = (event: StorageEvent) => {
   // Only handle changes to token-related keys
   if (event.key === 'accessToken' || event.key === 'refreshToken' || event.key === 'userType') {
-    console.log('[TokenSync] Token change detected in another tab:', event.key);
+    
     
     // Notify all listeners
     syncCallbacks.forEach(callback => {
@@ -46,7 +46,7 @@ const handleStorageChange = (event: StorageEvent) => {
 export const initTokenSync = () => {
   if (typeof window !== 'undefined') {
     window.addEventListener('storage', handleStorageChange);
-    console.log('[TokenSync] Token synchronization initialized');
+    
   }
 };
 
@@ -57,7 +57,7 @@ export const cleanupTokenSync = () => {
   if (typeof window !== 'undefined') {
     window.removeEventListener('storage', handleStorageChange);
     syncCallbacks = [];
-    console.log('[TokenSync] Token synchronization cleaned up');
+    
   }
 };
 

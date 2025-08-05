@@ -11,7 +11,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then(registrations => {
     registrations.forEach(registration => {
       registration.unregister();
-      console.log('Unregistered old service worker:', registration.scope);
+      
     });
   });
   
@@ -20,7 +20,7 @@ if ('serviceWorker' in navigator) {
     caches.keys().then(cacheNames => {
       cacheNames.forEach(cacheName => {
         caches.delete(cacheName);
-        console.log('Deleted old cache:', cacheName);
+        
       });
     });
   }

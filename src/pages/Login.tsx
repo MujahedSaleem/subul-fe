@@ -23,13 +23,13 @@ const Login: React.FC = () => {
   useEffect(() => {
     const clearCachesForMobile = async () => {
       if (isMobileDevice() && 'caches' in window) {
-        console.log('[Login] Mobile device detected, clearing caches on login page load');
+        
         try {
           const cacheKeys = await caches.keys();
           await Promise.all(
             cacheKeys.map(cacheKey => caches.delete(cacheKey))
           );
-          console.log('[Login] Caches cleared on login page load');
+          
         } catch (err) {
           console.error('[Login] Error clearing caches:', err);
         }
@@ -51,7 +51,7 @@ const Login: React.FC = () => {
       
       // For distributors on mobile, handle the special reload case
       if (userType === 'Distributor' && isMobileDevice()) {
-        console.log('[Login] Distributor login on mobile, handling navigation');
+        
         
         // Store the destination in session storage
         sessionStorage.setItem('loginRedirect', '/distributor');

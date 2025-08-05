@@ -106,8 +106,8 @@ const EditOrder: React.FC = () => {
               const customerResult = await findCustomerByPhone(result.customer.phone);
               const customerData = customerResult.payload as any;
               if (customerData && customerData.length > 0) {
-                console.log('Found complete customer data:', customerData[0]);
-                console.log('Customer locations from API:', customerData[0].locations);
+                
+                
                 fullOrderData = {
                   ...result,
                   customer: customerData[0]

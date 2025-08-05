@@ -32,8 +32,8 @@ const OrdersList: React.FC = () => {
 
   // Sync local state with Redux state when Redux state changes
   useEffect(() => {
-    console.log('reduxPage', reduxPage);
-    console.log('page', page);
+    
+    
     if (reduxPage !== page) {
       setPage(reduxPage);
     }
@@ -172,12 +172,12 @@ const OrdersList: React.FC = () => {
   };
 
   const handlePageChange = (newPage: number) => {
-    console.log(`Changing page from ${page} to ${newPage}`);
+    
     setPage(newPage);
   };
 
   const handlePageSizeChange = (newPageSize: number) => {
-    console.log(`Changing page size from ${pageSize} to ${newPageSize}`);
+    
     setPageSize(newPageSize);
     setPage(1);
   };

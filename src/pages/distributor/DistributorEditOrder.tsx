@@ -100,9 +100,9 @@ const DistributorEditOrder: React.FC = () => {
   useEffect(() => {
     const loadCustomerData = async () => {
       if (currentOrder && !initialOrder) {
-        console.log('Current order received:', currentOrder);
-        console.log('Customer data:', currentOrder.customer);
-        console.log('Customer locations:', currentOrder.customer?.locations);
+        
+        
+        
         
         // Fetch complete customer data with locations
         let fullOrderData = currentOrder;
@@ -111,8 +111,8 @@ const DistributorEditOrder: React.FC = () => {
             const customerResult = await findByPhone(currentOrder.customer.phone);
             const customerData = customerResult.payload as Customer | null;
             if (customerData && customerData.id) {
-              console.log('Found complete customer data:', customerData);
-              console.log('Customer locations from API:', customerData.locations);
+              
+              
               fullOrderData = {
                 ...currentOrder,
                 customer: customerData
@@ -136,8 +136,8 @@ const DistributorEditOrder: React.FC = () => {
           }
         };
 
-        console.log('Final order data:', orderWithLocation);
-        console.log('Final customer locations:', orderWithLocation.customer.locations);
+        
+        
 
         setInitialOrder(orderWithLocation);
         setOrder(orderWithLocation);

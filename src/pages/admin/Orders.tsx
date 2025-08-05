@@ -93,7 +93,7 @@ const Orders = () => {
   // Handle force refresh when navigating from order creation
   useEffect(() => {
     if (location.state?.forceRefresh) {
-      console.log('Force refreshing orders after creation...');
+      
       dispatch(fetchOrders(filterParams));
       // Clear the state to prevent repeated refreshes
       navigate('.', { replace: true, state: {} });
@@ -103,7 +103,7 @@ const Orders = () => {
   // Only fetch distributors once when component mounts
   useEffect(() => {
     if (!distributorsFetched.current && distributors.length === 0 && !distributorsLoading) {
-      console.log('Fetching active distributors...');
+      
       distributorsFetched.current = true;
       dispatch(fetchDistributors({ activeOnly: true }));
     }
@@ -111,44 +111,44 @@ const Orders = () => {
 
   // Fetch orders when filter parameters change
   useEffect(() => {
-    console.log('Fetching orders with filters:', filterParams);
+    
     dispatch(fetchOrders(filterParams));
   }, [dispatch, filterParams]);
 
   // Manual refresh handler
   const handleManualRefresh = useCallback(async () => {
     if (isLoading) {
-      console.log('[MANUAL-REFRESH] Already loading data, skipping manual refresh');
+      
       return;
     }
     
     if (isRefreshing) {
-      console.log('[MANUAL-REFRESH] Already refreshing, skipping manual refresh');
+      
       return;
     }
     
     // Throttle manual refreshes (minimum 2 seconds between refreshes)
     const now = Date.now();
     if (now - lastRefreshTimeRef.current < 2000) {
-      console.log('[MANUAL-REFRESH] Manual refresh throttled (too soon)');
+      
       dispatch(showInfo({ message: 'يرجى الانتظار قبل التحديث مرة أخرى', duration: 2000 }));
       return;
     }
     
-    console.log(`[MANUAL-REFRESH] Manual refresh triggered at ${new Date().toLocaleTimeString()}`);
+    
     lastRefreshTimeRef.current = now;
     setIsRefreshing(true);
     
     try {
-      console.log('[MANUAL-REFRESH] Dispatching fetchOrders action...');
+      
       await dispatch(fetchOrders(filterParams)).unwrap();
-      console.log('[MANUAL-REFRESH] Fetch completed successfully');
+      
       dispatch(showSuccess({ message: 'تم تحديث الطلبات', duration: 2000 }));
     } catch (error) {
       console.error('[MANUAL-REFRESH] Error during manual refresh:', error);
       dispatch(showError({ message: 'فشل في تحديث الطلبات', duration: 2000 }));
     } finally {
-      console.log('[MANUAL-REFRESH] Manual refresh completed');
+      
       setIsRefreshing(false);
     }
   }, [dispatch, filterParams, isLoading, isRefreshing]);
@@ -235,7 +235,7 @@ const Orders = () => {
   }, []);
 
   const handlePageChange = useCallback((newPage: number) => {
-    console.log(`Changing page from ${filters.page} to ${newPage}`);
+    
     setFilters(prev => ({
       ...prev,
       page: newPage
@@ -243,7 +243,7 @@ const Orders = () => {
   }, [filters.page]);
 
   const handlePageSizeChange = useCallback((newPageSize: number) => {
-    console.log(`Changing page size from ${filters.pageSize} to ${newPageSize}`);
+    
     setFilters(prev => ({
       ...prev,
       pageSize: newPageSize,

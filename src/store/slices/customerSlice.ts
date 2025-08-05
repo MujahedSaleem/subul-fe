@@ -191,14 +191,16 @@ export const getCustomerById = createAsyncThunk<Customer, string>(
   }
 );
 
-export const findCustomerByPhone = createAsyncThunk<Customer[], string>(
+export const findCustomerByPhone = createAsyncThunk<Customer, string>(
   'customers/findCustomerByPhone',
   async (phone: string, { rejectWithValue }) => {
     try {
       const response = await axiosInstance.get('/customers', { params: { phone } });
-      const { data, error } = handleApiResponse<Customer[]>(response.data);
+      const { data, error } = handleApiResponse<PaginatedCustomers>(response.data);
       if (error) return rejectWithValue(error);
-      return data as Customer[];
+      
+      
+      return data?.items[0] as Customer;
     } catch (error: any) {
       return rejectWithValue(handleApiError(error));
     }
@@ -263,7 +265,7 @@ export const filterCustomers = createAsyncThunk<PaginatedCustomers, CustomerFilt
       if (filters.createdAfter) params.append('createdAfter', filters.createdAfter);
       if (filters.createdBefore) params.append('createdBefore', filters.createdBefore);
 
-      const response = await axiosInstance.get(`/customers/filter?${params.toString()}`);
+      const response = await axiosInstance.get(`/customers?${params.toString()}`);
       const { data, error } = handleApiResponse<PaginatedCustomers>(response.data);
       if (error) return rejectWithValue(error);
       return data as PaginatedCustomers;
@@ -377,18 +379,18 @@ const customerSlice = createSlice({
       
       // Find customer by phone
       .addCase(findCustomerByPhone.fulfilled, (state, action) => {
+        
+        
         // Add found customers to state if they don't exist
-        action.payload.forEach(customer => {
-          const existingIndex = state.customers.findIndex(c => c.id === customer.id);
-          if (existingIndex === -1) {
-            state.customers.push(customer);
-          }
-        });
+        const existingIndex = state.customers.findIndex(c => c?.id === action?.payload?.id);
+        if (existingIndex === -1) {
+          state.customers.push(action.payload);
+        }
       })
       
       // Find or create customer
       .addCase(findOrCreateCustomer.fulfilled, (state, action) => {
-        const existingIndex = state.customers.findIndex(c => c.id === action.payload.id);
+        const existingIndex = state.customers.findIndex(c => c?.id === action?.payload?.id);
         if (existingIndex === -1) {
           state.customers.push(action.payload);
         }

@@ -58,7 +58,7 @@ export const getStoredTokens = () => {
       refreshToken = Cookies.get('subul_refresh_token') || null;
       
       if (refreshToken) {
-        console.log('[TokenUtils] Found refresh token in cookies, syncing to localStorage');
+        
         // Sync to localStorage for future access
         localStorage.setItem('refreshToken', refreshToken);
       }
@@ -92,7 +92,7 @@ export const storeTokens = (accessToken: string, refreshToken: string) => {
       sameSite: 'strict'
     });
     
-    console.log('[TokenUtils] Tokens stored successfully');
+    
   } catch (error) {
     console.error('[TokenUtils] Error storing tokens:', error);
   }
@@ -107,7 +107,7 @@ export const clearTokens = () => {
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('userType');
     Cookies.remove('subul_refresh_token');
-    console.log('[TokenUtils] All tokens cleared');
+    
   } catch (error) {
     console.error('[TokenUtils] Error clearing tokens:', error);
   }
