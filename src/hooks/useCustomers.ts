@@ -10,15 +10,27 @@ import {
   getCustomerById,
   findCustomerByPhone,
   findOrCreateCustomer,
+  filterCustomers,
   clearError,
   resetState,
   invalidateCache,
 } from '../store/slices/customerSlice';
-import { Customer, UpdateCustomerRequest } from '../types/customer';
+import { Customer, UpdateCustomerRequest, CustomerFilters } from '../types/customer';
 
 export const useCustomers = () => {
   const dispatch = useAppDispatch();
-  const { customers, loading, error, initialized } = useAppSelector((state) => state.customers);
+  const { 
+    customers, 
+    loading, 
+    error, 
+    initialized,
+    filteredCustomers,
+    totalCount,
+    pageNumber,
+    pageSize,
+    totalPages,
+    currentFilters
+  } = useAppSelector((state) => state.customers);
 
   const fetchCustomersData = useCallback((forceRefresh: boolean = false) => {
     if (forceRefresh || (!initialized && !loading)) {
@@ -77,11 +89,22 @@ export const useCustomers = () => {
     dispatch(fetchCustomers());
   }, [dispatch]);
 
+  const filterCustomersData = useCallback((filters: CustomerFilters) => {
+    return dispatch(filterCustomers(filters));
+  }, [dispatch]);
+
   return {
     customers,
     loading,
     error,
     initialized,
+    // Filter state
+    filteredCustomers,
+    totalCount,
+    pageNumber,
+    pageSize,
+    totalPages,
+    currentFilters,
     fetchCustomers: fetchCustomersData,
     addCustomer: addCustomerData,
     updateCustomer: updateCustomerData,
@@ -91,6 +114,7 @@ export const useCustomers = () => {
     getCustomerById: getCustomerByIdData,
     findCustomerByPhone: findCustomerByPhoneData,
     findOrCreateCustomer: findOrCreateCustomerData,
+    filterCustomers: filterCustomersData,
     clearError: clearErrorData,
     resetState: resetStateData,
     refreshCustomers,

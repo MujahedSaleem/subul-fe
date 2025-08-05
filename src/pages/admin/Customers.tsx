@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
-import { faPlus, faPenToSquare, faTrash, faSearch, faLocationDot, faPhone } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faPenToSquare, faTrash, faLocationDot, faPhone } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import IconButton from '../../components/IconButton';
 import { useCustomers } from '../../hooks/useCustomers';
@@ -9,28 +9,57 @@ import { useAppDispatch } from '../../store/hooks';
 import { showSuccess, showError } from '../../store/slices/notificationSlice';
 import { Card, CardHeader, CardBody, Typography } from '@material-tailwind/react';
 import Loader from '../../components/admin/shared/Loader';
+import CustomerFilters from '../../components/CustomerFilters';
+import Pagination from '../../components/Pagination';
+
 
 const Customers: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useAppDispatch();
-  const { customers, loading, fetchCustomers, deleteCustomer, refreshCustomers } = useCustomers();
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const { 
+    loading, 
+    deleteCustomer, 
+    filteredCustomers,
+    totalCount,
+    totalPages,
+    filterCustomers
+  } = useCustomers();
   
+  // Filter state similar to Orders page
+  const [showFilters, setShowFilters] = useState<boolean>(false);
+  const [filters, setFilters] = useState({
+    name: '',
+    isActive: null as boolean | null,
+    createdAfter: '',
+    createdBefore: '',
+    page: 1,
+    pageSize: 10
+  });
+  
+  // Memoize filter parameters to prevent unnecessary re-renders
+  const filterParams = useMemo(() => ({
+    name: filters.name || undefined,
+    isActive: filters.isActive !== null ? filters.isActive : undefined,
+    createdAfter: filters.createdAfter || undefined,
+    createdBefore: filters.createdBefore || undefined,
+    page: filters.page,
+    pageSize: filters.pageSize
+  }), [filters.name, filters.isActive, filters.createdAfter, filters.createdBefore, filters.page, filters.pageSize]);
+
+  // Fetch customers when filter parameters change (like Orders page)
   useEffect(() => {
-    fetchCustomers();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run once on mount
+    filterCustomers(filterParams);
+  }, [filterParams, filterCustomers]);
 
   // Refresh data when returning to this page from edit
   useEffect(() => {
-    // If we're on the customers page and there's state indicating we should refresh
     if (location.pathname === '/admin/customers' && location.state?.shouldRefresh) {
-      refreshCustomers();
+      filterCustomers(filterParams);
       // Clear the state to prevent unnecessary refreshes
       window.history.replaceState({}, document.title);
     }
-  }, [location, refreshCustomers]);
+  }, [location, filterParams, filterCustomers]);
 
   const handleDelete = async (id: string) => {
     if (window.confirm('هل أنت متأكد من حذف هذا العميل؟')) {
@@ -38,6 +67,9 @@ const Customers: React.FC = () => {
         await deleteCustomer(id).unwrap();
         // The Redux reducer will automatically remove the customer from state
         dispatch(showSuccess({ message: 'تم حذف العميل بنجاح' }));
+        
+        // Refresh the current view after deletion
+        filterCustomers(filterParams);
       } catch (error: any) {
         console.error("Error deleting customer:", error);
         dispatch(showError({ 
@@ -48,10 +80,24 @@ const Customers: React.FC = () => {
     }
   };
 
-  const filteredCustomers = customers.filter(customer => 
-    customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    customer.phone.includes(searchQuery)
-  );
+  const resetFilters = useCallback(() => {
+    setFilters({
+      name: '',
+      isActive: null,
+      createdAfter: '',
+      createdBefore: '',
+      page: 1,
+      pageSize: 10
+    });
+  }, []);
+
+  const handlePageChange = useCallback((page: number) => {
+    setFilters(prev => ({ ...prev, page }));
+  }, []);
+
+  const handlePageSizeChange = useCallback((pageSize: number) => {
+    setFilters(prev => ({ ...prev, pageSize, page: 1 })); // Reset to first page when changing page size
+  }, []);
 
   return (
     <Layout title="العملاء">
@@ -66,8 +112,8 @@ const Customers: React.FC = () => {
           shadow={false} 
           className="rounded-none bg-white p-6"
           placeholder=""
-          
-          
+          onPointerEnterCapture={undefined}
+          onPointerLeaveCapture={undefined}
         >
           <div className="flex flex-col gap-4">
             {/* Title Section */}
@@ -80,23 +126,8 @@ const Customers: React.FC = () => {
               </p>
             </div>
             
-            {/* Search and Add Button Section */}
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1">
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="بحث عن عميل..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-right"
-                  />
-                  <FontAwesomeIcon 
-                    icon={faSearch} 
-                    className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" 
-                  />
-                </div>
-              </div>
+            {/* Add Button Section */}
+            <div className="flex justify-end">
               <button 
                 onClick={() => navigate('/admin/customers/add')} 
                 className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg transition-colors font-medium whitespace-nowrap"
@@ -106,6 +137,21 @@ const Customers: React.FC = () => {
                 <span className="sm:hidden">إضافة</span>
               </button>
             </div>
+            
+            {/* Filter Component */}
+            <CustomerFilters
+              showFilters={showFilters}
+              setShowFilters={setShowFilters}
+              customerName={filters.name}
+              setCustomerName={(value) => setFilters(prev => ({ ...prev, name: value, page: 1 }))}
+              isActive={filters.isActive}
+              setIsActive={(value) => setFilters(prev => ({ ...prev, isActive: value, page: 1 }))}
+              createdAfter={filters.createdAfter}
+              setCreatedAfter={(value) => setFilters(prev => ({ ...prev, createdAfter: value, page: 1 }))}
+              createdBefore={filters.createdBefore}
+              setCreatedBefore={(value) => setFilters(prev => ({ ...prev, createdBefore: value, page: 1 }))}
+              resetFilters={resetFilters}
+            />
           </div>
         </CardHeader>
         
@@ -122,8 +168,8 @@ const Customers: React.FC = () => {
           <CardBody 
             className="overflow-auto px-6"
             placeholder=""
-            
-            
+            onPointerEnterCapture={undefined}
+            onPointerLeaveCapture={undefined}
           >
             {filteredCustomers.length === 0 ? (
               <div className="text-center py-12">
@@ -131,9 +177,9 @@ const Customers: React.FC = () => {
                   variant="h6" 
                   color="blue-gray"
                   className="font-medium"
-                  placeholder=""
-                  
-                  
+                  placeholder={undefined}
+                  onPointerEnterCapture={undefined}
+                  onPointerLeaveCapture={undefined}
                 >
                   لا يوجد عملاء
                 </Typography>
@@ -141,47 +187,48 @@ const Customers: React.FC = () => {
                   variant="small"
                   color="blue-gray"
                   className="mt-2"
-                  placeholder=""
-                  
-                  
+                  placeholder={undefined}
+                  onPointerEnterCapture={undefined}
+                  onPointerLeaveCapture={undefined}
                 >
-                  {searchQuery ? 'لم يتم العثور على نتائج للبحث' : 'قم بإضافة عميل جديد'}
+                  لا توجد عملاء مطابقين للفلترة
                 </Typography>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredCustomers.map((customer) => (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredCustomers.map((customer) => (
                   <Card
                     key={customer.id}
                     className="hover:shadow-lg transition-shadow duration-300"
                     placeholder=""
-                    
-                    
+                    onPointerEnterCapture={undefined}
+                    onPointerLeaveCapture={undefined}
                   >
                     <CardHeader
                       floated={false}
                       shadow={false}
                       className="rounded-t-lg bg-gradient-to-r from-blue-600 to-blue-800 p-4"
                       placeholder=""
-                      
-                      
+                      onPointerEnterCapture={undefined}
+                      onPointerLeaveCapture={undefined}
                     >
                       <Typography
                         variant="h5"
                         color="white"
                         className="font-bold"
-                        placeholder=""
-                        
-                        
+                        placeholder={undefined}
+                        onPointerEnterCapture={undefined}
+                        onPointerLeaveCapture={undefined}
                       >
                         {customer.name}
                       </Typography>
                     </CardHeader>
                     <CardBody
                       className="p-4"
-                      placeholder=""
-                      
-                      
+                      placeholder={undefined}
+                      onPointerEnterCapture={undefined}
+                      onPointerLeaveCapture={undefined}
                     >
                       <div className="space-y-4">
                         <div className="flex items-center gap-2">
@@ -190,9 +237,9 @@ const Customers: React.FC = () => {
                             variant="small"
                             color="blue-gray"
                             className="font-medium"
-                            placeholder=""
-                            
-                            
+                            placeholder={undefined}
+                            onPointerEnterCapture={undefined}
+                            onPointerLeaveCapture={undefined}
                           >
                             {customer.phone}
                           </Typography>
@@ -204,9 +251,9 @@ const Customers: React.FC = () => {
                               variant="small"
                               color="blue-gray"
                               className="font-medium"
-                              placeholder=""
-                              
-                              
+                              placeholder={undefined}
+                              onPointerEnterCapture={undefined}
+                              onPointerLeaveCapture={undefined}
                             >
                               المواقع
                             </Typography>
@@ -221,9 +268,9 @@ const Customers: React.FC = () => {
                                   variant="small"
                                   color="blue-gray"
                                   className="font-medium"
-                                  placeholder=""
-                                  
-                                  
+                                  placeholder={undefined}
+                                  onPointerEnterCapture={undefined}
+                                  onPointerLeaveCapture={undefined}
                                 >
                                   {location.name}
                                 </Typography>
@@ -231,9 +278,9 @@ const Customers: React.FC = () => {
                                   variant="small"
                                   color="blue-gray"
                                   className="text-xs mt-1"
-                                  placeholder=""
-                                  
-                                  
+                                  placeholder={undefined}
+                                  onPointerEnterCapture={undefined}
+                                  onPointerLeaveCapture={undefined}
                                 >
                                   {location.coordinates}
                                 </Typography>
@@ -259,8 +306,21 @@ const Customers: React.FC = () => {
                       </div>
                     </CardBody>
                   </Card>
-                ))}
-              </div>
+                  ))}
+                </div>
+                
+                {/* Pagination */}
+                { (
+                  <Pagination
+                    currentPage={filters.page}
+                    totalPages={totalPages}
+                    pageSize={filters.pageSize}
+                    totalItems={totalCount}
+                    onPageChange={handlePageChange}
+                    onPageSizeChange={handlePageSizeChange}
+                  />
+                )}
+              </>
             )}
           </CardBody>
         )}

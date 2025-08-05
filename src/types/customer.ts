@@ -35,3 +35,21 @@ export interface UpdateCustomerRequest {
   IsActive: boolean;
   Locations: UpdateLocationRequest[];
 }
+
+// Customer filter interfaces
+export interface CustomerFilters {
+  name?: string;
+  isActive?: boolean;
+  createdAfter?: string;
+  createdBefore?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedCustomers {
+  items: Customer[];
+  totalCount: number;
+  pageNumber: number;
+  pageSize: number;
+  totalPages: number;
+}
