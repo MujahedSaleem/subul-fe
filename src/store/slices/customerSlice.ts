@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import axiosInstance from '../../utils/axiosInstance';
-import { Customer, UpdateCustomerRequest } from '../../types/customer';
+import { Customer, UpdateCustomerRequest, CustomerFilters, PaginatedCustomers } from '../../types/customer';
 import { handleApiResponse, handleApiError } from '../../utils/apiResponseHandler';
 
 interface CustomerState {
@@ -8,6 +8,13 @@ interface CustomerState {
   loading: boolean;
   error: string | null;
   initialized: boolean;
+  // Filter state
+  filteredCustomers: Customer[];
+  totalCount: number;
+  pageNumber: number;
+  pageSize: number;
+  totalPages: number;
+  currentFilters: CustomerFilters | null;
 }
 
 // Request deduplication
@@ -19,6 +26,13 @@ const initialState: CustomerState = {
   loading: false,
   error: null,
   initialized: false,
+  // Filter state
+  filteredCustomers: [],
+  totalCount: 0,
+  pageNumber: 1,
+  pageSize: 10,
+  totalPages: 0,
+  currentFilters: null,
 };
 
 // Async thunks with deduplication
@@ -236,6 +250,29 @@ export const findOrCreateCustomer = createAsyncThunk<Customer, { customerName: s
   }
 );
 
+// Filter customers with pagination
+export const filterCustomers = createAsyncThunk<PaginatedCustomers, CustomerFilters>(
+  'customers/filterCustomers',
+  async (filters: CustomerFilters, { rejectWithValue }) => {
+    try {
+      const params = new URLSearchParams();
+      if (filters.page) params.append('page', filters.page.toString());
+      if (filters.pageSize) params.append('pageSize', filters.pageSize.toString());
+      if (filters.name) params.append('name', filters.name);
+      if (filters.isActive !== undefined) params.append('isActive', filters.isActive.toString());
+      if (filters.createdAfter) params.append('createdAfter', filters.createdAfter);
+      if (filters.createdBefore) params.append('createdBefore', filters.createdBefore);
+
+      const response = await axiosInstance.get(`/customers/filter?${params.toString()}`);
+      const { data, error } = handleApiResponse<PaginatedCustomers>(response.data);
+      if (error) return rejectWithValue(error);
+      return data as PaginatedCustomers;
+    } catch (error: any) {
+      return rejectWithValue(handleApiError(error));
+    }
+  }
+);
+
 // Slice
 const customerSlice = createSlice({
   name: 'customers',
@@ -249,6 +286,13 @@ const customerSlice = createSlice({
       state.loading = false;
       state.error = null;
       state.initialized = false;
+      // Reset filter state
+      state.filteredCustomers = [];
+      state.totalCount = 0;
+      state.pageNumber = 1;
+      state.pageSize = 10;
+      state.totalPages = 0;
+      state.currentFilters = null;
     },
     invalidateCache: (state) => {
       state.initialized = false;
@@ -348,6 +392,24 @@ const customerSlice = createSlice({
         if (existingIndex === -1) {
           state.customers.push(action.payload);
         }
+      })
+      
+      // Filter customers
+      .addCase(filterCustomers.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(filterCustomers.fulfilled, (state, action) => {
+        state.loading = false;
+        state.filteredCustomers = action.payload.items;
+        state.totalCount = action.payload.totalCount;
+        state.pageNumber = action.payload.pageNumber;
+        state.pageSize = action.payload.pageSize;
+        state.totalPages = action.payload.totalPages;
+      })
+      .addCase(filterCustomers.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
       });
   },
 });
