@@ -82,7 +82,7 @@ export const fetchOrders = createAsyncThunk<PaginatedOrders, OrderFilters>(
       
       // Check if there's already a pending request with the same filters
       if (pendingFetchRequests.has(requestKey)) {
-        console.log('Returning pending request for:', requestKey);
+        
         return await pendingFetchRequests.get(requestKey)!;
       }
 
@@ -101,7 +101,7 @@ export const fetchOrders = createAsyncThunk<PaginatedOrders, OrderFilters>(
       });
 
       pendingFetchRequests.set(requestKey, requestPromise);
-      console.log('Making new request for:', requestKey);
+      
       return await requestPromise;
     } catch (error: any) {
       const requestKey = generateCacheKey(filters);

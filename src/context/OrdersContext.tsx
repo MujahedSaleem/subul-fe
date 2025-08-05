@@ -32,7 +32,7 @@ interface OrdersProviderProps {
 }
 
 export const OrdersProvider: React.FC<OrdersProviderProps> = ({ children }) => {
-  console.log("Rendering OrdersProvider");
+  
   
   const {
     orders: reduxOrders,
@@ -57,7 +57,7 @@ export const OrdersProvider: React.FC<OrdersProviderProps> = ({ children }) => {
   React.useEffect(() => {
     const hasChanged = JSON.stringify(ordersRef.current) !== JSON.stringify(reduxOrders);
     if (hasChanged) {
-      console.log("Orders changed in Redux, updating local ref");
+      
       ordersRef.current = [...reduxOrders];
       forceUpdate({});
     }
@@ -65,14 +65,14 @@ export const OrdersProvider: React.FC<OrdersProviderProps> = ({ children }) => {
 
   // Fetch orders from the API
   const fetchOrders = useCallback(async () => {
-    console.log("Fetching orders from context");
+    
     await fetchReduxOrders();
   }, [fetchReduxOrders]);
 
   // Update order cost locally without triggering a full re-render
   const updateOrderCost = useCallback(async (orderId: number, cost: number | null): Promise<boolean> => {
     try {
-      console.log(`Updating order ${orderId} cost to ${cost}`);
+      
       
       // Find the order to update
       const orderToUpdate = ordersRef.current.find(order => order.id === orderId);
@@ -115,7 +115,7 @@ export const OrdersProvider: React.FC<OrdersProviderProps> = ({ children }) => {
     setLocationLoadingStates(prev => ({ ...prev, [order.id!]: true }));
     
     try {
-      console.log(`Updating location for order ${order.id}`);
+      
       
       // Get current GPS location
       const gpsLocation = await getCurrentLocation();
@@ -179,7 +179,7 @@ export const OrdersProvider: React.FC<OrdersProviderProps> = ({ children }) => {
     try {
       if (!order.id) return false;
       
-      console.log(`Confirming order ${order.id}`);
+      
       
       await confirmReduxOrder(order.id);
       

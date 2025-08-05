@@ -126,7 +126,7 @@ axiosInstance.interceptors.response.use(
                              refreshError.response?.data?.message?.includes('invalid');
           
           if (isAuthError) {
-            console.log('[Auth] Authentication error, logging out user');
+            
             clearTokens();
             
             // Dispatch a custom event to notify AuthContext
@@ -137,7 +137,7 @@ axiosInstance.interceptors.response.use(
               window.location.href = '/login';
             }
           } else {
-            console.log('[Auth] Refresh failed due to network/server error, keeping user logged in');
+            
           }
           
           reject(refreshError);

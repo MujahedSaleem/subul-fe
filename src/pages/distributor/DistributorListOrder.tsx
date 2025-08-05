@@ -56,7 +56,7 @@ const DistributorListOrder: React.FC = () => {
   // Fetch orders only once when the component mounts
   useEffect(() => {
     if (!hasInitiallyFetched.current && !initialized) {
-      console.log('Initial fetch of orders...');
+      
       fetchOrders();
       hasInitiallyFetched.current = true;
     }
@@ -67,11 +67,11 @@ const DistributorListOrder: React.FC = () => {
     // Check if we need to force a reload after login
     const forceReload = sessionStorage.getItem('forceReload');
     if (forceReload === 'true') {
-      console.log('[DistributorListOrder] Force reload detected after login');
+      
       sessionStorage.removeItem('forceReload'); // Clear the flag
       
       // Force a page reload
-      console.log('[DistributorListOrder] Forcing page reload');
+      
       window.location.reload();
     }
   }, []);
@@ -111,12 +111,12 @@ const DistributorListOrder: React.FC = () => {
       
       // Compare with previous orders
       if (forceRefresh || haveOrdersChanged(newOrders, previousOrdersRef.current)) {
-        console.log('Orders have changed, updating state...');
+        
         // Use the Redux action to update state
         await fetchOrders(true);
         return true; // Data changed
       } else {
-        console.log('No changes in orders, skipping re-render');
+        
         return false; // No changes
       }
     } catch (error) {
@@ -129,7 +129,7 @@ const DistributorListOrder: React.FC = () => {
   useEffect(() => {
     // Start the auto-refresh interval
     autoRefreshIntervalRef.current = setInterval(async () => {
-      console.log('Auto-refreshing orders...');
+      
       await fetchOrdersIfChanged();
     }, 5000);
     
@@ -144,7 +144,7 @@ const DistributorListOrder: React.FC = () => {
   // Handle force refresh when navigating from order creation
   useEffect(() => {
     if (location.state?.forceRefresh) {
-      console.log('Force refreshing orders after creation...');
+      
       fetchOrders(true); // Force refresh
       // Clear the state to prevent repeated refreshes
       navigate('.', { replace: true, state: {} });
@@ -159,7 +159,7 @@ const DistributorListOrder: React.FC = () => {
   const handleOrderChanged = (orderId: number) => {
     // This is just a notification that an order was changed
     // We don't need to do anything as each card manages its own state
-    console.log(`Order ${orderId} was updated`);
+    
   };
 
   const handleLogout = () => {

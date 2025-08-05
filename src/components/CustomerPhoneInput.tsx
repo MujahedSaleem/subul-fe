@@ -31,7 +31,12 @@ const CustomerPhoneInput: React.FC<CustomerPhoneInputProps> = ({
         type="tel"
         id="phone"
         value={customer?.phone || ''}
-        onChange={(e) => setOrder((prev) => ({ ...prev, customer: { phone: extractAndNormalizeLocalPhoneNumber(e.target.value) } as Customer }))}
+        onChange={(e) => {
+          const originalValue = e.target.value;
+          const normalizedPhone = extractAndNormalizeLocalPhoneNumber(originalValue);
+          
+          setOrder((prev) => ({ ...prev, customer: { phone: normalizedPhone } as Customer }));
+        }}
         className="block w-full pr-10 pl-3 py-2.5 border border-slate-200 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
         placeholder="أدخل رقم الهاتف"
         required={!disabled}

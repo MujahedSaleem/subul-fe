@@ -54,53 +54,107 @@ const OrderForm: React.FC<OrderFormProps> = ({
   const [lastSearchedPhone, setLastSearchedPhone] = useState<string>('');
   const navigate = useNavigate();
   const locationRef = React.useRef(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const currentSearchRef = useRef<string>('');
 
-  // Memoize the customer search function
-  const findCustomer = useCallback(async (phone: string) => {
-    if (!phone || !isValidPhoneNumber(phone) || phone === lastSearchedPhone) {
-      return;
+  // Debounced customer search function
+  const debouncedSearchCustomer = useCallback((phone: string) => {
+    // Clear any existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
     }
 
-    setIsSearching(true);
-    setLastSearchedPhone(phone);
-    
-    try {
-      const customerResults = await dispatch(findCustomerByPhone(phone)).unwrap();
-      if (customerResults && customerResults.length > 0) {
-        setIsNewCustomer(false);
-        const foundCustomer = customerResults[0];
-        setOrder((prev) => ({
-          ...prev,
-          customer: foundCustomer
-        }));
+    // Set a new timeout to search after 500ms of no typing
+    searchTimeoutRef.current = setTimeout(async () => {
+      if (!phone || !isValidPhoneNumber(phone) || phone === lastSearchedPhone) {
         
-        // Auto-open location dropdown if customer has locations - only in add mode, not edit mode
-        if (!isEdit && foundCustomer.locations && foundCustomer.locations.length > 0) {
-          setShouldAutoOpenLocation(true);
-        }
-      } else {
-        setIsNewCustomer(true);
+        return;
       }
-    } catch (error) {
-      // Customer not found, treat as new customer
-      setIsNewCustomer(true);
-    } finally {
-      setIsSearching(false);
-    }
+
+      
+      // Track this as the current search to ignore outdated results
+      currentSearchRef.current = phone;
+      setIsSearching(true);
+      
+      try {
+        
+        const customerResult = await dispatch(findCustomerByPhone(phone)).unwrap();
+        
+        
+        
+        // Only process results if this is still the latest search
+        if (currentSearchRef.current === phone) {
+          setLastSearchedPhone(phone);
+          
+          if (customerResult) {
+            setIsNewCustomer(false);
+            const foundCustomer = customerResult;
+            // Preserve the user's typed phone number instead of using the one from API
+            const customerWithTypedPhone = {
+              ...foundCustomer,
+              phone: phone // Use the phone number that was searched, not the one from API
+            };
+            
+            setOrder((prev) => ({
+              ...prev,
+              customer: customerWithTypedPhone
+            }));
+            
+            // Auto-open location dropdown if customer has locations - only in add mode, not edit mode
+            if (!isEdit && foundCustomer.locations && foundCustomer.locations.length > 0) {
+              setShouldAutoOpenLocation(true);
+            }
+          } else {
+            setIsNewCustomer(true);
+            setOrder((prev) => ({
+              ...prev,
+              location: {
+                id: 0,
+                name: '',
+                coordinates: '',
+                address: '',
+                isActive: true,
+                customerId: safeOrder.customer?.id || ''
+              },
+              customer: {
+                ...prev.customer,
+                phone: phone,
+                name: ''
+              }
+            }))
+          }
+        }
+      } catch (error) {
+        console.error('🔍 Error in findCustomerByPhone:', error);
+        console.error('🔍 Error details:', JSON.stringify(error, null, 2));
+        // Only process error if this is still the latest search
+        if (currentSearchRef.current === phone) {
+          setIsNewCustomer(true);
+          setLastSearchedPhone(phone);
+        }
+      } finally {
+        // Only stop loading if this is still the latest search
+        if (currentSearchRef.current === phone) {
+          setIsSearching(false);
+        }
+      }
+    }, 500); // 500ms debounce delay
   }, [dispatch, setOrder, isEdit, lastSearchedPhone]);
 
   // Search for customer when phone changes
   useEffect(() => {
     const currentPhone = safeOrder?.customer?.phone || '';
     
+    
     // Only search if phone has changed and is different from last searched
     if (currentPhone !== lastSearchedPhone && (!safeOrder?.customer?.id || !isEdit)) {
-      findCustomer(currentPhone);
+      
+      debouncedSearchCustomer(currentPhone);
     } else if (safeOrder?.customer?.id) {
       // If we already have a customer ID, mark as existing customer
       setIsNewCustomer(false);
     }
-  }, [safeOrder?.customer?.phone, findCustomer, safeOrder?.customer?.id, isEdit, lastSearchedPhone]);
+  }, [safeOrder?.customer?.phone, debouncedSearchCustomer, safeOrder?.customer?.id, isEdit, lastSearchedPhone]);
 
   // Reset auto-open flag after a short delay to allow the dropdown to open
   useEffect(() => {
@@ -111,6 +165,15 @@ const OrderForm: React.FC<OrderFormProps> = ({
       return () => clearTimeout(timer);
     }
   }, [shouldAutoOpenLocation]);
+
+  // Cleanup search timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleSetLocation = useCallback(async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -153,12 +216,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
     }
   }, [safeOrder.customer, safeOrder.location, setOrder]);
 
-  const handleOrderUpdate = useCallback((updater: (prev: OrderList | undefined) => OrderList | undefined) => {
-    setOrder(prev => {
-      const result = updater(prev);
-      return result || prev;
-    });
-  }, [setOrder]);
+;
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
@@ -184,7 +242,6 @@ const OrderForm: React.FC<OrderFormProps> = ({
           order={safeOrder}
           setOrder={setOrder as React.Dispatch<React.SetStateAction<OrderList | undefined>>}
           isNewCustomer={isNewCustomer}
-          disabled={(isEdit && safeOrder?.status === 'Confirmed') || !safeOrder?.customer?.name}
           customer={safeOrder?.customer}
           ref={locationRef}
           autoOpenDropdown={shouldAutoOpenLocation}

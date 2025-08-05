@@ -53,7 +53,7 @@ export const useOrderManagement = ({ initialOrder, isEdit = false }: UseOrderMan
         const key = `${name}-${coordinates}-${address}`;
         
         if (seen.has(key)) {
-          console.log('Duplicate location detected and removed:', location);
+          
           return false;
         }
         seen.add(key);
@@ -229,7 +229,7 @@ export const useOrderManagement = ({ initialOrder, isEdit = false }: UseOrderMan
                  const key = `${name}-${coordinates}-${address}`;
                  
                  if (seen.has(key)) {
-                   console.log('Duplicate location detected and removed in handleBack:', location);
+                   
                    return false;
                  }
                  seen.add(key);

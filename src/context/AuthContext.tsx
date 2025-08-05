@@ -65,7 +65,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Handle token sync from other tabs
     const handleTokenSync = () => {
-      console.log('[Auth] Token change detected from another tab, refreshing auth state');
+      
       const { accessToken, refreshToken } = getStoredTokens();
       
       if (accessToken && refreshToken) {
@@ -92,7 +92,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (accessToken && refreshToken && isAuthenticated) {
         if (shouldRefreshToken(accessToken, 5)) {
-          console.log('[Auth] Proactively refreshing token that expires soon');
+          
           refreshTokens(refreshToken);
         }
       }
@@ -110,7 +110,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Handle post-login forced reload
     const needsReload = sessionStorage.getItem('forceReloadAfterAuth');
     if (needsReload === 'true' && isAuthenticated) {
-      console.log('[Auth] Executing forced reload after auth');
+      
       sessionStorage.removeItem('forceReloadAfterAuth');
       
       // Use a small timeout to ensure the router has had a chance to update
@@ -126,29 +126,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const tokenInfo = checkTokenValidity(accessToken);
       
       if (!tokenInfo.isValid) {
-        console.log('[Auth] Invalid access token format, attempting refresh');
+        
         refreshTokens(refreshToken);
       } else if (tokenInfo.isExpired) {
-        console.log('[Auth] Access token expired, attempting refresh');
+        
         refreshTokens(refreshToken);
       } else if (shouldRefreshToken(accessToken, 5)) {
-        console.log('[Auth] Access token expires soon, will refresh on next API call');
+        
         setIsAuthenticated(true);
         setUserType(tokenInfo.userType!);
         setLoading(false);
       } else {
-        console.log('[Auth] Access token is valid');
+        
         setIsAuthenticated(true);
         setUserType(tokenInfo.userType!);
         setLoading(false);
       }
     } else if (refreshToken) {
       // Only refresh token exists, try to refresh
-      console.log('[Auth] Only refresh token found, attempting to get new access token');
+      
       refreshTokens(refreshToken);
     } else {
       // No tokens
-      console.log('[Auth] No tokens found');
+      
       setIsAuthenticated(false);
       setLoading(false);
     }
