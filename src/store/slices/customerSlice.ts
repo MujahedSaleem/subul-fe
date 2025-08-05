@@ -195,7 +195,7 @@ export const findCustomerByPhone = createAsyncThunk<Customer[], string>(
   'customers/findCustomerByPhone',
   async (phone: string, { rejectWithValue }) => {
     try {
-      const response = await axiosInstance.get('/customers/filter', { params: { phone } });
+      const response = await axiosInstance.get('/customers', { params: { phone } });
       const { data, error } = handleApiResponse<Customer[]>(response.data);
       if (error) return rejectWithValue(error);
       return data as Customer[];
