@@ -1,5 +1,4 @@
 import React, { useMemo, useCallback } from 'react';
-import { faFilter } from '@fortawesome/free-solid-svg-icons';
 import { Select, Option, Input, Card, CardBody, Typography } from '@material-tailwind/react';
 import Button from './Button';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -8,10 +7,10 @@ import { useAppDispatch } from '../store/hooks';
 import { showError } from '../store/slices/notificationSlice';
 
 interface CustomerFiltersProps {
-  showFilters: boolean;
-  setShowFilters: React.Dispatch<React.SetStateAction<boolean>>;
   customerName: string;
   setCustomerName: (value: string) => void;
+  customerPhone: string;
+  setCustomerPhone: (value: string) => void;
   isActive: boolean | null;
   setIsActive: (value: boolean | null) => void;
   createdAfter: string;
@@ -22,10 +21,10 @@ interface CustomerFiltersProps {
 }
 
 const CustomerFilters: React.FC<CustomerFiltersProps> = ({
-  showFilters,
-  setShowFilters,
   customerName,
   setCustomerName,
+  customerPhone,
+  setCustomerPhone,
   isActive,
   setIsActive,
   createdAfter,
@@ -42,8 +41,8 @@ const CustomerFilters: React.FC<CustomerFiltersProps> = ({
   ], []);
 
   const hasActiveFilters = useMemo(() => 
-    customerName || isActive !== null || createdAfter || createdBefore,
-    [customerName, isActive, createdAfter, createdBefore]
+    customerName || customerPhone || isActive !== null || createdAfter || createdBefore,
+    [customerName, customerPhone, isActive, createdAfter, createdBefore]
   );
 
   const handleIsActiveChange = useCallback((value: string | undefined) => {
@@ -72,9 +71,7 @@ const CustomerFilters: React.FC<CustomerFiltersProps> = ({
     setCreatedBefore(newCreatedBefore);
   }, [createdAfter, setCreatedBefore, dispatch]);
 
-  const toggleFilters = useCallback(() => {
-    setShowFilters(!showFilters);
-  }, [showFilters, setShowFilters]);
+
 
   const selectedStatusElement = useMemo(() => {
     const status = statusOptions.find(s => s.value === isActive);
@@ -89,15 +86,6 @@ const CustomerFilters: React.FC<CustomerFiltersProps> = ({
     <div dir="rtl" className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Button 
-            onClick={toggleFilters} 
-            variant={showFilters ? 'gradient' : 'outlined'} 
-            color={showFilters ? 'blue' : 'blue-gray'}
-            className="flex items-center gap-2"
-          >
-            <FontAwesomeIcon icon={showFilters ? faXmark : faFilter} />
-            {showFilters ? 'إخفاء الفلتر' : 'إظهار الفلتر'}
-          </Button>
           {hasActiveFilters && (
             <Button
               onClick={resetFilters}
@@ -112,22 +100,22 @@ const CustomerFilters: React.FC<CustomerFiltersProps> = ({
         </div>
       </div>
 
-      {showFilters && (
+      <div>
         <Card 
           className="w-full"
           placeholder={undefined}
         >
           <CardBody 
-            className="p-4"
+            className="p-3 sm:p-4"
             placeholder={undefined}
           >
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
               {/* Customer Name Filter */}
-              <div className="space-y-2 md:order-1">
+              <div className="space-y-1.5 sm:space-y-2">
                 <Typography 
                   variant="small" 
                   color="blue-gray"
-                  className="font-medium"
+                  className="font-medium text-xs sm:text-sm"
                   placeholder={undefined}
                 >
                   اسم العميل
@@ -137,9 +125,35 @@ const CustomerFilters: React.FC<CustomerFiltersProps> = ({
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                   placeholder="البحث بالاسم..."
-                  className="border border-blue-gray-200 rounded-lg !text-right"
+                  className="border border-blue-gray-200 rounded-lg !text-right text-sm"
                   containerProps={{
-                    className: "min-w-[200px]"
+                    className: "w-full"
+                  }}
+                  labelProps={{
+                    className: "text-right"
+                  }}
+                  crossOrigin={undefined}
+                />
+              </div>
+
+              {/* Customer Phone Filter */}
+              <div className="space-y-1.5 sm:space-y-2">
+                <Typography 
+                  variant="small" 
+                  color="blue-gray"
+                  className="font-medium text-xs sm:text-sm"
+                  placeholder={undefined}
+                >
+                  رقم الهاتف
+                </Typography>
+                <Input
+                  type="text"
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  placeholder="البحث بالهاتف..."
+                  className="border border-blue-gray-200 rounded-lg !text-right text-sm"
+                  containerProps={{
+                    className: "w-full"
                   }}
                   labelProps={{
                     className: "text-right"
@@ -149,11 +163,11 @@ const CustomerFilters: React.FC<CustomerFiltersProps> = ({
               </div>
 
               {/* Status Filter */}
-              <div className="space-y-2 md:order-2">
+              <div className="space-y-1.5 sm:space-y-2">
                 <Typography 
                   variant="small" 
                   color="blue-gray"
-                  className="font-medium"
+                  className="font-medium text-xs sm:text-sm"
                   placeholder={undefined}
                 >
                   الحالة
@@ -163,7 +177,7 @@ const CustomerFilters: React.FC<CustomerFiltersProps> = ({
                   onChange={handleIsActiveChange}
                   selected={() => selectedStatusElement}
                   label="الحالة"
-                  className="border border-blue-gray-200 rounded-lg leading-tight text-right"
+                  className="border border-blue-gray-200 rounded-lg leading-tight text-right text-sm"
                   labelProps={{
                     className: "text-right before:text-right after:text-right"
                   }}
@@ -172,7 +186,7 @@ const CustomerFilters: React.FC<CustomerFiltersProps> = ({
                     lockScroll: false
                   }}
                   containerProps={{ 
-                    className: "min-w-[200px] text-right"
+                    className: "w-full text-right"
                   }}
                   animate={{
                     mount: { y: 0, scale: 1 },
@@ -190,11 +204,11 @@ const CustomerFilters: React.FC<CustomerFiltersProps> = ({
               </div>
 
               {/* Created After Filter */}
-              <div className="space-y-2 md:order-3">
+              <div className="space-y-1.5 sm:space-y-2">
                 <Typography 
                   variant="small" 
                   color="blue-gray"
-                  className="font-medium"
+                  className="font-medium text-xs sm:text-sm"
                   placeholder={undefined}
                 >
                   من تاريخ الإنشاء
@@ -203,9 +217,9 @@ const CustomerFilters: React.FC<CustomerFiltersProps> = ({
                   type="date"
                   value={createdAfter}
                   onChange={handleCreatedAfterChange}
-                  className="border border-blue-gray-200 rounded-lg !text-right"
+                  className="border border-blue-gray-200 rounded-lg !text-right text-sm"
                   containerProps={{
-                    className: "min-w-[200px]"
+                    className: "w-full"
                   }}
                   labelProps={{
                     className: "text-right"
@@ -216,11 +230,11 @@ const CustomerFilters: React.FC<CustomerFiltersProps> = ({
               </div>
 
               {/* Created Before Filter */}
-              <div className="space-y-2 md:order-4">
+              <div className="space-y-1.5 sm:space-y-2">
                 <Typography 
                   variant="small" 
                   color="blue-gray"
-                  className="font-medium"
+                  className="font-medium text-xs sm:text-sm"
                   placeholder={undefined}
                 >
                   إلى تاريخ الإنشاء
@@ -229,9 +243,9 @@ const CustomerFilters: React.FC<CustomerFiltersProps> = ({
                   type="date"
                   value={createdBefore}
                   onChange={handleCreatedBeforeChange}
-                  className="border border-blue-gray-200 rounded-lg !text-right"
+                  className="border border-blue-gray-200 rounded-lg !text-right text-sm"
                   containerProps={{
-                    className: "min-w-[200px]"
+                    className: "w-full"
                   }}
                   labelProps={{
                     className: "text-right"
@@ -243,7 +257,7 @@ const CustomerFilters: React.FC<CustomerFiltersProps> = ({
             </div>
           </CardBody>
         </Card>
-      )}
+      </div>
     </div>
   );
 };

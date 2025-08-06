@@ -39,6 +39,7 @@ export interface UpdateCustomerRequest {
 // Customer filter interfaces
 export interface CustomerFilters {
   name?: string;
+  phone?: string;
   isActive?: boolean;
   createdAfter?: string;
   createdBefore?: string;
