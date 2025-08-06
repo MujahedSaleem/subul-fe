@@ -41,6 +41,7 @@ const cache = new Map<string, CacheEntry>();
 const pendingFetchRequests = new Map<string, Promise<PaginatedOrders>>();
 const pendingConfirmRequests = new Map<string, Promise<OrderList>>();
 const pendingDeleteRequests = new Map<string, Promise<number>>();
+const pendingGetByIdRequests = new Map<string, Promise<OrderList>>();
 
 // Add a flag to track if we need to bypass cache
 let shouldBypassCache = false;
@@ -158,8 +159,27 @@ export const getOrderById = createAsyncThunk<OrderList, string>(
   'orders/getOrderById',
   async (id: string, { rejectWithValue }) => {
     try {
-      const response = await axiosInstance.get(`/orders/${id}`);
-      return extractApiData<OrderList>(response.data);
+      const requestKey = `getOrderById-${id}`;
+      
+      // Check if there's already a pending request for this order
+      if (pendingGetByIdRequests.has(requestKey)) {
+        console.log('🔄 getOrderById - Using pending request for order:', id);
+        return await pendingGetByIdRequests.get(requestKey)!;
+      }
+
+      console.log('🔄 getOrderById - Making new API call for order:', id);
+      const requestPromise = axiosInstance.get(`/orders/${id}`)
+        .then(response => {
+          pendingGetByIdRequests.delete(requestKey);
+          return extractApiData<OrderList>(response.data);
+        })
+        .catch(error => {
+          pendingGetByIdRequests.delete(requestKey);
+          throw error;
+        });
+
+      pendingGetByIdRequests.set(requestKey, requestPromise);
+      return await requestPromise;
     } catch (error: any) {
       return rejectWithValue(handleApiError(error));
     }

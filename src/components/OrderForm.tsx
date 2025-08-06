@@ -32,6 +32,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
   isEdit = false,
   isSubmitLoading = false,
 }) => {
+  console.log('🔍 OrderForm - isEdit:', order);
   // Ensure order is defined with default values if needed
   const safeOrder: OrderList = order || {
     id: 0,
@@ -106,22 +107,26 @@ const OrderForm: React.FC<OrderFormProps> = ({
             }
           } else {
             setIsNewCustomer(true);
-            setOrder((prev) => ({
-              ...prev,
-              location: {
-                id: 0,
-                name: '',
-                coordinates: '',
-                address: '',
-                isActive: true,
-                customerId: safeOrder.customer?.id || ''
-              },
-              customer: {
-                ...prev.customer,
-                phone: phone,
-                name: ''
-              }
-            }))
+            // Only reset customer data if we're not in edit mode
+            // In edit mode, preserve existing customer data including locations
+            if (!isEdit) {
+              setOrder((prev) => ({
+                ...prev,
+                location: {
+                  id: 0,
+                  name: '',
+                  coordinates: '',
+                  address: '',
+                  isActive: true,
+                  customerId: safeOrder.customer?.id || ''
+                },
+                customer: {
+                  ...prev.customer,
+                  phone: phone,
+                  name: ''
+                }
+              }));
+            }
           }
         }
       } catch (error) {
@@ -144,17 +149,31 @@ const OrderForm: React.FC<OrderFormProps> = ({
   // Search for customer when phone changes
   useEffect(() => {
     const currentPhone = safeOrder?.customer?.phone || '';
+    console.log('🔍 OrderForm - Phone effect triggered:', {
+      currentPhone,
+      lastSearchedPhone,
+      hasCustomerId: !!safeOrder?.customer?.id,
+      isEdit,
+      customerName: safeOrder?.customer?.name
+    });
     
+    // In edit mode, if we already have complete customer data (id and name), don't search
+    if (isEdit && safeOrder?.customer?.id && safeOrder?.customer?.name) {
+      console.log('🔍 OrderForm - Edit mode with complete customer data, skipping search');
+      setIsNewCustomer(false);
+      setLastSearchedPhone(currentPhone);
+      return;
+    }
     
     // Only search if phone has changed and is different from last searched
     if (currentPhone !== lastSearchedPhone && (!safeOrder?.customer?.id || !isEdit)) {
-      
+      console.log('🔍 OrderForm - Triggering customer search for:', currentPhone);
       debouncedSearchCustomer(currentPhone);
     } else if (safeOrder?.customer?.id) {
       // If we already have a customer ID, mark as existing customer
       setIsNewCustomer(false);
     }
-  }, [safeOrder?.customer?.phone, debouncedSearchCustomer, safeOrder?.customer?.id, isEdit, lastSearchedPhone]);
+  }, [safeOrder?.customer?.phone, debouncedSearchCustomer, safeOrder?.customer?.id, isEdit, lastSearchedPhone, safeOrder?.customer?.name]);
 
   // Reset auto-open flag after a short delay to allow the dropdown to open
   useEffect(() => {
@@ -216,8 +235,6 @@ const OrderForm: React.FC<OrderFormProps> = ({
     }
   }, [safeOrder.customer, safeOrder.location, setOrder]);
 
-;
-
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <h2 className="text-xl font-semibold text-slate-800 mb-6">تفاصيل الطلب</h2>
@@ -242,6 +259,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
           order={safeOrder}
           setOrder={setOrder as React.Dispatch<React.SetStateAction<OrderList | undefined>>}
           isNewCustomer={isNewCustomer}
+          disabled={(isEdit && safeOrder?.status === 'Confirmed') || !safeOrder?.customer?.name}
           customer={safeOrder?.customer}
           ref={locationRef}
           autoOpenDropdown={shouldAutoOpenLocation}
