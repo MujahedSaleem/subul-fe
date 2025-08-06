@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import Layout from '../../components/Layout';
@@ -7,7 +7,7 @@ import type { OrderList } from '../../types/order';
 import { useAdminOrderManagement } from '../../hooks/useAdminOrderManagement';
 import { getOrderById, clearCurrentOrder } from '../../store/slices/orderSlice';
 import type { AppDispatch, RootState } from '../../store/store';
-import { useCustomers } from '../../hooks/useCustomers';
+
 
 // Separate component that uses the hook
 const EditOrderForm: React.FC<{ initialOrder: OrderList }> = ({ initialOrder }) => {
@@ -70,7 +70,6 @@ const EditOrder: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
-  const { findCustomerByPhone } = useCustomers();
   
   const { isLoading: reduxLoading } = useSelector((state: RootState) => state.orders);
   const [initialOrder, setInitialOrder] = useState<OrderList | null>(null);
@@ -99,26 +98,13 @@ const EditOrder: React.FC = () => {
         const result = await dispatch(getOrderById(orderId.toString())).unwrap();
         
         if (result) {
-          // Fetch complete customer data with locations using phone number
-          let fullOrderData = result;
-          if (result.customer?.phone) {
-            try {
-              const customerResult = await findCustomerByPhone(result.customer.phone);
-              const customerData = customerResult.payload as any;
-              if (customerData && customerData.length > 0) {
-                
-                
-                fullOrderData = {
-                  ...result,
-                  customer: customerData[0]
-                };
-              }
-            } catch (customerError) {
-              console.warn('Could not fetch customer details:', customerError);
-            }
-          }
+          // Use the order data as-is since getOrderById should return complete customer data
+          // No need to fetch customer again - this causes duplicate API calls
+          console.log('📝 EditOrder - Order data loaded:', result);
+          console.log('📝 EditOrder - Customer data:', result.customer);
+          console.log('📝 EditOrder - Customer locations:', result.customer?.locations);
           
-          setInitialOrder(fullOrderData);
+          setInitialOrder(result);
           setDataLoaded(true);
         } else {
           navigate('/admin/orders');
@@ -132,7 +118,7 @@ const EditOrder: React.FC = () => {
     };
 
     loadOrder();
-  }, [id, navigate, dispatch, findCustomerByPhone, dataLoaded]);
+  }, [id, navigate, dispatch, dataLoaded]);
 
   // Cleanup on unmount
   useEffect(() => {
