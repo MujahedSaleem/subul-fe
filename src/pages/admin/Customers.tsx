@@ -26,10 +26,10 @@ const Customers: React.FC = () => {
     filterCustomers
   } = useCustomers();
   
-  // Filter state similar to Orders page
-  const [showFilters, setShowFilters] = useState<boolean>(false);
+  // Filter state
   const [filters, setFilters] = useState({
     name: '',
+    phone: '',
     isActive: null as boolean | null,
     createdAfter: '',
     createdBefore: '',
@@ -40,12 +40,13 @@ const Customers: React.FC = () => {
   // Memoize filter parameters to prevent unnecessary re-renders
   const filterParams = useMemo(() => ({
     name: filters.name || undefined,
+    phone: filters.phone || undefined,
     isActive: filters.isActive !== null ? filters.isActive : undefined,
     createdAfter: filters.createdAfter || undefined,
     createdBefore: filters.createdBefore || undefined,
     page: filters.page,
     pageSize: filters.pageSize
-  }), [filters.name, filters.isActive, filters.createdAfter, filters.createdBefore, filters.page, filters.pageSize]);
+  }), [filters.name, filters.phone, filters.isActive, filters.createdAfter, filters.createdBefore, filters.page, filters.pageSize]);
 
   // Fetch customers when filter parameters change (like Orders page)
   useEffect(() => {
@@ -83,6 +84,7 @@ const Customers: React.FC = () => {
   const resetFilters = useCallback(() => {
     setFilters({
       name: '',
+      phone: '',
       isActive: null,
       createdAfter: '',
       createdBefore: '',
@@ -140,10 +142,10 @@ const Customers: React.FC = () => {
             
             {/* Filter Component */}
             <CustomerFilters
-              showFilters={showFilters}
-              setShowFilters={setShowFilters}
               customerName={filters.name}
               setCustomerName={(value) => setFilters(prev => ({ ...prev, name: value, page: 1 }))}
+              customerPhone={filters.phone}
+              setCustomerPhone={(value) => setFilters(prev => ({ ...prev, phone: value, page: 1 }))}
               isActive={filters.isActive}
               setIsActive={(value) => setFilters(prev => ({ ...prev, isActive: value, page: 1 }))}
               createdAfter={filters.createdAfter}

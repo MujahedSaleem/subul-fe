@@ -1,4 +1,4 @@
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axiosInstance from '../../utils/axiosInstance';
 import { Customer, UpdateCustomerRequest, CustomerFilters, PaginatedCustomers } from '../../types/customer';
 import { handleApiResponse, handleApiError } from '../../utils/apiResponseHandler';
@@ -261,6 +261,7 @@ export const filterCustomers = createAsyncThunk<PaginatedCustomers, CustomerFilt
       if (filters.page) params.append('page', filters.page.toString());
       if (filters.pageSize) params.append('pageSize', filters.pageSize.toString());
       if (filters.name) params.append('name', filters.name);
+      if (filters.phone) params.append('phone', filters.phone);
       if (filters.isActive !== undefined) params.append('isActive', filters.isActive.toString());
       if (filters.createdAfter) params.append('createdAfter', filters.createdAfter);
       if (filters.createdBefore) params.append('createdBefore', filters.createdBefore);
