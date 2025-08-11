@@ -5,6 +5,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { extractApiData, handleApiError } from '../utils/apiResponseHandler';
 import { checkTokenValidity, shouldRefreshToken, getStoredTokens, storeTokens, clearTokens } from '../utils/tokenUtils';
 import { initTokenSync, cleanupTokenSync, addTokenSyncListener, removeTokenSyncListener } from '../utils/tokenSync';
+import { getDeviceInfoString } from '../utils/deviceUtils';
+import { LoginRequest } from '../types/common';
 import Cookies from 'js-cookie';
 
 interface AuthContextType {
@@ -179,8 +181,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (username: string, password: string) => {
     try {
+      // Collect device information as string
+      const deviceInfo = await getDeviceInfoString();
+      
+      // Create login request with device info
+      const loginRequest: LoginRequest = {
+        username,
+        password,
+        deviceInfo
+      };
+
       // Proceed with login
-      const response = await api.post('/auth/login', { username, password });
+      const response = await api.post('/auth/login', loginRequest);
       const { accessToken, refreshToken } = extractApiData<LoginResponse>(response.data);
 
       // Store tokens in localStorage
